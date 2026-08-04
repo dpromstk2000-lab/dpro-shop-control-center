@@ -25,6 +25,10 @@
     securityTab: "resets",
     security: { summary: null, resets: [], access: [], audit: [], systems: [] },
     securityEditor: null,
+    websiteTab: "sites",
+    website: { summary: null, items: [], history: [] },
+    websiteEditor: null,
+    websiteAutoSyncDone: false,
   };
 
   const roleLabels = {
@@ -42,6 +46,9 @@
   const accessStatusLabels = { requested:"申請中",approved:"承認済み",active:"有効",expired:"期限切れ",revoked:"解除",denied:"却下" };
   const accessScopeLabels = { metadata_only:"安全な集計情報",system_check:"system-check要約" };
   const deliveryLabels = { phone:"電話",line:"LINE",email:"メール",in_person:"対面",other:"その他" };
+  const websitePublicationLabels = { preparing:"準備中",public:"公開中",private:"非公開",paused:"一時停止",ended:"終了" };
+  const websiteSyncLabels = { not_configured:"未設定",disabled:"停止",pending:"確認待ち",ok:"正常",warning:"要確認",error:"異常" };
+  const websitePlatformLabels = { github_pages:"GitHub Pages",cloudflare_pages:"Cloudflare Pages",google_sites:"Google Sites",other:"その他" };
   const lineCampaignStatusLabels = { idea:"アイデア",draft:"下書き",copy_work:"原稿作成",image_work:"画像作成",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",scheduled:"配信予定",delivered:"配信済み",cancelled:"中止",overdue:"期限超過",waiting_client:"承認待ち" };
   const lineApprovalLabels = { not_required:"承認不要",not_requested:"未依頼",waiting:"オーナー承認待ち",approved:"承認済み",changes_requested:"修正依頼" };
   const lineAssetStatusLabels = { draft:"下書き",in_progress:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",in_use:"使用中",archived:"保管" };
@@ -1040,10 +1047,248 @@
     $$('[data-reset-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.resetAction,id=b.dataset.id;if(action==="cancel"&&!confirm("この復旧申請を取り消しますか？"))return;setBusy(b,true,"処理中…");try{const result=await api(`/api/security/resets/${id}/${action}`,{method:"POST",headers:securityHeaders(),body:"{}"});if(action==="issue")showOneTimeCode(result);else toast("復旧申請を更新しました。");await loadSecurityOverview();}catch(e){toast(e.data?.message||e.message,true);}finally{setBusy(b,false);}});
     $$('[data-access-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.accessAction,id=b.dataset.id;if(action==="revoke"&&!confirm("一時サポートアクセスを解除しますか？"))return;setBusy(b,true,"処理中…");try{const result=await api(`/api/security/access/${id}/${action}`,{method:"POST",headers:securityHeaders(),body:JSON.stringify(action==="revoke"?{reason:"CONTROL CENTER画面から解除"}:{})});if(action==="summary")renderSupportSummary(result.summary||{});else toast("一時サポートアクセスを更新しました。");await loadSecurityOverview();}catch(e){toast(e.data?.message||e.message,true);}finally{setBusy(b,false);}});
   }
-  async function loadWebsiteOverview() {
-    const { data, error } = await state.supabase.from("cc_websites").select("*,cc_clients(display_name,client_code)").order("created_at");
-    if (error) throw error;
-    $("websiteOverview").innerHTML = (data || []).length ? data.map((item) => `<article class="summary-card"><h2>${escapeHtml(item.cc_clients?.display_name || item.website_name)}</h2><p>${escapeHtml(item.website_name)}・${escapeHtml(item.platform)}</p><p>公開 ${escapeHtml(item.publication_status)}／休日連動 ${item.holiday_sync_enabled ? "ON" : "OFF"}／お知らせ連動 ${item.announcement_sync_enabled ? "ON" : "OFF"}</p><p>最終同期 ${formatDate(item.last_sync_at, true)}・${escapeHtml(item.last_sync_status)}</p>${safeUrl(item.public_url) ? `<a class="small-link" href="${escapeHtml(safeUrl(item.public_url))}" target="_blank" rel="noopener noreferrer">ホームページを開く</a>` : ""}</article>`).join("") : '<div class="empty-state">ホームページは未登録です。</div>';
+  function websiteHeaders(){ return { authorization:`Bearer ${state.session?.access_token || ""}` }; }
+
+  async function loadWebsiteOverview(options = {}) {
+    if (!state.infrastructure.clients.length || !state.infrastructure.systems.length) {
+      await loadInfrastructureOverview();
+    }
+    const result = await api("/api/websites/overview", { headers: websiteHeaders() });
+    state.website = {
+      summary: result.summary || {},
+      items: result.websites || [],
+      history: result.history || [],
+    };
+    renderWebsiteOverview();
+    if (!options.skipAutoSync
+      && !state.websiteAutoSyncDone
+      && canTechnicalWrite()
+      && state.website.items.some((item) => item.dpro_sync_enabled && ["pending","not_configured"].includes(item.last_sync_status))) {
+      state.websiteAutoSyncDone = true;
+      runAllWebsiteSync(true).catch(() => null);
+    }
+  }
+
+  function renderWebsiteOverview(){
+    const d=state.website.summary||{};
+    const metrics=[
+      [d.registered_websites,"登録ホームページ","全台帳",""],
+      [d.public_websites,"公開中","公開状態",""],
+      [d.live_sync_websites,"自動連動","公開API",""],
+      [d.sync_ok,"同期正常","直近結果",Number(d.sync_attention||0)?"warning":""],
+      [d.sync_attention,"要確認","警告・異常",Number(d.sync_attention||0)?"danger":""],
+      [d.sync_stale,"24時間超","再確認対象",Number(d.sync_stale||0)?"warning":""],
+      [d.fallback_enabled,"フォールバック","config.js", ""],
+    ];
+    $("websiteMetricGrid").innerHTML=metrics.map(([value,label,note,tone])=>`<article class="metric-card ${tone}"><b>${Number(value||0)}</b><span>${label}</span><small>${note}</small></article>`).join("");
+    renderWebsiteCards();
+    renderWebsiteSyncBoard();
+    renderWebsitePreview();
+    renderWebsiteHistory();
+    switchWebsiteTab(state.websiteTab);
+  }
+
+  function websiteSyncBadges(item){
+    return [
+      ["営業時間",item.business_hours_sync_enabled],
+      ["休日",item.holiday_sync_enabled],
+      ["お知らせ",item.announcement_sync_enabled],
+      ["障害時表示",item.fallback_enabled],
+    ].map(([label,on])=>`<span class="website-feature ${on?"on":"off"}">${label} ${on?"ON":"OFF"}</span>`).join("");
+  }
+
+  function renderWebsiteCards(){
+    const items=state.website.items||[];
+    $("websiteOverview").innerHTML=items.length?items.map((item)=>`
+      <article class="website-card">
+        <div class="website-card-head">
+          <div><p class="eyebrow">${escapeHtml(item.client_code||"WEBSITE")}</p><h2>${escapeHtml(item.client_name||item.website_name)}</h2><p>${escapeHtml(item.website_name)}／${escapeHtml(websitePlatformLabels[item.platform]||item.platform)}</p></div>
+          <div class="website-status-stack">${pill(websitePublicationLabels[item.publication_status]||item.publication_status,statusTone(item.publication_status))}${pill(websiteSyncLabels[item.sync_health]||item.sync_health,statusTone(item.sync_health))}</div>
+        </div>
+        <div class="website-feature-row">${websiteSyncBadges(item)}</div>
+        <dl class="website-definition">
+          <div><dt>公開URL</dt><dd>${safeUrl(item.public_url)?`<a href="${escapeHtml(safeUrl(item.public_url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.public_url)}</a>`:"未設定"}</dd></div>
+          <div><dt>接続システム</dt><dd>${escapeHtml(item.system_name||"未接続")} ${item.system_environment?`（${escapeHtml(item.system_environment)}）`:""}</dd></div>
+          <div><dt>最終同期</dt><dd>${formatDate(item.last_sync_at,true)}／${escapeHtml(websiteSyncLabels[item.last_sync_status]||item.last_sync_status)}</dd></div>
+          <div><dt>取得方法</dt><dd>${escapeHtml(item.latest_transport||item.last_sync_source||"未確認")} ${item.last_public_response_ms!=null?`／${Number(item.last_public_response_ms)}ms`:""}</dd></div>
+          <div><dt>連動アダプター</dt><dd>${escapeHtml(item.adapter_version||"未登録")}</dd></div>
+          <div><dt>次回確認</dt><dd>${formatDate(item.next_sync_review_at,true)}</dd></div>
+        </dl>
+        ${item.sync_error_summary?`<p class="website-error">${escapeHtml(item.sync_error_summary)}</p>`:""}
+        <div class="website-actions">
+          ${safeUrl(item.public_url)?`<a class="btn btn-secondary" href="${escapeHtml(safeUrl(item.public_url))}" target="_blank" rel="noopener noreferrer">ホームページを開く</a>`:""}
+          ${canTechnicalWrite()?`<button class="btn btn-secondary" type="button" data-website-sync="${item.id}">同期確認</button><button class="btn btn-primary" type="button" data-website-edit="${item.id}">編集</button>`:""}
+        </div>
+      </article>`).join(""):'<div class="empty-state">ホームページは未登録です。</div>';
+    bindWebsiteDynamicEvents();
+  }
+
+  function renderWebsiteSyncBoard(){
+    const rows=[];
+    for(const item of state.website.items||[]){
+      const result=item.latest_scope_results||{};
+      const scopes=[
+        ["site_profile","店舗基本情報",true],
+        ["business_hours","営業時間",item.business_hours_sync_enabled],
+        ["holidays","休日・臨時休業",item.holiday_sync_enabled],
+        ["announcements","公開お知らせ",item.announcement_sync_enabled],
+      ];
+      for(const [key,label,enabled] of scopes){
+        const status=enabled?(result[key]||item.last_sync_status||"pending"):"disabled";
+        rows.push(`<tr><td><strong>${escapeHtml(item.client_name)}</strong><br><span class="client-code">${escapeHtml(item.website_name)}</span></td><td>${escapeHtml(label)}</td><td>${pill(websiteSyncLabels[status]||status,statusTone(status))}</td><td>${escapeHtml(item.profile_endpoint_url||"未設定")}</td><td>${formatDate(item.last_sync_at,true)}</td></tr>`);
+      }
+    }
+    $("websiteSyncBoard").innerHTML=`<table><thead><tr><th>顧客・ホームページ</th><th>連動項目</th><th>状態</th><th>公開API</th><th>最終確認</th></tr></thead><tbody>${rows.join("")||'<tr><td colspan="5">同期対象はありません。</td></tr>'}</tbody></table>`;
+  }
+
+  function previewHours(snapshot){
+    const rows=snapshot?.businessHours||[];
+    const names=["日","月","火","水","木","金","土"];
+    return rows.length?rows.sort((a,b)=>Number(a.weekday)-Number(b.weekday)).map((row)=>`<li><strong>${names[Number(row.weekday)]||row.weekday}</strong><span>${row.isOpen?`${escapeHtml(row.openTime||"—")}〜${escapeHtml(row.closeTime||"—")}`:"休業"}${row.note?`　${escapeHtml(row.note)}`:""}</span></li>`).join(""):'<li><span>営業時間データはまだ取得されていません。</span></li>';
+  }
+
+  function renderWebsitePreview(){
+    const items=(state.website.items||[]).filter((item)=>item.latest_public_snapshot&&Object.keys(item.latest_public_snapshot).length);
+    $("websitePreviewBoard").innerHTML=items.length?items.map((item)=>{
+      const snap=item.latest_public_snapshot||{};
+      return `<article class="website-preview">
+        <header><div><p class="eyebrow">PUBLIC SAFE PREVIEW</p><h2>${escapeHtml(snap.facilityName||item.website_name)}</h2><p>${escapeHtml(snap.address||"")} ${snap.phone?`／${escapeHtml(snap.phone)}`:""}</p></div>${pill(websiteSyncLabels[item.latest_run_status]||item.latest_run_status,statusTone(item.latest_run_status))}</header>
+        <div class="website-preview-grid">
+          <section><h3>営業時間・定休日</h3><p class="website-summary">${escapeHtml(snap.businessHoursSummary||"未設定")}</p><p class="website-summary">${escapeHtml(snap.closedDaysSummary||"未設定")}</p><ul class="website-hours">${previewHours(snap)}</ul></section>
+          <section><h3>今後の休日・特別営業</h3><div class="website-notice-list">${(snap.upcomingHolidays||[]).map((h)=>`<article><strong>${escapeHtml(h.date)}　${escapeHtml(h.title)}</strong><p>${h.isClosed?"休業":`${escapeHtml(h.openTime||"—")}〜${escapeHtml(h.closeTime||"—")}`}${h.note?`／${escapeHtml(h.note)}`:""}</p></article>`).join("")||'<p class="empty-inline">公開予定の休日情報はありません。</p>'}</div></section>
+          <section class="full"><h3>公開お知らせ</h3><div class="website-notice-list">${(snap.announcements||[]).map((a)=>`<article class="${a.isImportant?"important":""}"><strong>${escapeHtml(a.title)}</strong><p>${escapeHtml(a.body).replaceAll("\n","<br>")}</p>${a.period?`<small>${escapeHtml(a.period)}</small>`:""}</article>`).join("")||'<p class="empty-inline">公開中のお知らせはありません。</p>'}</div></section>
+        </div>
+        <footer>取得 ${formatDate(item.latest_run_at,true)}／公開情報のみ保存／Hash ${escapeHtml(item.last_public_payload_hash||"—")}</footer>
+      </article>`;
+    }).join(""):'<div class="empty-state">まだ公開プレビューがありません。同期確認後に表示されます。</div>';
+  }
+
+  function renderWebsiteHistory(){
+    $("websiteHistoryBoard").innerHTML=`<table><thead><tr><th>日時</th><th>顧客・ホームページ</th><th>結果</th><th>取得方法</th><th>応答</th><th>公開内容</th><th>担当</th></tr></thead><tbody>${(state.website.history||[]).map((run)=>`<tr><td>${formatDate(run.created_at,true)}</td><td><strong>${escapeHtml(run.client_name)}</strong><br><span class="client-code">${escapeHtml(run.website_name)}</span></td><td>${pill(websiteSyncLabels[run.status]||run.status,statusTone(run.status))}${run.error_summary?`<span class="status-detail">${escapeHtml(run.error_summary)}</span>`:""}</td><td>${escapeHtml(run.transport)}<br><span class="client-code">${escapeHtml(run.run_type)}</span></td><td>${run.http_status||"—"}／${run.response_ms!=null?`${Number(run.response_ms)}ms`:"—"}</td><td>休日 ${Number(run.public_snapshot?.upcomingHolidays?.length||0)}件<br>お知らせ ${Number(run.public_snapshot?.announcements?.length||0)}件</td><td>${escapeHtml(run.requested_by_name||"システム")}</td></tr>`).join("")||'<tr><td colspan="7">同期履歴はありません。</td></tr>'}</tbody></table>`;
+  }
+
+  function switchWebsiteTab(tab){
+    state.websiteTab=tab;
+    $$(".website-tab").forEach((button)=>button.classList.toggle("active",button.dataset.websiteTab===tab));
+    $$(".website-panel").forEach((panel)=>panel.classList.add("hidden"));
+    $(`website-panel-${tab}`)?.classList.remove("hidden");
+  }
+
+  function websiteInput(name,label,value="",type="text",options=""){
+    if(type==="select")return `<label class="field"><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}" required>${options}</select></label>`;
+    if(type==="checkbox")return `<label class="field website-check"><input type="checkbox" name="${escapeHtml(name)}"${value?" checked":""}><span>${escapeHtml(label)}</span></label>`;
+    return `<label class="field"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value??"")}" required></label>`;
+  }
+
+  function openWebsiteEditor(websiteId=null){
+    if(!canTechnicalWrite())return toast("管理責任者または技術管理者のみ編集できます。",true);
+    const item=(state.website.items||[]).find((row)=>row.id===websiteId)||{};
+    state.websiteEditor={websiteId,item};
+    $("websiteEditorTitle").textContent=websiteId?"編集｜ホームページ連動":"登録｜ホームページ連動";
+    const selectedClient=item.client_id||"";
+    const selectedSystem=item.system_instance_id||"";
+    const platformOptions=["github_pages","cloudflare_pages","google_sites","other"].map((value)=>`<option value="${value}"${(item.platform||"github_pages")===value?" selected":""}>${websitePlatformLabels[value]}</option>`).join("");
+    const publicationOptions=["preparing","public","private","paused","ended"].map((value)=>`<option value="${value}"${(item.publication_status||"preparing")===value?" selected":""}>${websitePublicationLabels[value]}</option>`).join("");
+    const maintenanceOptions=["none","preparing","active","paused","ended"].map((value)=>`<option value="${value}"${(item.maintenance_contract_status||"none")===value?" selected":""}>${value==="none"?"保守なし":value==="active"?"保守中":value==="preparing"?"準備中":value==="paused"?"一時停止":"終了"}</option>`).join("");
+    const syncOptions=["live_api","manual","disabled"].map((value)=>`<option value="${value}"${(item.sync_mode||"live_api")===value?" selected":""}>${value==="live_api"?"公開API自動連動":value==="manual"?"手動確認":"連動停止"}</option>`).join("");
+    $("websiteEditorFields").innerHTML=
+      websiteInput("clientId","顧客",selectedClient,"select",clientOptions(selectedClient))+
+      websiteInput("systemInstanceId","接続DPROシステム",selectedSystem,"select",systemOptions(selectedSystem))+
+      websiteInput("websiteName","ホームページ名",item.website_name||"")+
+      websiteInput("publicUrl","公開URL",item.public_url||"","url")+
+      websiteInput("platform","公開基盤",item.platform||"github_pages","select",platformOptions)+
+      websiteInput("publicationStatus","公開状態",item.publication_status||"preparing","select",publicationOptions)+
+      websiteInput("maintenanceContractStatus","ホームページ保守",item.maintenance_contract_status||"none","select",maintenanceOptions)+
+      websiteInput("syncMode","連動方式",item.sync_mode||"live_api","select",syncOptions)+
+      websiteInput("profileEndpointUrl","公開情報API",item.profile_endpoint_url||"","url")+
+      websiteInput("adapterVersion","ホームページ連動アダプター",item.adapter_version||"")+
+      `<p class="form-section-title">公開する連動項目</p>`+
+      websiteInput("dproSyncEnabled","DPROシステムとの連動を有効化",item.dpro_sync_enabled!==false,"checkbox")+
+      websiteInput("businessHoursSyncEnabled","営業時間を連動",item.business_hours_sync_enabled!==false,"checkbox")+
+      websiteInput("holidaySyncEnabled","休日・臨時休業を連動",item.holiday_sync_enabled!==false,"checkbox")+
+      websiteInput("announcementSyncEnabled","公開お知らせを連動",item.announcement_sync_enabled!==false,"checkbox")+
+      websiteInput("fallbackEnabled","API停止時はconfig.js表示へ戻す",item.fallback_enabled!==false,"checkbox");
+    $("websiteEditorMessage").textContent="";
+    $("websiteEditorBackdrop").classList.remove("hidden");
+    $("websiteEditorModal").classList.remove("hidden");
+  }
+
+  function closeWebsiteEditor(){
+    $("websiteEditorBackdrop").classList.add("hidden");
+    $("websiteEditorModal").classList.add("hidden");
+    state.websiteEditor=null;
+  }
+
+  async function saveWebsiteEditor(event){
+    event.preventDefault();
+    const form=event.currentTarget;
+    const fd=new FormData(form);
+    const item=state.websiteEditor?.item||{};
+    const payload={
+      websiteId:state.websiteEditor?.websiteId||null,
+      clientId:fd.get("clientId"),
+      siteId:item.site_id||null,
+      systemInstanceId:fd.get("systemInstanceId"),
+      websiteName:fd.get("websiteName"),
+      publicUrl:fd.get("publicUrl"),
+      platform:fd.get("platform"),
+      publicationStatus:fd.get("publicationStatus"),
+      maintenanceContractStatus:fd.get("maintenanceContractStatus"),
+      syncMode:fd.get("syncMode"),
+      profileEndpointUrl:fd.get("profileEndpointUrl"),
+      adapterVersion:fd.get("adapterVersion"),
+      dproSyncEnabled:form.elements.dproSyncEnabled.checked,
+      businessHoursSyncEnabled:form.elements.businessHoursSyncEnabled.checked,
+      holidaySyncEnabled:form.elements.holidaySyncEnabled.checked,
+      announcementSyncEnabled:form.elements.announcementSyncEnabled.checked,
+      fallbackEnabled:form.elements.fallbackEnabled.checked,
+    };
+    const button=$("websiteEditorSave");
+    setBusy(button,true,"保存中…");
+    try{
+      const result=await api("/api/websites/configure",{method:"POST",headers:websiteHeaders(),body:JSON.stringify(payload)});
+      closeWebsiteEditor();
+      toast("ホームページ連動設定を保存しました。");
+      await loadWebsiteOverview({skipAutoSync:true});
+      if(result.website?.id&&payload.dproSyncEnabled&&payload.syncMode==="live_api"){
+        const target=$(`[data-website-sync="${result.website.id}"]`);
+        await runWebsiteSync(result.website.id,target,true);
+      }
+    }catch(error){
+      $("websiteEditorMessage").textContent=error.data?.message||error.message||"保存できませんでした。";
+    }finally{setBusy(button,false);}
+  }
+
+  async function runWebsiteSync(websiteId,button=null,silent=false){
+    if(!canTechnicalWrite())return toast("技術管理権限が必要です。",true);
+    setBusy(button,true,"同期中…");
+    try{
+      const result=await api("/api/websites/sync",{method:"POST",headers:websiteHeaders(),body:JSON.stringify({websiteId,runType:"manual"})});
+      if(!silent)toast(result.status==="ok"?"ホームページ連動は正常です。":"ホームページ連動に要確認があります。",result.status==="error");
+      await loadWebsiteOverview({skipAutoSync:true});
+      return result;
+    }catch(error){
+      if(!silent)toast(error.data?.message||error.message||"同期確認に失敗しました。",true);
+      throw error;
+    }finally{setBusy(button,false);}
+  }
+
+  async function runAllWebsiteSync(silent=false){
+    if(!canTechnicalWrite())return;
+    const button=$("syncAllWebsites");
+    setBusy(button,true,"同期中…");
+    try{
+      const result=await api("/api/websites/sync-all",{method:"POST",headers:websiteHeaders(),body:"{}"});
+      if(!silent)toast(result.errors?`同期確認：${result.errors}件を確認してください。`:"すべてのホームページ連動は正常です。",Boolean(result.errors));
+      await loadWebsiteOverview({skipAutoSync:true});
+    }catch(error){
+      if(!silent)toast(error.data?.message||error.message||"一括同期できませんでした。",true);
+    }finally{setBusy(button,false);}
+  }
+
+  function bindWebsiteDynamicEvents(){
+    $$("[data-website-sync]").forEach((button)=>button.onclick=()=>runWebsiteSync(button.dataset.websiteSync,button));
+    $$("[data-website-edit]").forEach((button)=>button.onclick=()=>openWebsiteEditor(button.dataset.websiteEdit));
   }
 
   async function loadTaskOverview() {
@@ -1065,7 +1310,7 @@
     contracts: ["契約・サービス", "契約内容の確認"],
     line: ["LINE公式運用", "配信・制作・承認・販促設定・対応履歴"],
     systems: ["DPROシステム", "接続・バージョン・稼働状態"],
-    websites: ["ホームページ", "公開・自動連動状態"],
+    websites: ["ホームページ", "営業時間・休日・お知らせの公開連動"],
     tasks: ["タスク・確認待ち", "対応期限と回答待ち"],
     support: ["サポート案件", "問い合わせと技術対応"],
     security: ["コード復旧・一時サポート", "本人確認・期限・監査付きの安全な運用"],
@@ -1223,6 +1468,12 @@
       element.addEventListener(id === "lineSearch" ? "input" : "change", renderActiveLineTab);
     });
     $("refreshLineOps").addEventListener("click", async () => { const button = $("refreshLineOps"); setBusy(button,true,"更新中…"); try { await loadLineOverview(); toast("LINE運用情報を更新しました。"); } catch(error){ toast(error.message||"更新できませんでした。",true); } finally { setBusy(button,false); } });
+    $$(".website-tab").forEach((button)=>button.addEventListener("click",()=>switchWebsiteTab(button.dataset.websiteTab)));
+    $("refreshWebsites")?.addEventListener("click",async()=>{const button=$("refreshWebsites");setBusy(button,true,"更新中…");try{await loadWebsiteOverview({skipAutoSync:true});toast("ホームページ情報を更新しました。");}catch(error){toast(error.message||"更新できませんでした。",true);}finally{setBusy(button,false);}});
+    $("syncAllWebsites")?.addEventListener("click",()=>runAllWebsiteSync(false));
+    $("newWebsite")?.addEventListener("click",()=>openWebsiteEditor(null));
+    $$("[data-website-close]").forEach((button)=>button.addEventListener("click",closeWebsiteEditor));
+    $("websiteEditorForm")?.addEventListener("submit",saveWebsiteEditor);
     $$("[data-security-new]").forEach((button) => button.addEventListener("click", () => openSecurityEditor(button.dataset.securityNew)));
     $$("[data-security-close]").forEach((button) => button.addEventListener("click", closeSecurityEditor));
     $("securityEditorForm")?.addEventListener("submit", saveSecurityEditor);

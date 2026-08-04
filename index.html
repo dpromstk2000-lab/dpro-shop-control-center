@@ -295,7 +295,27 @@
           <section id="infra-panel-releases" class="infra-panel hidden"><div class="subpage-head"><div><h2>推奨バージョン</h2><p>業種別システムの最新推奨版と導入状況を比較します。</p></div><button class="btn btn-primary" type="button" data-infra-new="release">推奨版登録</button></div><div id="releaseOverview" class="table-wrap"></div></section>
           <section id="infra-panel-health" class="infra-panel hidden"><div class="subpage-head"><div><h2>稼働確認履歴</h2><p>CONTROL CENTERから実行したHealth確認を新しい順に表示します。</p></div></div><div id="healthOverview" class="table-wrap"></div></section>
         </section>
-        <section id="view-websites" class="view hidden"><div class="page-head"><div><p class="eyebrow">WEBSITES</p><h1>ホームページ</h1><p>公開状態とDPRO連動準備を確認します。</p></div></div><div id="websiteOverview" class="summary-list"></div></section>
+        <section id="view-websites" class="view hidden">
+          <div class="page-head website-page-head">
+            <div><p class="eyebrow">WEBSITE OPERATIONS</p><h1>ホームページ・公開連動</h1><p>公開状態、営業時間、休日、お知らせの自動連動と同期結果を一元管理します。</p></div>
+            <div class="page-actions"><button id="refreshWebsites" class="btn btn-secondary" type="button">最新情報</button><button id="syncAllWebsites" class="btn btn-secondary" type="button">すべて同期確認</button><button id="newWebsite" class="btn btn-primary" type="button">ホームページ登録</button></div>
+          </div>
+          <div id="websiteMetricGrid" class="metric-grid website-metrics" aria-live="polite"></div>
+          <div class="website-sync-notice">
+            <strong>自動連動の仕組み</strong>
+            <span>DPROシステムで営業時間・休日・公開お知らせを更新すると、ホームページは公開APIから最新情報を取得します。API停止時は現在のconfig.js表示へ自動で戻ります。</span>
+          </div>
+          <div class="website-tabs" role="tablist" aria-label="ホームページ管理メニュー">
+            <button class="website-tab active" type="button" data-website-tab="sites">ホームページ一覧</button>
+            <button class="website-tab" type="button" data-website-tab="sync">同期状態</button>
+            <button class="website-tab" type="button" data-website-tab="preview">公開プレビュー</button>
+            <button class="website-tab" type="button" data-website-tab="history">同期履歴</button>
+          </div>
+          <section id="website-panel-sites" class="website-panel"><div id="websiteOverview" class="website-card-grid"></div></section>
+          <section id="website-panel-sync" class="website-panel hidden"><div id="websiteSyncBoard" class="table-wrap"></div></section>
+          <section id="website-panel-preview" class="website-panel hidden"><div id="websitePreviewBoard" class="website-preview-board"></div></section>
+          <section id="website-panel-history" class="website-panel hidden"><div id="websiteHistoryBoard" class="table-wrap"></div></section>
+        </section>
         <section id="view-tasks" class="view hidden"><div class="page-head"><div><p class="eyebrow">TASKS</p><h1>タスク・確認待ち</h1><p>期限、オーナー回答待ち、作業状態を確認します。</p></div></div><div id="taskOverview" class="table-wrap"></div></section>
         <section id="view-support" class="view hidden"><div class="page-head"><div><p class="eyebrow">SUPPORT</p><h1>サポート案件</h1><p>現在登録されているサポート案件を確認します。</p></div></div><div id="supportOverview" class="table-wrap"></div></section>
 
@@ -341,6 +361,16 @@
     </form>
   </section>
 
+
+  <div id="websiteEditorBackdrop" class="modal-backdrop hidden" data-website-close></div>
+  <section id="websiteEditorModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="websiteEditorTitle">
+    <header class="modal-head"><div><p class="eyebrow">WEBSITE OPERATIONS</p><h2 id="websiteEditorTitle">ホームページ連動設定</h2></div><button class="modal-close" type="button" data-website-close aria-label="閉じる">×</button></header>
+    <form id="websiteEditorForm" class="modal-body" novalidate>
+      <div id="websiteEditorFields" class="form-grid"></div>
+      <div id="websiteEditorMessage" class="form-message full" role="alert"></div>
+      <div class="modal-actions"><button class="btn btn-secondary" type="button" data-website-close>閉じる</button><button id="websiteEditorSave" class="btn btn-primary" type="submit">保存</button></div>
+    </form>
+  </section>
 
   <div id="securityEditorBackdrop" class="modal-backdrop hidden" data-security-close></div>
   <section id="securityEditorModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="securityEditorTitle">
