@@ -29,6 +29,9 @@
     website: { summary: null, items: [], history: [] },
     websiteEditor: null,
     websiteAutoSyncDone: false,
+    productTab: "catalog",
+    product: { summary:null, products:[], standard:null, policy:null },
+    productEditor: null,
   };
 
   const roleLabels = {
@@ -54,6 +57,12 @@
   const lineAssetStatusLabels = { draft:"下書き",in_progress:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",in_use:"使用中",archived:"保管" };
   const lineItemStatusLabels = { draft:"下書き",designing:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",scheduled:"開始予定",active:"運用中",inactive:"停止中",expired:"期限終了",stopped:"停止",archived:"保管" };
   const lineEventLabels = { call:"電話",line:"LINE",email:"メール",meeting:"打合せ",note:"メモ",status_change:"状態変更",delivery:"配信",approval:"承認",design:"制作",settings:"設定",other:"その他" };
+
+  const productIntegrationLabels = {
+    not_assessed:"未評価",cataloged:"台帳登録",adapter_planned:"適用計画",adapter_ready:"アダプター準備済み",
+    demo_connected:"デモ連動済み",production_ready:"本番連動済み",deferred_until_contract:"契約時対応",needs_review:"要確認"
+  };
+  const rolloutStatusLabels = { waiting_contract:"契約待ち",planned:"計画",in_progress:"対応中",ready:"適用準備済み",completed:"完了",on_hold:"保留" };
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -1291,6 +1300,81 @@
     $$("[data-website-edit]").forEach((button)=>button.onclick=()=>openWebsiteEditor(button.dataset.websiteEdit));
   }
 
+
+  function productHeaders(){ return { authorization:`Bearer ${state.session?.access_token || ""}` }; }
+  function productStatusTone(status){
+    if(status==="production_ready")return "green";
+    if(["adapter_ready","demo_connected"].includes(status))return "blue";
+    if(status==="deferred_until_contract")return "";
+    if(status==="needs_review")return "red";
+    return "amber";
+  }
+  function switchProductTab(tab){
+    state.productTab=tab;
+    $$(".product-tab").forEach(b=>b.classList.toggle("active",b.dataset.productTab===tab));
+    $$(".product-panel").forEach(p=>p.classList.toggle("hidden",p.id!==`product-panel-${tab}`));
+  }
+  async function loadProductOverview(){
+    const result=await api("/api/products/overview",{headers:productHeaders()});
+    state.product={summary:result.summary||{},products:result.products||[],standard:result.standard||{},policy:result.policy||{}};
+    renderProductOverview();
+  }
+  function renderProductOverview(){
+    const s=state.product.summary||{};
+    const metrics=[
+      [s.catalog_products||0,"製品台帳","現行DPRO製品"],
+      [s.completed_products||0,"完成製品","営業・契約対象"],
+      [s.production_ready||0,"本番連動済み","GREEN基準実装"],
+      [s.adapter_prepared||0,"事前準備済み","デモ・アダプター"],
+      [s.on_contract||0,"契約時対応","一斉改修しない"],
+      [s.needs_review||0,"要確認","仕様整理"],
+      [s.priority_demos||0,"優先デモ","営業で使用"],
+    ];
+    $("productMetricGrid").innerHTML=metrics.map(([v,l,n])=>`<article class="metric-card ${l==="要確認"&&Number(v)>0?"danger":""}"><b>${v}</b><span>${l}</span><small>${n}</small></article>`).join("");
+    const categories=[...new Set(state.product.products.map(x=>x.category).filter(Boolean))];
+    const select=$("productCategoryFilter"), current=select.value;
+    select.innerHTML='<option value="all">すべてのカテゴリ</option>'+categories.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join("");
+    if(categories.includes(current))select.value=current;
+    renderProductCatalog();renderProductStandard();renderProductRollout();switchProductTab(state.productTab);
+  }
+  function filteredProducts(){
+    const q=String($("productSearch")?.value||"").trim().toLowerCase();
+    const category=$("productCategoryFilter")?.value||"all";
+    const status=$("productStatusFilter")?.value||"all";
+    return state.product.products.filter(x=>(!q||`${x.product_name} ${x.system_code} ${x.product_code}`.toLowerCase().includes(q))&&(category==="all"||x.category===category)&&(status==="all"||x.integration_status===status));
+  }
+  function capabilityDots(x){
+    const defs=[["H",x.health_contract_ready,"Health"],["V",x.version_contract_ready,"Version"],["R",x.support_recovery_ready,"Recovery"],["W",x.website_sync_ready,"Website"],["B",x.service_binding_ready,"Binding"],["C",x.system_check_ready,"Check"],["G",x.demo_guard_ready,"Guard"]];
+    return `<div class="capability-dots">${defs.map(([k,v,t])=>`<span class="${v?"ready":""}" title="${t}">${k}</span>`).join("")}</div>`;
+  }
+  function renderProductCatalog(){
+    const rows=filteredProducts();$("productResultCount").textContent=`${rows.length}件を表示`;
+    $("productCatalogBoard").innerHTML=`<table><thead><tr><th>No.</th><th>製品</th><th>カテゴリ</th><th>連動方針</th><th>対応項目</th><th>次の作業</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${x.product_number}</strong><br><span class="client-code">${escapeHtml(x.product_code)}</span></td><td><strong>${escapeHtml(x.product_name)}</strong><br><span class="client-code">${escapeHtml(x.system_code)}</span>${safeUrl(x.product_page_url)?`<br><a class="small-link" href="${escapeHtml(x.product_page_url)}" target="_blank" rel="noopener">製品ページ</a>`:""}${safeUrl(x.demo_url)?` <a class="small-link" href="${escapeHtml(x.demo_url)}" target="_blank" rel="noopener">デモ</a>`:""}</td><td>${escapeHtml(x.category)}</td><td>${pill(productIntegrationLabels[x.integration_status]||x.integration_status,productStatusTone(x.integration_status))}<br><span class="client-code">${x.integration_status==="deferred_until_contract"?"契約後に適用":"標準を維持"}</span></td><td>${capabilityDots(x)}</td><td>${escapeHtml(x.next_action||"—")}</td><td><button class="infra-action" data-product-manifest="${escapeHtml(x.system_code)}">標準書</button>${["owner_admin","technical_admin"].includes(state.staff?.role_key)?` <button class="infra-action" data-product-edit="${escapeHtml(x.system_code)}">編集</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7">該当する製品はありません。</td></tr>'}</tbody></table>`;
+    bindProductRowActions();
+  }
+  function renderProductStandard(){
+    const s=state.product.standard||{};const required=Array.isArray(s.required_capabilities)?s.required_capabilities:[];const optional=Array.isArray(s.optional_capabilities)?s.optional_capabilities:[];
+    $("productStandardBoard").innerHTML=`<div class="standard-grid"><article class="panel"><div class="panel-head"><div><h2>${escapeHtml(s.standard_name||"DPRO CONTROL ADAPTER 標準")}</h2><p>${escapeHtml(s.standard_code||"")} / ${escapeHtml(s.standard_version||"")}</p></div>${pill("有効","green")}</div><div class="standard-list"><h3>必須</h3>${required.map(x=>`<span>✓ ${escapeHtml(x)}</span>`).join("")}<h3>契約内容に応じて追加</h3>${optional.map(x=>`<span>＋ ${escapeHtml(x)}</span>`).join("")}</div></article><article class="panel"><div class="panel-head"><div><h2>適用ルール</h2><p>全製品を今すぐ変更しない安全な運用</p></div></div><ol class="rollout-steps"><li>契約成立</li><li>顧客専用環境を確定</li><li>対象製品を最新化</li><li>共通アダプターを適用</li><li>Service Binding・復旧・HP連動を必要分だけ設定</li><li>自動検査後に本番開始</li></ol></article></div>`;
+  }
+  function renderProductRollout(){
+    const rows=filteredProducts();
+    $("productRolloutBoard").innerHTML=`<table><thead><tr><th>製品</th><th>開始条件</th><th>進行</th><th>想定</th><th>チェック項目</th><th>次の作業</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(x.product_name)}</strong><br>${escapeHtml(x.system_code)}</td><td>${x.trigger_policy==="on_contract"?"契約成立時":x.trigger_policy==="completed"?"完了済み":escapeHtml(x.trigger_policy||"—")}</td><td>${pill(rolloutStatusLabels[x.rollout_status]||x.rollout_status,statusTone(x.rollout_status))}</td><td>${escapeHtml(x.effort_level||"standard")}</td><td>${Array.isArray(x.checklist)?`${x.checklist.length}項目`:'—'}</td><td>${escapeHtml(x.next_action||"—")}</td></tr>`).join("")}</tbody></table>`;
+  }
+  function bindProductRowActions(){
+    $$('[data-product-manifest]').forEach(b=>b.onclick=()=>openProductManifest(b.dataset.productManifest));
+    $$('[data-product-edit]').forEach(b=>b.onclick=()=>openProductEditor(b.dataset.productEdit));
+  }
+  function openProductEditor(systemCode){
+    const x=state.product.products.find(p=>p.system_code===systemCode);if(!x)return;state.productEditor=x;
+    const form=$("productEditorForm");form.elements.systemCode.value=x.system_code;form.elements.systemCodeDisplay.value=x.system_code;form.elements.productName.value=x.product_name;form.elements.integrationStatus.value=x.integration_status;
+    ["healthContractReady","versionContractReady","supportRecoveryReady","websiteSyncReady","serviceBindingReady","systemCheckReady","demoGuardReady"].forEach(k=>{form.elements[k].checked=Boolean(x[k.replace(/[A-Z]/g,m=>`_${m.toLowerCase()}`)]);});
+    form.elements.currentAdapterVersion.value=x.current_adapter_version||"";form.elements.notes.value=x.integration_notes||"";$("productEditorMessage").textContent="";$("productEditorModal").classList.remove("hidden");$("productEditorModal").setAttribute("aria-hidden","false");
+  }
+  function closeProductEditor(){$("productEditorModal").classList.add("hidden");$("productEditorModal").setAttribute("aria-hidden","true");state.productEditor=null;}
+  async function saveProductEditor(event){event.preventDefault();const form=event.currentTarget,code=form.elements.systemCode.value,button=$("productEditorSave");setBusy(button,true,"保存中…");try{const payload={integrationStatus:form.elements.integrationStatus.value,currentAdapterVersion:form.elements.currentAdapterVersion.value.trim(),notes:form.elements.notes.value.trim()};["healthContractReady","versionContractReady","supportRecoveryReady","websiteSyncReady","serviceBindingReady","systemCheckReady","demoGuardReady"].forEach(k=>payload[k]=form.elements[k].checked);await api(`/api/products/${encodeURIComponent(code)}/assess`,{method:"POST",headers:productHeaders(),body:JSON.stringify(payload)});closeProductEditor();await loadProductOverview();toast("製品連動状態を更新しました。");}catch(e){$("productEditorMessage").textContent=e.data?.message||e.message;}finally{setBusy(button,false);}}
+  async function openProductManifest(systemCode){try{const result=await api(`/api/products/${encodeURIComponent(systemCode)}/manifest`,{headers:productHeaders()});$("productManifestTitle").textContent=`${result.manifest?.product?.productName||systemCode}｜共通アダプター適用情報`;$("productManifestValue").textContent=JSON.stringify(result.manifest,null,2);$("productManifestModal").classList.remove("hidden");$("productManifestModal").setAttribute("aria-hidden","false");}catch(e){toast(e.message||"標準書を取得できませんでした。",true);}}
+  function closeProductManifest(){$("productManifestModal").classList.add("hidden");$("productManifestModal").setAttribute("aria-hidden","true");}
+
   async function loadTaskOverview() {
     const { data, error } = await state.supabase.from("cc_v_pending_work").select("*").order("due_at", { ascending: true, nullsFirst: false });
     if (error) throw error;
@@ -1310,6 +1394,7 @@
     contracts: ["契約・サービス", "契約内容の確認"],
     line: ["LINE公式運用", "配信・制作・承認・販促設定・対応履歴"],
     systems: ["DPROシステム", "接続・バージョン・稼働状態"],
+    products: ["製品・連動標準", "49製品台帳・共通アダプター・契約時適用"],
     websites: ["ホームページ", "営業時間・休日・お知らせの公開連動"],
     tasks: ["タスク・確認待ち", "対応期限と回答待ち"],
     support: ["サポート案件", "問い合わせと技術対応"],
@@ -1328,6 +1413,7 @@
     try {
       if (view === "line") await loadLineOverview();
       if (view === "systems") await loadInfrastructureOverview();
+      if (view === "products") await loadProductOverview();
       if (view === "websites") await loadWebsiteOverview();
       if (view === "tasks") await loadTaskOverview();
       if (view === "support") await loadSupportOverview();
@@ -1468,6 +1554,13 @@
       element.addEventListener(id === "lineSearch" ? "input" : "change", renderActiveLineTab);
     });
     $("refreshLineOps").addEventListener("click", async () => { const button = $("refreshLineOps"); setBusy(button,true,"更新中…"); try { await loadLineOverview(); toast("LINE運用情報を更新しました。"); } catch(error){ toast(error.message||"更新できませんでした。",true); } finally { setBusy(button,false); } });
+    $$(".product-tab").forEach((button)=>button.addEventListener("click",()=>switchProductTab(button.dataset.productTab)));
+    ["productSearch","productCategoryFilter","productStatusFilter"].forEach(id=>{const el=$(id);if(el)el.addEventListener(id==="productSearch"?"input":"change",()=>{renderProductCatalog();renderProductRollout();});});
+    $("refreshProducts")?.addEventListener("click",async()=>{const button=$("refreshProducts");setBusy(button,true,"更新中…");try{await loadProductOverview();toast("製品台帳を更新しました。");}catch(e){toast(e.message,true);}finally{setBusy(button,false);}});
+    $$('[data-product-close]').forEach(b=>b.addEventListener("click",closeProductEditor));
+    $("productEditorForm")?.addEventListener("submit",saveProductEditor);
+    $$('[data-manifest-close]').forEach(b=>b.addEventListener("click",closeProductManifest));
+    $("copyProductManifest")?.addEventListener("click",async()=>{try{await navigator.clipboard.writeText($("productManifestValue").textContent);toast("共通アダプター適用情報をコピーしました。");}catch{toast("コピーできませんでした。",true);}});
     $$(".website-tab").forEach((button)=>button.addEventListener("click",()=>switchWebsiteTab(button.dataset.websiteTab)));
     $("refreshWebsites")?.addEventListener("click",async()=>{const button=$("refreshWebsites");setBusy(button,true,"更新中…");try{await loadWebsiteOverview({skipAutoSync:true});toast("ホームページ情報を更新しました。");}catch(error){toast(error.message||"更新できませんでした。",true);}finally{setBusy(button,false);}});
     $("syncAllWebsites")?.addEventListener("click",()=>runAllWebsiteSync(false));

@@ -45,9 +45,10 @@
       add('CONTROL CENTER DB',health.dbOk?'PASS':'FAIL',`${health.databaseVersion||'不明'} / host ${health.hostProject||'不明'}`);
       add('将来移行準備',health.migrationReady?'PASS':'WARN',health.migrationReady?'専用Supabase移行準備済み':'移行準備を確認してください');
       add('初期管理者',health.staffPrepared?'PASS':'WARN',health.staffPrepared?'DPROスタッフ登録済み':'初回管理者登録が必要です');
-      add('LINE公式運用管理',health.lineOperationsReady?'PASS':'FAIL',health.lineOperationsReady?`運用中 ${health.lineOperations?.activeAccounts||0}／進行中 ${health.lineOperations?.openCampaigns||0}／承認待ち ${health.lineOperations?.waitingClientApproval||0}`:'CONTROL-CENTER-6 SQLを確認してください');
-      add('接続・稼働管理',health.infrastructureReady?'PASS':'FAIL',health.infrastructureReady?`管理 ${health.infrastructure?.managed_systems||0}／異常 ${health.infrastructure?.unhealthy_systems||0}／更新 ${health.infrastructure?.systems_needing_update||0}`:'CONTROL-CENTER-6 SQLを確認してください');
-      add('ホームページ公開連動',health.websiteSyncReady?'PASS':'FAIL',health.websiteSyncReady?`登録 ${health.websites?.registered||0}／自動連動 ${health.websites?.liveSync||0}／正常 ${health.websites?.syncOk||0}／要確認 ${health.websites?.syncAttention||0}`:'CONTROL-CENTER-6 SQL・Service Bindingを確認してください');
+      add('LINE公式運用管理',health.lineOperationsReady?'PASS':'FAIL',health.lineOperationsReady?`運用中 ${health.lineOperations?.activeAccounts||0}／進行中 ${health.lineOperations?.openCampaigns||0}／承認待ち ${health.lineOperations?.waitingClientApproval||0}`:'CONTROL-CENTER-7 SQLを確認してください');
+      add('接続・稼働管理',health.infrastructureReady?'PASS':'FAIL',health.infrastructureReady?`管理 ${health.infrastructure?.managed_systems||0}／異常 ${health.infrastructure?.unhealthy_systems||0}／更新 ${health.infrastructure?.systems_needing_update||0}`:'CONTROL-CENTER-7 SQLを確認してください');
+      add('ホームページ公開連動',health.websiteSyncReady?'PASS':'FAIL',health.websiteSyncReady?`登録 ${health.websites?.registered||0}／自動連動 ${health.websites?.liveSync||0}／正常 ${health.websites?.syncOk||0}／要確認 ${health.websites?.syncAttention||0}`:'CONTROL-CENTER-7 SQL・Service Bindingを確認してください');
+      add('DPRO製品・連動標準',health.productCatalogReady?'PASS':'FAIL',health.productCatalogReady?`製品 ${health.products?.catalog||0}／本番連動 ${health.products?.productionReady||0}／契約時対応 ${health.products?.onContract||0}／${health.products?.adapterStandard||'標準不明'}`:'CONTROL-CENTER-7 SQLを確認してください');
     }catch(e){ add('Worker・DB接続','FAIL',e.message); }
     try{
       const publicConfig=await fetchJson(`${String(config.apiBaseUrl||'').replace(/\/$/,'')}/api/public-config`);

@@ -184,6 +184,7 @@
         <button class="nav-button" type="button" data-view="contracts"><span>契</span>契約・サービス</button>
         <button class="nav-button" type="button" data-view="line"><span>LINE</span>LINE公式運用</button>
         <button class="nav-button" type="button" data-view="systems"><span>SYS</span>DPROシステム</button>
+        <button class="nav-button" type="button" data-view="products"><span>製</span>製品・連動標準</button>
         <button class="nav-button" type="button" data-view="websites"><span>WEB</span>ホームページ</button>
         <button class="nav-button" type="button" data-view="tasks"><span>✓</span>タスク・確認待ち</button>
         <button class="nav-button" type="button" data-view="support"><span>支</span>サポート案件</button>
@@ -295,6 +296,29 @@
           <section id="infra-panel-releases" class="infra-panel hidden"><div class="subpage-head"><div><h2>推奨バージョン</h2><p>業種別システムの最新推奨版と導入状況を比較します。</p></div><button class="btn btn-primary" type="button" data-infra-new="release">推奨版登録</button></div><div id="releaseOverview" class="table-wrap"></div></section>
           <section id="infra-panel-health" class="infra-panel hidden"><div class="subpage-head"><div><h2>稼働確認履歴</h2><p>CONTROL CENTERから実行したHealth確認を新しい順に表示します。</p></div></div><div id="healthOverview" class="table-wrap"></div></section>
         </section>
+
+        <section id="view-products" class="view hidden">
+          <div class="page-head product-page-head">
+            <div><p class="eyebrow">PRODUCT & ADAPTER STANDARD</p><h1>DPRO製品・連動標準</h1><p>49製品を一斉改修せず、契約時に同じ共通アダプターでCONTROL CENTERへ接続します。</p></div>
+            <div class="page-actions"><button id="refreshProducts" class="btn btn-secondary" type="button">最新情報</button></div>
+          </div>
+          <div id="productMetricGrid" class="metric-grid product-metrics" aria-live="polite"></div>
+          <div class="automation-note product-policy-note"><strong>標準方針</strong><span>GREENを基準実装として維持し、他の完成済み製品は契約成立時に顧客環境へ共通アダプターを適用します。全製品の今すぐの一斉改修は行いません。</span></div>
+          <div class="product-toolbar">
+            <input id="productSearch" class="search-input" type="search" placeholder="製品名・システムコードで検索">
+            <select id="productCategoryFilter"><option value="all">すべてのカテゴリ</option></select>
+            <select id="productStatusFilter"><option value="all">すべての連動状態</option><option value="production_ready">本番連動済み</option><option value="adapter_ready">アダプター準備済み</option><option value="demo_connected">デモ連動済み</option><option value="deferred_until_contract">契約時対応</option><option value="needs_review">要確認</option></select>
+            <span id="productResultCount" class="result-count"></span>
+          </div>
+          <div class="product-tabs" role="tablist" aria-label="製品連動管理メニュー">
+            <button class="product-tab active" type="button" data-product-tab="catalog">49製品台帳</button>
+            <button class="product-tab" type="button" data-product-tab="standard">共通アダプター標準</button>
+            <button class="product-tab" type="button" data-product-tab="rollout">契約時ブラッシュアップ</button>
+          </div>
+          <section id="product-panel-catalog" class="product-panel"><div id="productCatalogBoard" class="table-wrap"></div></section>
+          <section id="product-panel-standard" class="product-panel hidden"><div id="productStandardBoard"></div></section>
+          <section id="product-panel-rollout" class="product-panel hidden"><div id="productRolloutBoard" class="table-wrap"></div></section>
+        </section>
         <section id="view-websites" class="view hidden">
           <div class="page-head website-page-head">
             <div><p class="eyebrow">WEBSITE OPERATIONS</p><h1>ホームページ・公開連動</h1><p>公開状態、営業時間、休日、お知らせの自動連動と同期結果を一元管理します。</p></div>
@@ -400,6 +424,32 @@
   </section>
 
   <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+
+  <div id="productEditorModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-product-close></div>
+    <div class="modal-card product-editor-card" role="dialog" aria-modal="true" aria-labelledby="productEditorTitle">
+      <header class="modal-head"><div><p class="eyebrow">PRODUCT INTEGRATION</p><h2 id="productEditorTitle">製品連動状態</h2></div><button class="modal-close" type="button" data-product-close aria-label="閉じる">×</button></header>
+      <form id="productEditorForm" class="modal-form">
+        <input type="hidden" name="systemCode">
+        <div class="form-grid two"><label>製品<input name="productName" readonly></label><label>システムコード<input name="systemCodeDisplay" readonly></label></div>
+        <label>連動状態<select name="integrationStatus"><option value="deferred_until_contract">契約時対応</option><option value="adapter_planned">適用計画</option><option value="adapter_ready">アダプター準備済み</option><option value="demo_connected">デモ連動済み</option><option value="production_ready">本番連動済み</option><option value="needs_review">要確認</option></select></label>
+        <div class="capability-check-grid">
+          <label><input type="checkbox" name="healthContractReady">共通Health</label><label><input type="checkbox" name="versionContractReady">3種バージョン</label><label><input type="checkbox" name="supportRecoveryReady">コード復旧</label><label><input type="checkbox" name="websiteSyncReady">HP公開連動</label><label><input type="checkbox" name="serviceBindingReady">Service Binding</label><label><input type="checkbox" name="systemCheckReady">system-check</label><label><input type="checkbox" name="demoGuardReady">デモ・本番ガード</label>
+        </div>
+        <label>現在のアダプター版<input name="currentAdapterVersion" placeholder="DPRO-CONTROL-ADAPTER-1.0"></label>
+        <label>確認メモ<textarea name="notes" rows="3"></textarea></label>
+        <p id="productEditorMessage" class="form-message"></p>
+        <div class="modal-actions"><button type="button" class="btn btn-secondary" data-product-close>閉じる</button><button id="productEditorSave" type="submit" class="btn btn-primary">保存</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="productManifestModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-manifest-close></div>
+    <div class="modal-card manifest-card" role="dialog" aria-modal="true" aria-labelledby="productManifestTitle">
+      <header class="modal-head"><div><p class="eyebrow">SAFE MANIFEST</p><h2 id="productManifestTitle">共通アダプター適用情報</h2></div><button class="modal-close" type="button" data-manifest-close aria-label="閉じる">×</button></header>
+      <div class="modal-form"><p>Secretの値や顧客情報は含みません。契約時の実装基準だけを表示します。</p><pre id="productManifestValue" class="manifest-pre"></pre><div class="modal-actions"><button type="button" class="btn btn-secondary" data-manifest-close>閉じる</button><button id="copyProductManifest" type="button" class="btn btn-primary">コピー</button></div></div>
+    </div>
+  </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>
 </html>
