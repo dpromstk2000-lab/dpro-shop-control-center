@@ -22,6 +22,9 @@
     infraTab: "systems",
     infrastructure: { summary:null, systems:[], supabase:[], workers:[], github:[], releases:[], health:[], clients:[], sites:[] },
     infraEditor: null,
+    securityTab: "resets",
+    security: { summary: null, resets: [], access: [], audit: [], systems: [] },
+    securityEditor: null,
   };
 
   const roleLabels = {
@@ -35,6 +38,10 @@
   const taskStatusLabels = { todo: "未着手", in_progress: "対応中", waiting_client: "オーナー回答待ち", waiting_internal: "社内確認待ち", scheduled: "予定済み", done: "完了", cancelled: "中止" };
   const priorityLabels = { low: "低", normal: "通常", high: "高", urgent: "緊急", critical: "最重要" };
   const systemStatusLabels = { planned: "計画", preparing: "準備中", active: "稼働中", degraded: "要確認", paused: "停止中", ended: "終了" };
+  const resetStatusLabels = { requested:"申請中",approved:"承認済み",issued:"発行済み",used:"使用済み",completed:"変更完了",expired:"期限切れ",revoked:"解除",cancelled:"取消",failed:"失敗" };
+  const accessStatusLabels = { requested:"申請中",approved:"承認済み",active:"有効",expired:"期限切れ",revoked:"解除",denied:"却下" };
+  const accessScopeLabels = { metadata_only:"安全な集計情報",system_check:"system-check要約" };
+  const deliveryLabels = { phone:"電話",line:"LINE",email:"メール",in_person:"対面",other:"その他" };
   const lineCampaignStatusLabels = { idea:"アイデア",draft:"下書き",copy_work:"原稿作成",image_work:"画像作成",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",scheduled:"配信予定",delivered:"配信済み",cancelled:"中止",overdue:"期限超過",waiting_client:"承認待ち" };
   const lineApprovalLabels = { not_required:"承認不要",not_requested:"未依頼",waiting:"オーナー承認待ち",approved:"承認済み",changes_requested:"修正依頼" };
   const lineAssetStatusLabels = { draft:"下書き",in_progress:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",in_use:"使用中",archived:"保管" };
@@ -954,6 +961,85 @@
   async function saveInfraEditor(event){ event.preventDefault(); const current=state.infraEditor;if(!current)return; const fd=new FormData(event.currentTarget); const payload=Object.fromEntries(fd.entries()); Object.keys(payload).forEach(k=>{if(payload[k]==="")payload[k]=null}); if(payload.system_code)payload.system_code=String(payload.system_code).toUpperCase(); if(payload.released_at)payload.released_at=new Date(payload.released_at).toISOString(); let workerUrl=""; if(current.type==="system"){ workerUrl=normalizeWorkerUrl(payload.worker_url); delete payload.worker_url; if(!workerUrl){$("infraEditorMessage").textContent="Worker URLを入力してください。";return;} if(!payload.health_url)payload.health_url=healthUrlFromWorker(workerUrl); if(!safeUrl(payload.health_url)){$("infraEditorMessage").textContent="Health URLを確認してください。";return;} } const table=infraTypeTables[current.type]; let savedSystemId=current.id; let query; if(current.type==="release"&&current.id==null&&current.item?.system_code){query=state.supabase.from(table).update(payload).eq("system_code",current.item.system_code).eq("component",current.item.component).eq("release_channel",current.item.release_channel||"stable");}else if(current.id){query=state.supabase.from(table).update(payload).eq("id",current.id);}else if(current.type==="system"){query=state.supabase.from(table).insert(payload).select("id").single();}else{query=state.supabase.from(table).insert(payload);} const {data,error}=await query;if(error){$("infraEditorMessage").textContent=error.message;return;} if(current.type==="system"){ savedSystemId=savedSystemId||data?.id; const linked=current.linkedWorker||linkedWorkerForSystem(savedSystemId); const workerPayload={client_id:payload.client_id,system_instance_id:savedSystemId,worker_name:linked?.worker_name||workerNameFromUrl(workerUrl),worker_url:workerUrl,health_url:payload.health_url,environment:payload.environment||"production",status:workerStatusFromSystem(payload.status),expected_version:payload.expected_worker_version||null,updated_at:new Date().toISOString()}; const workerQuery=linked?.id?state.supabase.from("cc_workers").update(workerPayload).eq("id",linked.id):state.supabase.from("cc_workers").insert(workerPayload); const {error:workerError}=await workerQuery; if(workerError){$("infraEditorMessage").textContent=`システムは保存されましたが、Worker URLを保存できませんでした：${workerError.message}`;await loadInfrastructureOverview();return;} } closeInfraEditor();toast(current.type==="system"?"システム情報とWorker URLを保存しました。":"接続情報を保存しました。");await loadInfrastructureOverview(); }
   function bindInfrastructureButtons(){ $$('[data-health-check]').forEach(b=>b.onclick=()=>runHealthCheck(b.dataset.healthCheck,b)); $$('[data-infra-edit]').forEach(b=>b.onclick=()=>openInfraEditor(b.dataset.infraEdit,b.dataset.infraId||null,b)); }
 
+
+  function securityHeaders(){ return { authorization:`Bearer ${state.session?.access_token || ""}` }; }
+  function securityInput(name,label,value="",type="text",options=""){
+    const fieldClass=type==="textarea"||name==="reason"||name==="clientApprovalReference"?"field full":"field";
+    if(type==="select")return `<label class="${fieldClass}"><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}" required>${options}</select></label>`;
+    if(type==="textarea")return `<label class="${fieldClass}"><span>${escapeHtml(label)}</span><textarea name="${escapeHtml(name)}" rows="4" required>${escapeHtml(value)}</textarea></label>`;
+    if(type==="checkbox")return `<label class="field full security-check"><input type="checkbox" name="${escapeHtml(name)}"${value?" checked":""}><span>${escapeHtml(label)}</span></label>`;
+    return `<label class="${fieldClass}"><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" required></label>`;
+  }
+  function securitySystemOptions(selected=""){return `<option value="">対象システムを選択</option>${state.security.systems.map(s=>`<option value="${s.id}"${s.id===selected?" selected":""}>${escapeHtml(s.cc_clients?.display_name||s.system_name)}／${escapeHtml(s.system_name)}（${escapeHtml(s.environment)}）</option>`).join("")}`;}
+  async function loadSecurityOverview(){
+    const result=await api("/api/security/overview",{headers:securityHeaders()});
+    state.security={summary:result.summary||{},resets:result.resets||[],access:result.access||[],audit:result.audit||[],systems:result.systems||[]};
+    renderSecurity();
+  }
+  function renderSecurity(){
+    const d=state.security.summary||{};
+    const metrics=[
+      [d.active_resets,"復旧対応中","申請・発行・使用中",d.active_resets?"warning":""],
+      [d.resets_expiring_soon,"まもなく期限","60分以内",d.resets_expiring_soon?"danger":""],
+      [d.active_access,"一時アクセス中","期限付き",d.active_access?"warning":""],
+      [d.access_expiring_soon,"アクセス期限間近","30分以内",d.access_expiring_soon?"danger":""],
+      [d.security_actions_24h,"24時間の重要操作","監査記録済み",""],
+      [d.failed_security_actions_24h,"失敗操作","24時間",d.failed_security_actions_24h?"danger":""],
+    ];
+    $("securityMetricGrid").innerHTML=metrics.map(([v,l,n,t])=>`<article class="metric-card ${t}"><b>${Number(v||0)}</b><span>${l}</span><small>${n}</small></article>`).join("");
+    renderSecurityResets();renderSecurityAccess();renderSecurityAudit();switchSecurityTab(state.securityTab);
+  }
+  function securityActionsReset(item){
+    const actions=[];
+    if(["requested","approved","failed"].includes(item.status)&&item.identity_verified&&canTechnicalWrite())actions.push(`<button class="infra-action primary" data-reset-action="issue" data-id="${item.id}">一時コード発行</button>`);
+    if(["issued","used"].includes(item.status))actions.push(`<button class="infra-action" data-reset-action="sync" data-id="${item.id}">状態確認</button>`);
+    if(!["completed","expired","cancelled","revoked"].includes(item.status)&&canTechnicalWrite())actions.push(`<button class="infra-action" data-reset-action="cancel" data-id="${item.id}">取消</button>`);
+    return `<div class="infra-actions">${actions.join("")}</div>`;
+  }
+  function renderSecurityResets(){
+    $("securityResetBoard").innerHTML=`<table><thead><tr><th>申請・顧客</th><th>本人確認</th><th>状態</th><th>一時コード</th><th>期限</th><th>担当</th><th>操作</th></tr></thead><tbody>${state.security.resets.map(i=>`<tr><td><strong>${escapeHtml(i.client_name)}</strong><br><span class="client-code">${escapeHtml(i.reset_code)}／${escapeHtml(i.system_name)}</span><span class="status-detail">${escapeHtml(i.reason)}</span></td><td>${i.identity_verified?pill("確認済み","green"):pill("未確認","amber")}<br>${escapeHtml(i.identity_verification_method||"未記録")}</td><td>${pill(resetStatusLabels[i.status]||i.status,statusTone(i.status))}<br>${escapeHtml(i.remote_status||"")}</td><td>${i.temporary_code_last4?`末尾 ****${escapeHtml(i.temporary_code_last4)}`:"未発行"}<br>${escapeHtml(deliveryLabels[i.delivery_method]||i.delivery_method)}</td><td>${formatDate(i.expires_at,true)}</td><td>${escapeHtml(i.requested_by_name||"—")}<br>${escapeHtml(i.executed_by_name||"")}</td><td>${securityActionsReset(i)}</td></tr>`).join("")||'<tr><td colspan="7">復旧申請はありません。</td></tr>'}</tbody></table>`;
+    bindSecurityActionButtons();
+  }
+  function securityActionsAccess(item){
+    const actions=[];
+    if(["requested","approved"].includes(item.status)&&canTechnicalWrite())actions.push(`<button class="infra-action primary" data-access-action="activate" data-id="${item.id}">有効化</button>`);
+    if(item.status==="active")actions.push(`<button class="infra-action primary" data-access-action="summary" data-id="${item.id}">安全情報を見る</button>`);
+    if(item.status==="active"&&canTechnicalWrite())actions.push(`<button class="infra-action" data-access-action="revoke" data-id="${item.id}">解除</button>`);
+    return `<div class="infra-actions">${actions.join("")}</div>`;
+  }
+  function renderSecurityAccess(){
+    $("securityAccessBoard").innerHTML=`<table><thead><tr><th>申請・顧客</th><th>範囲</th><th>了承記録</th><th>状態</th><th>有効期限</th><th>最終利用</th><th>操作</th></tr></thead><tbody>${state.security.access.map(i=>`<tr><td><strong>${escapeHtml(i.client_name)}</strong><br><span class="client-code">${escapeHtml(i.access_code)}／${escapeHtml(i.system_name)}</span><span class="status-detail">${escapeHtml(i.reason)}</span></td><td>${pill(accessScopeLabels[i.access_scope]||i.access_scope,"green")}</td><td>${escapeHtml(i.client_approval_reference||"未記録")}</td><td>${pill(accessStatusLabels[i.status]||i.status,statusTone(i.status))}<br>${escapeHtml(i.remote_status||"")}</td><td>${formatDate(i.expires_at,true)}<br>${Number(i.duration_minutes||30)}分</td><td>${formatDate(i.last_used_at,true)}</td><td>${securityActionsAccess(i)}</td></tr>`).join("")||'<tr><td colspan="7">一時アクセス申請はありません。</td></tr>'}</tbody></table>`;
+    bindSecurityActionButtons();
+  }
+  function renderSecurityAudit(){
+    $("securityAuditBoard").innerHTML=`<table><thead><tr><th>日時</th><th>操作</th><th>顧客</th><th>担当者</th><th>結果</th><th>理由</th><th>安全な詳細</th></tr></thead><tbody>${state.security.audit.map(i=>`<tr><td>${formatDate(i.created_at,true)}</td><td><strong>${escapeHtml(i.action)}</strong><br><span class="client-code">${escapeHtml(i.entity_table)}</span></td><td>${escapeHtml(i.client_name||"DPRO内部")}</td><td>${escapeHtml(i.actor_name||"システム")}<br>${escapeHtml(i.actor_role||"")}</td><td>${pill(i.success?"成功":"失敗",i.success?"green":"red")}</td><td>${escapeHtml(i.reason||"—")}</td><td><code class="safe-json">${escapeHtml(JSON.stringify(i.safe_detail||{}))}</code></td></tr>`).join("")||'<tr><td colspan="7">監査ログはありません。</td></tr>'}</tbody></table>`;
+  }
+  function switchSecurityTab(tab){state.securityTab=tab;$$('.security-tab').forEach(b=>b.classList.toggle('active',b.dataset.securityTab===tab));$$('.security-panel').forEach(p=>p.classList.add('hidden'));$(`security-panel-${tab}`)?.classList.remove('hidden');}
+  function openSecurityEditor(type){
+    state.securityEditor={type};$("securityEditorTitle").textContent=type==="reset"?"管理コード復旧申請":"一時サポートアクセス申請";
+    let fields=securityInput("systemInstanceId","対象システム","","select",securitySystemOptions());
+    if(type==="reset"){
+      fields+=securityInput("reason","復旧理由","","textarea")+securityInput("identityVerificationMethod","本人確認方法（例：登録電話へ折返し）")+securityInput("identityVerified","本人確認を完了しました",false,"checkbox")+securityInput("deliveryMethod","一時コードの伝達方法","phone","select",`<option value="phone">電話</option><option value="line">LINE</option><option value="email">メール</option><option value="in_person">対面</option><option value="other">その他</option>`)+securityInput("deliveryReference","伝達先・記録（個人情報は最小限）");
+    }else{
+      fields+=securityInput("accessScope","アクセス範囲","metadata_only","select",`<option value="metadata_only">安全な集計情報のみ</option><option value="system_check">system-check要約</option>`)+securityInput("durationMinutes","有効時間（分）","30","number")+securityInput("reason","サポート理由","","textarea")+securityInput("clientApprovalReference","オーナー了承記録","","textarea");
+    }
+    $("securityEditorFields").innerHTML=fields;$("securityEditorMessage").textContent="";$("securityEditorBackdrop").classList.remove("hidden");$("securityEditorModal").classList.remove("hidden");
+  }
+  function closeSecurityEditor(){$("securityEditorBackdrop").classList.add("hidden");$("securityEditorModal").classList.add("hidden");state.securityEditor=null;}
+  async function saveSecurityEditor(event){event.preventDefault();const fd=new FormData(event.currentTarget);const payload=Object.fromEntries(fd.entries());if(state.securityEditor?.type==="reset")payload.identityVerified=event.currentTarget.elements.identityVerified.checked;const path=state.securityEditor?.type==="reset"?"/api/security/resets":"/api/security/access";const button=$("securityEditorSave");setBusy(button,true,"申請中…");try{await api(path,{method:"POST",headers:securityHeaders(),body:JSON.stringify(payload)});closeSecurityEditor();toast("安全サポート申請を作成しました。");await loadSecurityOverview();}catch(e){$("securityEditorMessage").textContent=e.data?.message||e.message;}finally{setBusy(button,false);}}
+  function showOneTimeCode(result){$("oneTimeCodeValue").textContent=result.temporaryCode;$("oneTimeResetCode").textContent=result.resetCode;$("oneTimeCodeExpiry").textContent=formatDate(result.expiresAt,true);$("oneTimeCodeBackdrop").classList.remove("hidden");$("oneTimeCodeModal").classList.remove("hidden");}
+  function closeOneTimeCode(){$("oneTimeCodeBackdrop").classList.add("hidden");$("oneTimeCodeModal").classList.add("hidden");$("oneTimeCodeValue").textContent="--------";}
+  function renderSupportSummary(summary){
+    const content=$("supportSummaryContent");
+    if(summary.scope==="metadata_only")content.innerHTML=`<div class="support-safe-grid">${Object.entries(summary.counts||{}).map(([k,v])=>`<article><small>${escapeHtml(k)}</small><strong>${Number(v||0)}</strong></article>`).join("")}</div><div class="security-notice"><strong>${escapeHtml(summary.facility?.facilityName||"")}</strong><span>${escapeHtml(summary.facility?.facilityCode||"")}／${escapeHtml(summary.facility?.environment||"")}</span></div>`;
+    else content.innerHTML=`<div class="security-check-summary"><strong>PASS ${Number(summary.passed||0)}／WARN ${Number(summary.warnings||0)}／FAIL ${Number(summary.failed||0)}</strong>${(summary.checks||[]).map(c=>`<div class="security-check-row"><span>${escapeHtml(c.label)}</span>${pill(String(c.status||"").toUpperCase(),c.status==="pass"?"green":c.status==="warn"?"amber":"red")}</div>`).join("")}</div>`;
+    $("supportSummaryBackdrop").classList.remove("hidden");$("supportSummaryModal").classList.remove("hidden");
+  }
+  function closeSupportSummary(){$("supportSummaryBackdrop").classList.add("hidden");$("supportSummaryModal").classList.add("hidden");$("supportSummaryContent").innerHTML="";}
+  function bindSecurityActionButtons(){
+    $$('[data-reset-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.resetAction,id=b.dataset.id;if(action==="cancel"&&!confirm("この復旧申請を取り消しますか？"))return;setBusy(b,true,"処理中…");try{const result=await api(`/api/security/resets/${id}/${action}`,{method:"POST",headers:securityHeaders(),body:"{}"});if(action==="issue")showOneTimeCode(result);else toast("復旧申請を更新しました。");await loadSecurityOverview();}catch(e){toast(e.data?.message||e.message,true);}finally{setBusy(b,false);}});
+    $$('[data-access-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.accessAction,id=b.dataset.id;if(action==="revoke"&&!confirm("一時サポートアクセスを解除しますか？"))return;setBusy(b,true,"処理中…");try{const result=await api(`/api/security/access/${id}/${action}`,{method:"POST",headers:securityHeaders(),body:JSON.stringify(action==="revoke"?{reason:"CONTROL CENTER画面から解除"}:{})});if(action==="summary")renderSupportSummary(result.summary||{});else toast("一時サポートアクセスを更新しました。");await loadSecurityOverview();}catch(e){toast(e.data?.message||e.message,true);}finally{setBusy(b,false);}});
+  }
   async function loadWebsiteOverview() {
     const { data, error } = await state.supabase.from("cc_websites").select("*,cc_clients(display_name,client_code)").order("created_at");
     if (error) throw error;
@@ -982,6 +1068,7 @@
     websites: ["ホームページ", "公開・自動連動状態"],
     tasks: ["タスク・確認待ち", "対応期限と回答待ち"],
     support: ["サポート案件", "問い合わせと技術対応"],
+    security: ["コード復旧・一時サポート", "本人確認・期限・監査付きの安全な運用"],
   };
 
   async function activateView(view) {
@@ -999,6 +1086,7 @@
       if (view === "websites") await loadWebsiteOverview();
       if (view === "tasks") await loadTaskOverview();
       if (view === "support") await loadSupportOverview();
+      if (view === "security") await loadSecurityOverview();
     } catch (error) {
       toast(error.message || "情報を取得できませんでした。", true);
     }
@@ -1135,6 +1223,14 @@
       element.addEventListener(id === "lineSearch" ? "input" : "change", renderActiveLineTab);
     });
     $("refreshLineOps").addEventListener("click", async () => { const button = $("refreshLineOps"); setBusy(button,true,"更新中…"); try { await loadLineOverview(); toast("LINE運用情報を更新しました。"); } catch(error){ toast(error.message||"更新できませんでした。",true); } finally { setBusy(button,false); } });
+    $$("[data-security-new]").forEach((button) => button.addEventListener("click", () => openSecurityEditor(button.dataset.securityNew)));
+    $$("[data-security-close]").forEach((button) => button.addEventListener("click", closeSecurityEditor));
+    $("securityEditorForm")?.addEventListener("submit", saveSecurityEditor);
+    $$(".security-tab").forEach((button) => button.addEventListener("click", () => switchSecurityTab(button.dataset.securityTab)));
+    $("refreshSecurity")?.addEventListener("click", async () => { const button=$("refreshSecurity");setBusy(button,true,"更新中…");try{await loadSecurityOverview();toast("安全サポート情報を更新しました。");}catch(e){toast(e.message,true);}finally{setBusy(button,false);}});
+    $$("[data-code-close]").forEach((button) => button.addEventListener("click", closeOneTimeCode));
+    $("copyOneTimeCode")?.addEventListener("click", async () => { try{await navigator.clipboard.writeText($("oneTimeCodeValue").textContent);toast("一時コードをコピーしました。");}catch{toast("コピーできませんでした。",true);} });
+    $$("[data-summary-close]").forEach((button) => button.addEventListener("click", closeSupportSummary));
     $$(".nav-button").forEach((button) => button.addEventListener("click", () => activateView(button.dataset.view)));
     $$('[data-go-view]').forEach((button) => button.addEventListener("click", () => activateView(button.dataset.goView)));
     $("clientSearch").addEventListener("input", renderClientGrid);

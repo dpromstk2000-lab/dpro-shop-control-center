@@ -45,8 +45,8 @@
       add('CONTROL CENTER DB',health.dbOk?'PASS':'FAIL',`${health.databaseVersion||'不明'} / host ${health.hostProject||'不明'}`);
       add('将来移行準備',health.migrationReady?'PASS':'WARN',health.migrationReady?'専用Supabase移行準備済み':'移行準備を確認してください');
       add('初期管理者',health.staffPrepared?'PASS':'WARN',health.staffPrepared?'DPROスタッフ登録済み':'初回管理者登録が必要です');
-      add('LINE公式運用管理',health.lineOperationsReady?'PASS':'FAIL',health.lineOperationsReady?`運用中 ${health.lineOperations?.activeAccounts||0}／進行中 ${health.lineOperations?.openCampaigns||0}／承認待ち ${health.lineOperations?.waitingClientApproval||0}`:'CONTROL-CENTER-4 SQLを確認してください');
-      add('接続・稼働管理',health.infrastructureReady?'PASS':'FAIL',health.infrastructureReady?`管理 ${health.infrastructure?.managed_systems||0}／異常 ${health.infrastructure?.unhealthy_systems||0}／更新 ${health.infrastructure?.systems_needing_update||0}`:'CONTROL-CENTER-4 SQLを確認してください');
+      add('LINE公式運用管理',health.lineOperationsReady?'PASS':'FAIL',health.lineOperationsReady?`運用中 ${health.lineOperations?.activeAccounts||0}／進行中 ${health.lineOperations?.openCampaigns||0}／承認待ち ${health.lineOperations?.waitingClientApproval||0}`:'CONTROL-CENTER-5 SQLを確認してください');
+      add('接続・稼働管理',health.infrastructureReady?'PASS':'FAIL',health.infrastructureReady?`管理 ${health.infrastructure?.managed_systems||0}／異常 ${health.infrastructure?.unhealthy_systems||0}／更新 ${health.infrastructure?.systems_needing_update||0}`:'CONTROL-CENTER-5 SQLを確認してください');
     }catch(e){ add('Worker・DB接続','FAIL',e.message); }
     try{
       const publicConfig=await fetchJson(`${String(config.apiBaseUrl||'').replace(/\/$/,'')}/api/public-config`);

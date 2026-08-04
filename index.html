@@ -187,6 +187,7 @@
         <button class="nav-button" type="button" data-view="websites"><span>WEB</span>ホームページ</button>
         <button class="nav-button" type="button" data-view="tasks"><span>✓</span>タスク・確認待ち</button>
         <button class="nav-button" type="button" data-view="support"><span>支</span>サポート案件</button>
+        <button class="nav-button" type="button" data-view="security"><span>鍵</span>コード復旧・一時サポート</button>
       </nav>
       <div class="side-bottom">
         <a href="system-check.html">接続確認</a>
@@ -297,6 +298,23 @@
         <section id="view-websites" class="view hidden"><div class="page-head"><div><p class="eyebrow">WEBSITES</p><h1>ホームページ</h1><p>公開状態とDPRO連動準備を確認します。</p></div></div><div id="websiteOverview" class="summary-list"></div></section>
         <section id="view-tasks" class="view hidden"><div class="page-head"><div><p class="eyebrow">TASKS</p><h1>タスク・確認待ち</h1><p>期限、オーナー回答待ち、作業状態を確認します。</p></div></div><div id="taskOverview" class="table-wrap"></div></section>
         <section id="view-support" class="view hidden"><div class="page-head"><div><p class="eyebrow">SUPPORT</p><h1>サポート案件</h1><p>現在登録されているサポート案件を確認します。</p></div></div><div id="supportOverview" class="table-wrap"></div></section>
+
+        <section id="view-security" class="view hidden">
+          <div class="page-head security-page-head">
+            <div><p class="eyebrow">SECURE SUPPORT</p><h1>管理コード復旧・一時サポート</h1><p>現在の管理コードや顧客データを表示せず、本人確認・期限・監査記録付きで安全にサポートします。</p></div>
+            <div class="page-actions"><button id="refreshSecurity" class="btn btn-secondary" type="button">最新情報</button><button class="btn btn-primary" type="button" data-security-new="reset">復旧申請</button></div>
+          </div>
+          <div id="securityMetricGrid" class="metric-grid security-metrics" aria-live="polite"></div>
+          <div class="security-notice"><strong>表示しない情報</strong><span>現在の管理コード、顧客名簿、LINE個別会話、顧客写真、Secret、アクセストークン</span></div>
+          <div class="security-tabs" role="tablist" aria-label="安全サポートメニュー">
+            <button class="security-tab active" type="button" data-security-tab="resets">管理コード復旧</button>
+            <button class="security-tab" type="button" data-security-tab="access">一時サポートアクセス</button>
+            <button class="security-tab" type="button" data-security-tab="audit">監査ログ</button>
+          </div>
+          <section id="security-panel-resets" class="security-panel"><div class="subpage-head"><div><h2>管理コード復旧</h2><p>元のコードは表示せず、30分間の一時コードを一度だけ発行します。</p></div><button class="btn btn-primary" type="button" data-security-new="reset">復旧申請を作成</button></div><div id="securityResetBoard" class="table-wrap"></div></section>
+          <section id="security-panel-access" class="security-panel hidden"><div class="subpage-head"><div><h2>一時サポートアクセス</h2><p>オーナー了承を記録し、安全な集計情報またはsystem-checkだけを期限付きで確認します。</p></div><button class="btn btn-primary" type="button" data-security-new="access">アクセス申請を作成</button></div><div id="securityAccessBoard" class="table-wrap"></div></section>
+          <section id="security-panel-audit" class="security-panel hidden"><div class="subpage-head"><div><h2>セキュリティ監査ログ</h2><p>重要操作の担当者・日時・理由・成否を確認します。コードやトークンは表示しません。</p></div></div><div id="securityAuditBoard" class="table-wrap"></div></section>
+        </section>
       </main>
     </div>
   </div>
@@ -321,6 +339,34 @@
       <div id="infraEditorMessage" class="form-message full" role="alert"></div>
       <div class="modal-actions"><button class="btn btn-secondary" type="button" data-infra-close>閉じる</button><button id="infraEditorSave" class="btn btn-primary" type="submit">保存</button></div>
     </form>
+  </section>
+
+
+  <div id="securityEditorBackdrop" class="modal-backdrop hidden" data-security-close></div>
+  <section id="securityEditorModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="securityEditorTitle">
+    <header class="modal-head"><div><p class="eyebrow">SECURE SUPPORT</p><h2 id="securityEditorTitle">安全サポート</h2></div><button class="modal-close" type="button" data-security-close aria-label="閉じる">×</button></header>
+    <form id="securityEditorForm" class="modal-body" novalidate>
+      <div id="securityEditorFields" class="form-grid"></div>
+      <div id="securityEditorMessage" class="form-message full" role="alert"></div>
+      <div class="modal-actions"><button class="btn btn-secondary" type="button" data-security-close>閉じる</button><button id="securityEditorSave" class="btn btn-primary" type="submit">申請を作成</button></div>
+    </form>
+  </section>
+
+  <div id="oneTimeCodeBackdrop" class="modal-backdrop hidden" data-code-close></div>
+  <section id="oneTimeCodeModal" class="modal-shell one-time-code-modal hidden" role="dialog" aria-modal="true" aria-labelledby="oneTimeCodeTitle">
+    <header class="modal-head"><div><p class="eyebrow">DISPLAY ONCE</p><h2 id="oneTimeCodeTitle">一時管理コード</h2></div><button class="modal-close" type="button" data-code-close aria-label="閉じる">×</button></header>
+    <div class="modal-body">
+      <div class="security-warning"><strong>この画面を閉じると、コードは再表示できません。</strong><span>紛失した場合は、この申請を取り消して新しい申請を作成します。</span></div>
+      <div class="one-time-code-box"><small>一時管理コード</small><strong id="oneTimeCodeValue">--------</strong><button id="copyOneTimeCode" class="btn btn-secondary" type="button">コードをコピー</button></div>
+      <dl class="code-details"><div><dt>申請番号</dt><dd id="oneTimeResetCode">—</dd></div><div><dt>有効期限</dt><dd id="oneTimeCodeExpiry">—</dd></div></dl>
+      <div class="modal-actions"><button class="btn btn-primary" type="button" data-code-close>確認して閉じる</button></div>
+    </div>
+  </section>
+
+  <div id="supportSummaryBackdrop" class="modal-backdrop hidden" data-summary-close></div>
+  <section id="supportSummaryModal" class="modal-shell support-summary-modal hidden" role="dialog" aria-modal="true" aria-labelledby="supportSummaryTitle">
+    <header class="modal-head"><div><p class="eyebrow">SAFE SUPPORT DATA</p><h2 id="supportSummaryTitle">一時サポート結果</h2></div><button class="modal-close" type="button" data-summary-close aria-label="閉じる">×</button></header>
+    <div class="modal-body"><div class="security-notice"><strong>個人情報は含まれません</strong><span>顧客名、写真、LINEユーザーID、会話内容は取得していません。</span></div><div id="supportSummaryContent" class="support-summary-content"></div><div class="modal-actions"><button class="btn btn-primary" type="button" data-summary-close>閉じる</button></div></div>
   </section>
 
   <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
