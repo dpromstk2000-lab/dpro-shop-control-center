@@ -42,3 +42,28 @@ input,select,textarea{width:100%;min-height:48px;padding:10px 12px;color:var(--i
 .readonly-note{grid-column:1/-1;padding:12px 14px;border-radius:12px;background:var(--blue-soft);color:var(--blue);font-size:12px;font-weight:750}
 @media(max-width:1100px){.line-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.line-toolbar .search-input{grid-column:1/-1}.line-account-grid{grid-template-columns:1fr}.line-status-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:680px){.line-toolbar{grid-template-columns:1fr}.line-toolbar .search-input{grid-column:auto}.line-status-grid{grid-template-columns:1fr 1fr}.timeline-item{grid-template-columns:1fr}.modal-shell{inset:0;border-radius:0;max-height:100vh}.modal-body{padding:15px}.page-actions .btn,.subpage-head .btn{width:100%}}
+
+
+/* CONTROL-CENTER-4: larger, readable operational UI */
+html{font-size:18px}
+body{line-height:1.65}
+:root{--sidebar:292px}
+.sidebar{padding:19px 15px}.side-brand strong{font-size:17px}.side-brand small{font-size:12px}
+.nav-button{min-height:51px;padding:11px 12px;font-size:14px}.nav-button span{min-width:31px;min-height:31px;font-size:11px}
+.side-bottom a,.side-bottom button{min-height:45px;font-size:13px}.side-bottom small{font-size:10px}
+.topbar{min-height:78px}.top-title strong{font-size:17px}.top-title small{font-size:12px}.staff-chip strong{font-size:14px}.staff-chip small{font-size:11px}
+.content{padding:28px 32px 38px}.page-head{margin-bottom:21px}.page-head h1{font-size:32px}.page-head p:not(.eyebrow){font-size:15px}.eyebrow{font-size:12px}
+.btn{min-height:50px;font-size:14px}.field label{font-size:14px}.field small{font-size:12px}input,select,textarea{min-height:52px;font-size:16px}.field-action{font-size:13px}
+.metric-card{min-height:126px;padding:20px}.metric-card b{font-size:36px}.metric-card span{font-size:14px}.metric-card small{font-size:12px}
+.panel{padding:20px}.panel-head h2{font-size:21px}.panel-head p{font-size:13px}.text-button{font-size:13px}
+.list-item{padding:14px}.list-item-main strong{font-size:14px}.list-item-main p,.list-item-meta p{font-size:12px}.pill{font-size:11px;padding:5px 9px}
+.filter-bar{grid-template-columns:minmax(280px,1fr) 210px 220px auto}.result-count{font-size:13px}.client-card h2{font-size:20px}.client-code{font-size:12px}.service-badge{font-size:11px}.mini-stat b{font-size:18px}.mini-stat span{font-size:10px}.client-card-button{font-size:14px}
+.detail-section h2{font-size:21px}.definition dt{font-size:11px}.definition dd{font-size:14px}.record strong{font-size:14px}.record p{font-size:12px}.small-link{font-size:11px;min-height:34px}
+th,td{padding:14px 15px;font-size:13px;line-height:1.55}th{font-size:12px}.summary-card h2{font-size:19px}.summary-card p{font-size:13px}.empty-state{font-size:14px}.toast{font-size:14px}
+.subpage-head h2{font-size:25px}.subpage-head p{font-size:14px}.line-account-head h2{font-size:21px}.line-account-head p,.line-account-foot p{font-size:13px}.line-status-cell strong{font-size:14px}.line-status-cell span{font-size:12px}.line-table-sub{font-size:12px}.timeline-time{font-size:13px}.timeline-next{font-size:12px}
+.infrastructure-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:17px 0 19px;padding:8px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.72)}
+.infrastructure-tab{min-height:45px;padding:8px 16px;border:0;border-radius:11px;background:transparent;color:var(--muted);font-weight:900;font-size:13px}.infrastructure-tab.active{background:var(--brand2);color:#fff;box-shadow:0 7px 18px rgba(15,73,55,.17)}
+.infra-panel{animation:fade .16s ease}.infrastructure-page-head{align-items:flex-end}.infra-actions{display:flex;gap:7px;flex-wrap:wrap}.infra-action{min-height:37px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--brand2);font-size:11px;font-weight:900}.infra-action.primary{background:var(--soft)}.infra-action.warning{background:var(--warning-soft);color:var(--warning)}
+.version-stack{display:grid;gap:3px}.version-stack span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}.status-detail{display:block;margin-top:4px;color:var(--muted);font-size:11px;max-width:270px;white-space:normal}
+@media(max-width:900px){html{font-size:17px}.content{padding:20px}.infrastructure-page-head{align-items:flex-start}.infrastructure-tabs{overflow-x:auto;flex-wrap:nowrap}.infrastructure-tab{white-space:nowrap}.page-head h1{font-size:28px}}
+@media(max-width:560px){html{font-size:16px}.content{padding:15px}.metric-card b{font-size:31px}.page-head h1{font-size:26px}th,td{font-size:12px}}

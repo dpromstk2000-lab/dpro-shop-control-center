@@ -29,7 +29,7 @@
         <div><strong>DPRO SHOP CONTROL CENTER</strong><small>初回管理者設定</small></div>
       </div>
       <div class="auth-heading">
-        <p class="eyebrow">CONTROL-CENTER-3</p>
+        <p class="eyebrow">CONTROL-CENTER-4</p>
         <h1 id="bootstrapTitle">最初のDPRO管理者を登録</h1>
         <p>この設定は最初の1回だけ実行できます。登録後は自動的に閉じます。</p>
       </div>
@@ -273,7 +273,27 @@
           <section id="line-panel-shop-cards" class="line-panel hidden"><div class="subpage-head"><div><h2>ショップカード</h2><p>必要ポイント、特典、承認状態、利用期間を管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="shop-card">ショップカードを登録</button></div><div id="lineShopCardBoard" class="summary-list"></div></section>
           <section id="line-panel-history" class="line-panel hidden"><div class="subpage-head"><div><h2>対応履歴</h2><p>電話・LINE・打合せ・設定変更などの業務履歴だけを記録します。個別LINE会話は保存しません。</p></div><button class="btn btn-primary" type="button" data-line-new="event">対応履歴を追加</button></div><div id="lineHistoryBoard" class="timeline"></div></section>
         </section>
-        <section id="view-systems" class="view hidden"><div class="page-head"><div><p class="eyebrow">DPRO SYSTEMS</p><h1>DPROシステム</h1><p>登録済みシステムと稼働状態を確認します。</p></div></div><div id="systemOverview" class="table-wrap"></div></section>
+        <section id="view-systems" class="view hidden">
+          <div class="page-head infrastructure-page-head">
+            <div><p class="eyebrow">SYSTEM OPERATIONS</p><h1>DPROシステム・接続管理</h1><p>Supabase、Worker、GitHub、バージョン、Healthの状態を店舗ごとに管理します。</p></div>
+            <div class="page-actions"><button id="checkAllSystems" class="btn btn-secondary" type="button">すべて稼働確認</button><button class="btn btn-primary" type="button" data-infra-new="system">システム登録</button></div>
+          </div>
+          <div id="infrastructureMetricGrid" class="metric-grid infrastructure-metrics" aria-live="polite"></div>
+          <div class="infrastructure-tabs" role="tablist" aria-label="接続管理メニュー">
+            <button class="infrastructure-tab active" type="button" data-infra-tab="systems">システム</button>
+            <button class="infrastructure-tab" type="button" data-infra-tab="supabase">Supabase</button>
+            <button class="infrastructure-tab" type="button" data-infra-tab="workers">Worker</button>
+            <button class="infrastructure-tab" type="button" data-infra-tab="github">GitHub</button>
+            <button class="infrastructure-tab" type="button" data-infra-tab="releases">バージョン</button>
+            <button class="infrastructure-tab" type="button" data-infra-tab="health">確認履歴</button>
+          </div>
+          <section id="infra-panel-systems" class="infra-panel"><div class="subpage-head"><div><h2>システム稼働一覧</h2><p>各店舗のDPROシステム、Health、現在バージョンを確認します。</p></div><button class="btn btn-primary" type="button" data-infra-new="system">システム登録</button></div><div id="systemOverview" class="table-wrap"></div></section>
+          <section id="infra-panel-supabase" class="infra-panel hidden"><div class="subpage-head"><div><h2>Supabase台帳</h2><p>所有者、招待状態、環境、データ区分を整理します。Secretは保存しません。</p></div><button class="btn btn-primary" type="button" data-infra-new="supabase">Supabase登録</button></div><div id="supabaseOverview" class="table-wrap"></div></section>
+          <section id="infra-panel-workers" class="infra-panel hidden"><div class="subpage-head"><div><h2>Cloudflare Worker台帳</h2><p>Health URL、期待バージョン、応答時間、連続失敗を確認します。</p></div><button class="btn btn-primary" type="button" data-infra-new="worker">Worker登録</button></div><div id="workerOverview" class="table-wrap"></div></section>
+          <section id="infra-panel-github" class="infra-panel hidden"><div class="subpage-head"><div><h2>GitHub台帳</h2><p>リポジトリとGitHub Pagesの接続・権限状態を管理します。</p></div><button class="btn btn-primary" type="button" data-infra-new="github">GitHub登録</button></div><div id="githubOverview" class="table-wrap"></div></section>
+          <section id="infra-panel-releases" class="infra-panel hidden"><div class="subpage-head"><div><h2>推奨バージョン</h2><p>業種別システムの最新推奨版と導入状況を比較します。</p></div><button class="btn btn-primary" type="button" data-infra-new="release">推奨版登録</button></div><div id="releaseOverview" class="table-wrap"></div></section>
+          <section id="infra-panel-health" class="infra-panel hidden"><div class="subpage-head"><div><h2>稼働確認履歴</h2><p>CONTROL CENTERから実行したHealth確認を新しい順に表示します。</p></div></div><div id="healthOverview" class="table-wrap"></div></section>
+        </section>
         <section id="view-websites" class="view hidden"><div class="page-head"><div><p class="eyebrow">WEBSITES</p><h1>ホームページ</h1><p>公開状態とDPRO連動準備を確認します。</p></div></div><div id="websiteOverview" class="summary-list"></div></section>
         <section id="view-tasks" class="view hidden"><div class="page-head"><div><p class="eyebrow">TASKS</p><h1>タスク・確認待ち</h1><p>期限、オーナー回答待ち、作業状態を確認します。</p></div></div><div id="taskOverview" class="table-wrap"></div></section>
         <section id="view-support" class="view hidden"><div class="page-head"><div><p class="eyebrow">SUPPORT</p><h1>サポート案件</h1><p>現在登録されているサポート案件を確認します。</p></div></div><div id="supportOverview" class="table-wrap"></div></section>
@@ -289,6 +309,17 @@
       <div id="lineEditorFields" class="form-grid"></div>
       <div id="lineEditorMessage" class="form-message full" role="alert"></div>
       <div class="modal-actions"><button class="btn btn-secondary" type="button" data-line-close>閉じる</button><button id="lineEditorSave" class="btn btn-primary" type="submit">保存</button></div>
+    </form>
+  </section>
+
+
+  <div id="infraEditorBackdrop" class="modal-backdrop hidden" data-infra-close></div>
+  <section id="infraEditorModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="infraEditorTitle">
+    <header class="modal-head"><div><p class="eyebrow">SYSTEM OPERATIONS</p><h2 id="infraEditorTitle">接続情報を編集</h2></div><button class="modal-close" type="button" data-infra-close aria-label="閉じる">×</button></header>
+    <form id="infraEditorForm" class="modal-body" novalidate>
+      <div id="infraEditorFields" class="form-grid"></div>
+      <div id="infraEditorMessage" class="form-message full" role="alert"></div>
+      <div class="modal-actions"><button class="btn btn-secondary" type="button" data-infra-close>閉じる</button><button id="infraEditorSave" class="btn btn-primary" type="submit">保存</button></div>
     </form>
   </section>
 

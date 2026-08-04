@@ -19,6 +19,9 @@
     currentView: "dashboard",
     lineTab: "accounts",
     lineOps: { summary: null, accounts: [], campaigns: [], assets: [], richMenus: [], coupons: [], shopCards: [], events: [], sites: [] },
+    infraTab: "systems",
+    infrastructure: { summary:null, systems:[], supabase:[], workers:[], github:[], releases:[], health:[], clients:[], sites:[] },
+    infraEditor: null,
   };
 
   const roleLabels = {
@@ -204,7 +207,7 @@
     const { data: aalData, error: aalError } = await state.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aalError) throw aalError;
 
-    // CONTROL-CENTER-3ではDB側もAAL2を必須にするため、
+    // CONTROL-CENTER-4ではDB側もAAL2を必須にするため、
     // スタッフ情報を読む前に二段階認証を完了させます。
     if (aalData.currentLevel !== "aal2") {
       if (aalData.nextLevel === "aal2") {
@@ -266,7 +269,8 @@
     $("staffRole").textContent = roleLabels[state.staff.role_key] || state.staff.role_key;
     $("staffInitial").textContent = (state.staff.display_name || "D").slice(0, 1);
     showOnly("appShell");
-    await Promise.all([loadDashboard(), loadClients()]);
+    await loadClients();
+    await loadDashboard();
     activateView("dashboard");
   }
 
@@ -878,11 +882,72 @@
     finally { setBusy(button, false); }
   }
 
-  async function loadSystemOverview() {
-    const { data, error } = await state.supabase.from("cc_v_system_inventory").select("*").order("client_name");
-    if (error) throw error;
-    $("systemOverview").innerHTML = `<table><thead><tr><th>顧客</th><th>システム</th><th>環境</th><th>状態</th><th>Health</th><th>Worker</th><th>DB</th><th>Supabase</th></tr></thead><tbody>${(data || []).map((item) => `<tr><td>${escapeHtml(item.client_name)}<br><span class="client-code">${escapeHtml(item.client_code)}</span></td><td>${escapeHtml(item.system_name)}<br>${escapeHtml(item.facility_code)}</td><td>${escapeHtml(item.environment)}</td><td>${pill(systemStatusLabels[item.status] || item.status, statusTone(item.status))}</td><td>${pill(item.last_health_status, statusTone(item.last_health_status))}<br>${formatDate(item.last_health_checked_at, true)}</td><td>${escapeHtml(item.worker_version || "未確認")}</td><td>${escapeHtml(item.database_version || "未確認")}</td><td>${escapeHtml(item.supabase_project_name || "未登録")}</td></tr>`).join("") || '<tr><td colspan="8">登録済みシステムはありません。</td></tr>'}</tbody></table>`;
+  const infraStatusLabels = {
+    not_checked:"未確認",ok:"正常",warning:"要確認",error:"異常",unknown:"未確認",latest:"最新版",
+    update_recommended:"更新推奨",update_required:"要更新",ahead:"先行版",accepted:"招待済み",requested:"依頼中",
+    invited:"招待送信済み",revoked:"解除",granted:"権限あり"
+  };
+  const infraTypeTables = { system:"cc_system_instances",supabase:"cc_supabase_projects",worker:"cc_workers",github:"cc_github_repositories",release:"cc_release_catalog" };
+  function canTechnicalWrite(){ return ["owner_admin","technical_admin"].includes(state.staff?.role_key); }
+  function clientOptions(selected=""){ return `<option value="">DPRO内部・未指定</option>`+state.infrastructure.clients.map(c=>`<option value="${c.id}" ${c.id===selected?"selected":""}>${escapeHtml(c.display_name)}（${escapeHtml(c.client_code)}）</option>`).join(""); }
+  function systemOptions(selected=""){ return `<option value="">未接続</option>`+state.infrastructure.systems.map(s=>`<option value="${s.id}" ${s.id===selected?"selected":""}>${escapeHtml(s.client_name)}｜${escapeHtml(s.system_name)}</option>`).join(""); }
+  function infraInput(name,label,value="",type="text",options=""){ if(type==="select")return `<label class="field"><span>${label}</span><select name="${name}">${options}</select></label>`; return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${escapeHtml(value??"")}"></label>`; }
+
+  async function loadInfrastructureOverview(){
+    const results = await Promise.all([
+      state.supabase.from("cc_v_infrastructure_summary").select("*").single(),
+      state.supabase.from("cc_v_system_operations").select("*").order("client_name"),
+      state.supabase.from("cc_v_supabase_inventory_v4").select("*").order("project_name"),
+      state.supabase.from("cc_v_worker_inventory_v4").select("*").order("worker_name"),
+      state.supabase.from("cc_v_github_inventory_v4").select("*").order("repository_full_name"),
+      state.supabase.from("cc_v_release_status_v4").select("*").order("system_code"),
+      state.supabase.from("cc_health_checks").select("*,cc_clients(display_name,client_code),cc_system_instances(system_name,system_code)").order("checked_at",{ascending:false}).limit(100),
+      state.supabase.from("cc_clients").select("id,client_code,display_name,status").order("display_name"),
+      state.supabase.from("cc_sites").select("id,client_id,site_code,site_name").order("site_code"),
+    ]);
+    results.forEach(r=>{if(r.error)throw r.error});
+    const [summary,systems,supabase,workers,github,releases,health,clients,sites]=results.map(r=>r.data);
+    state.infrastructure={summary,systems:systems||[],supabase:supabase||[],workers:workers||[],github:github||[],releases:releases||[],health:health||[],clients:clients||[],sites:sites||[]};
+    renderInfrastructure();
   }
+
+  function renderInfrastructure(){
+    const d=state.infrastructure.summary||{};
+    const metrics=[
+      [d.managed_systems,"管理システム","稼働・準備中",d.unhealthy_systems?"warning":""],
+      [d.unhealthy_systems,"要確認システム","警告・異常",d.unhealthy_systems?"danger":""],
+      [d.systems_needing_update,"更新対象","推奨・必須",d.systems_needing_update?"warning":""],
+      [d.supabase_projects,"Supabase","登録プロジェクト",d.supabase_permission_attention?"warning":""],
+      [d.workers,"Worker","登録Worker",d.worker_errors?"danger":""],
+      [d.repositories,"GitHub","登録リポジトリ",d.repository_attention?"warning":""],
+      [d.checks_last_24h,"24時間の確認","Health履歴",""],
+    ];
+    $("infrastructureMetricGrid").innerHTML=metrics.map(([v,l,n,t])=>`<article class="metric-card ${t}"><b>${Number(v||0)}</b><span>${l}</span><small>${n}</small></article>`).join("");
+    renderSystemsTable();renderSupabaseTable();renderWorkersTable();renderGithubTable();renderReleaseTable();renderHealthTable();switchInfrastructureTab(state.infraTab);
+  }
+  function actionButtons(type,id,systemId=""){ const edit=canTechnicalWrite()?`<button class="infra-action" data-infra-edit="${type}" data-infra-id="${id}">編集</button>`:""; const check=systemId&&canTechnicalWrite()?`<button class="infra-action primary" data-health-check="${systemId}">稼働確認</button>`:""; return `<div class="infra-actions">${check}${edit}</div>`; }
+  function renderSystemsTable(){ $("systemOverview").innerHTML=`<table><thead><tr><th>顧客・システム</th><th>状態</th><th>Health</th><th>バージョン</th><th>Supabase</th><th>Worker・GitHub</th><th>操作</th></tr></thead><tbody>${state.infrastructure.systems.map(x=>`<tr><td><strong>${escapeHtml(x.client_name)}</strong><br><span class="client-code">${escapeHtml(x.client_code)}／${escapeHtml(x.system_code)}／${escapeHtml(x.facility_code)}</span></td><td>${pill(systemStatusLabels[x.status]||x.status,statusTone(x.status))}<br>${pill(infraStatusLabels[x.version_status]||x.version_status,statusTone(x.version_status))}</td><td>${pill(infraStatusLabels[x.last_health_status]||x.last_health_status,statusTone(x.last_health_status))}<br>${formatDate(x.last_health_checked_at,true)}${x.last_error_summary?`<span class="status-detail">${escapeHtml(x.last_error_summary)}</span>`:""}</td><td><div class="version-stack"><span>W ${escapeHtml(x.worker_version||"未確認")}</span><span>DB ${escapeHtml(x.database_version||"未確認")}</span><span>FE ${escapeHtml(x.frontend_version||"未確認")}</span></div></td><td>${escapeHtml(x.supabase_project_name||"未登録")}<br>${pill(infraStatusLabels[x.supabase_invitation_status]||x.supabase_invitation_status,statusTone(x.supabase_invitation_status))}</td><td>${escapeHtml(x.worker_name||"未登録")}<br>${escapeHtml(x.repository_full_name||"未登録")}</td><td>${actionButtons("system",x.id,x.id)}</td></tr>`).join("")||'<tr><td colspan="7">登録済みシステムはありません。</td></tr>'}</tbody></table>`; bindInfrastructureButtons(); }
+  function renderSupabaseTable(){ $("supabaseOverview").innerHTML=`<table><thead><tr><th>顧客</th><th>プロジェクト</th><th>所有・環境</th><th>招待状態</th><th>接続確認</th><th>操作</th></tr></thead><tbody>${state.infrastructure.supabase.map(x=>`<tr><td>${escapeHtml(x.client_name||"DPRO内部")}<br><span class="client-code">${escapeHtml(x.client_code||"")}</span></td><td><strong>${escapeHtml(x.project_name)}</strong><br><span class="client-code">${escapeHtml(x.project_ref)}</span></td><td>${escapeHtml(x.owner_type)}／${escapeHtml(x.environment)}<br>${escapeHtml(x.data_class)}</td><td>${pill(infraStatusLabels[x.invitation_status]||x.invitation_status,statusTone(x.invitation_status))}<br>${escapeHtml(x.dpro_role||"役割未登録")}</td><td>${pill(infraStatusLabels[x.last_connection_status]||x.last_connection_status,statusTone(x.last_connection_status))}<br>${formatDate(x.last_connection_check_at,true)}</td><td>${actionButtons("supabase",x.id)}</td></tr>`).join("")||'<tr><td colspan="6">Supabaseは未登録です。</td></tr>'}</tbody></table>`; bindInfrastructureButtons(); }
+  function renderWorkersTable(){ $("workerOverview").innerHTML=`<table><thead><tr><th>顧客</th><th>Worker</th><th>状態</th><th>バージョン</th><th>最終確認</th><th>操作</th></tr></thead><tbody>${state.infrastructure.workers.map(x=>`<tr><td>${escapeHtml(x.client_name||"DPRO内部")}<br><span class="client-code">${escapeHtml(x.system_name||"")}</span></td><td><strong>${escapeHtml(x.worker_name)}</strong><br>${safeUrl(x.worker_url)?`<a class="small-link" target="_blank" rel="noopener" href="${escapeHtml(x.worker_url)}">Worker</a>`:""} ${safeUrl(x.health_url)?`<a class="small-link" target="_blank" rel="noopener" href="${escapeHtml(x.health_url)}">Health</a>`:""}</td><td>${pill(x.status,statusTone(x.status))}<br>連続失敗 ${x.consecutive_failures||0}</td><td><div class="version-stack"><span>現在 ${escapeHtml(x.current_version||"未確認")}</span><span>期待 ${escapeHtml(x.expected_version||"未設定")}</span></div></td><td>${formatDate(x.last_checked_at,true)}<br>${x.last_response_ms!=null?`${x.last_response_ms}ms`:"—"}</td><td>${actionButtons("worker",x.id,x.system_instance_id)}</td></tr>`).join("")||'<tr><td colspan="6">Workerは未登録です。</td></tr>'}</tbody></table>`; bindInfrastructureButtons(); }
+  function renderGithubTable(){ $("githubOverview").innerHTML=`<table><thead><tr><th>顧客</th><th>リポジトリ</th><th>用途・公開範囲</th><th>権限</th><th>Pages</th><th>操作</th></tr></thead><tbody>${state.infrastructure.github.map(x=>`<tr><td>${escapeHtml(x.client_name||"DPRO内部")}<br><span class="client-code">${escapeHtml(x.system_name||"")}</span></td><td><strong>${escapeHtml(x.repository_full_name)}</strong><br><a class="small-link" target="_blank" rel="noopener" href="${escapeHtml(x.repository_url)}">GitHub</a>${safeUrl(x.pages_url)?` <a class="small-link" target="_blank" rel="noopener" href="${escapeHtml(x.pages_url)}">Pages</a>`:""}</td><td>${escapeHtml(x.purpose)}／${escapeHtml(x.visibility)}<br>branch ${escapeHtml(x.default_branch)}</td><td>${pill(infraStatusLabels[x.access_status]||x.access_status,statusTone(x.access_status))}</td><td>${pill(infraStatusLabels[x.pages_status]||x.pages_status,statusTone(x.pages_status))}<br>${formatDate(x.last_pages_check_at,true)}</td><td>${actionButtons("github",x.id)}</td></tr>`).join("")||'<tr><td colspan="6">GitHubは未登録です。</td></tr>'}</tbody></table>`; bindInfrastructureButtons(); }
+  function renderReleaseTable(){ $("releaseOverview").innerHTML=`<table><thead><tr><th>顧客・システム</th><th>部品</th><th>現在</th><th>推奨</th><th>判定</th><th>公開日</th><th>操作</th></tr></thead><tbody>${state.infrastructure.releases.map(x=>`<tr><td>${escapeHtml(x.client_name)}<br><span class="client-code">${escapeHtml(x.system_code)}</span></td><td>${escapeHtml(x.component)}</td><td>${escapeHtml(x.current_version||"未確認")}</td><td><strong>${escapeHtml(x.recommended_version||"未登録")}</strong><br><span class="client-code">最低 ${escapeHtml(x.minimum_supported_version||"未設定")}</span></td><td>${pill(infraStatusLabels[x.comparison_status]||x.comparison_status,statusTone(x.comparison_status))}</td><td>${formatDate(x.released_at,true)}</td><td>${canTechnicalWrite()?`<button class="infra-action" data-infra-edit="release" data-release-system="${escapeHtml(x.system_code)}" data-release-component="${escapeHtml(x.component||"")}">編集</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7">推奨バージョンは未登録です。</td></tr>'}</tbody></table>`; bindInfrastructureButtons(); }
+  function renderHealthTable(){ $("healthOverview").innerHTML=`<table><thead><tr><th>確認日時</th><th>顧客・システム</th><th>種類</th><th>結果</th><th>応答</th><th>バージョン</th><th>実行元</th></tr></thead><tbody>${state.infrastructure.health.map(x=>`<tr><td>${formatDate(x.checked_at,true)}</td><td>${escapeHtml(x.cc_clients?.display_name||"DPRO内部")}<br>${escapeHtml(x.cc_system_instances?.system_name||"—")}</td><td>${escapeHtml(x.check_type)}</td><td>${pill(infraStatusLabels[x.status]||x.status,statusTone(x.status))}</td><td>${x.http_status||"—"}／${x.response_ms!=null?`${x.response_ms}ms`:"—"}</td><td><div class="version-stack"><span>${escapeHtml(x.worker_version||"—")}</span><span>${escapeHtml(x.database_version||"—")}</span></div></td><td>${escapeHtml(x.source)}</td></tr>`).join("")||'<tr><td colspan="7">確認履歴はありません。</td></tr>'}</tbody></table>`; }
+  function switchInfrastructureTab(tab){ state.infraTab=tab; $$(".infrastructure-tab").forEach(b=>b.classList.toggle("active",b.dataset.infraTab===tab)); $$(".infra-panel").forEach(p=>p.classList.add("hidden")); $(`infra-panel-${tab}`)?.classList.remove("hidden"); }
+
+  async function runHealthCheck(systemInstanceId,button){ if(!canTechnicalWrite())return toast("技術管理権限が必要です。",true); const old=button?.textContent; if(button){button.disabled=true;button.textContent="確認中…"} try{ const token=state.session?.access_token; const result=await api("/api/infrastructure/check",{method:"POST",headers:{authorization:`Bearer ${token}`},body:JSON.stringify({systemInstanceId})}); toast(result.status==="ok"?"Health確認は正常です。":"Health確認で要確認項目がありました。",result.status==="error"); await loadInfrastructureOverview(); await loadClients(); await loadDashboard(); }catch(e){toast(e.message||"稼働確認に失敗しました。",true)}finally{if(button){button.disabled=false;button.textContent=old}} }
+  async function checkAllSystems(){ const btn=$("checkAllSystems"); const targets=state.infrastructure.systems.filter(x=>x.monitoring_enabled!==false); if(!targets.length)return toast("確認対象がありません。",true); btn.disabled=true; for(let i=0;i<targets.length;i++){btn.textContent=`確認中 ${i+1}/${targets.length}`; await runHealthCheck(targets[i].id,null);} btn.disabled=false;btn.textContent="すべて稼働確認"; }
+
+  function findInfraItem(type,id,button){ if(type==="system")return state.infrastructure.systems.find(x=>x.id===id); if(type==="supabase")return state.infrastructure.supabase.find(x=>x.id===id); if(type==="worker")return state.infrastructure.workers.find(x=>x.id===id); if(type==="github")return state.infrastructure.github.find(x=>x.id===id); if(type==="release"){return state.infrastructure.releases.find(x=>x.system_code===button?.dataset.releaseSystem&&x.component===button?.dataset.releaseComponent)||{};} return {}; }
+  function openInfraEditor(type,id=null,button=null){ if(!canTechnicalWrite())return toast("管理責任者または技術管理者のみ編集できます。",true); const item=findInfraItem(type,id,button)||{}; state.infraEditor={type,id,item}; const title={system:"DPROシステム",supabase:"Supabase",worker:"Worker",github:"GitHub",release:"推奨バージョン"}[type]||"接続情報"; $("infraEditorTitle").textContent=`${id?"編集":"登録"}｜${title}`; let fields="";
+    if(type==="system") fields=infraInput("client_id","顧客",item.client_id,"select",clientOptions(item.client_id))+infraInput("system_code","システムコード",item.system_code)+infraInput("system_name","システム名",item.system_name)+infraInput("facility_code","事業所コード",item.facility_code)+infraInput("environment","環境",item.environment||"production","select",`<option value="demo">demo</option><option value="staging">staging</option><option value="production">production</option>`)+infraInput("status","状態",item.status||"preparing","select",`<option value="planned">計画</option><option value="preparing">準備中</option><option value="active">稼働中</option><option value="degraded">要確認</option><option value="paused">停止中</option><option value="ended">終了</option>`)+infraInput("health_url","Health URL",item.health_url)+infraInput("system_check_url","system-check URL",item.system_check_url)+infraInput("expected_worker_version","期待Worker版",item.expected_worker_version)+infraInput("expected_database_version","期待DB版",item.expected_database_version);
+    if(type==="supabase") fields=infraInput("client_id","顧客",item.client_id,"select",clientOptions(item.client_id))+infraInput("system_instance_id","接続システム",item.system_instance_id,"select",systemOptions(item.system_instance_id))+infraInput("project_name","プロジェクト名",item.project_name)+infraInput("project_ref","Project Ref",item.project_ref)+infraInput("owner_type","所有者",item.owner_type||"client","select",`<option value="dpro">DPRO</option><option value="client">オーナー</option><option value="shared_demo">共有デモ</option><option value="shared_development">共有開発</option>`)+infraInput("environment","環境",item.environment||"production","select",`<option value="development">development</option><option value="demo">demo</option><option value="staging">staging</option><option value="production">production</option>`)+infraInput("data_class","データ区分",item.data_class||"general","select",`<option value="internal">internal</option><option value="general">general</option><option value="medical">medical</option><option value="welfare">welfare</option><option value="sensitive">sensitive</option>`)+infraInput("invitation_status","DPRO招待状態",item.invitation_status||"not_requested","select",`<option value="not_requested">未依頼</option><option value="requested">依頼中</option><option value="invited">招待済み</option><option value="accepted">承認済み</option><option value="revoked">解除</option><option value="error">エラー</option>`);
+    if(type==="worker") fields=infraInput("client_id","顧客",item.client_id,"select",clientOptions(item.client_id))+infraInput("system_instance_id","接続システム",item.system_instance_id,"select",systemOptions(item.system_instance_id))+infraInput("worker_name","Worker名",item.worker_name)+infraInput("worker_url","Worker URL",item.worker_url)+infraInput("health_url","Health URL",item.health_url)+infraInput("environment","環境",item.environment||"production","select",`<option value="demo">demo</option><option value="staging">staging</option><option value="production">production</option>`)+infraInput("status","状態",item.status||"preparing","select",`<option value="preparing">準備中</option><option value="active">稼働中</option><option value="degraded">要確認</option><option value="paused">停止中</option><option value="ended">終了</option>`)+infraInput("expected_version","期待バージョン",item.expected_version);
+    if(type==="github") fields=infraInput("client_id","顧客",item.client_id,"select",clientOptions(item.client_id))+infraInput("system_instance_id","接続システム",item.system_instance_id,"select",systemOptions(item.system_instance_id))+infraInput("repository_full_name","owner/repository",item.repository_full_name)+infraInput("repository_url","GitHub URL",item.repository_url)+infraInput("pages_url","Pages URL",item.pages_url)+infraInput("purpose","用途",item.purpose||"system","select",`<option value="control_center">CONTROL CENTER</option><option value="system">DPROシステム</option><option value="website">ホームページ</option><option value="proposal">提案書</option><option value="other">その他</option>`)+infraInput("visibility","公開範囲",item.visibility||"private","select",`<option value="private">private</option><option value="public">public</option><option value="internal">internal</option>`)+infraInput("access_status","権限状態",item.access_status||"not_checked","select",`<option value="not_checked">未確認</option><option value="granted">権限あり</option><option value="revoked">解除</option><option value="error">エラー</option>`);
+    if(type==="release") fields=infraInput("system_code","システムコード",item.system_code)+infraInput("component","部品",item.component||"worker","select",`<option value="worker">worker</option><option value="database">database</option><option value="frontend">frontend</option><option value="website">website</option><option value="config">config</option>`)+infraInput("release_channel","チャンネル",item.release_channel||"stable","select",`<option value="stable">stable</option><option value="preview">preview</option><option value="legacy">legacy</option>`)+infraInput("recommended_version","推奨バージョン",item.recommended_version)+infraInput("minimum_supported_version","最低対応バージョン",item.minimum_supported_version)+infraInput("release_status","公開状態",item.release_status||"released","select",`<option value="planned">計画</option><option value="testing">テスト中</option><option value="released">公開済み</option><option value="deprecated">非推奨</option>`)+infraInput("released_at","公開日時",item.released_at?new Date(item.released_at).toISOString().slice(0,16):"","datetime-local")+infraInput("notes","変更内容",item.notes);
+    $("infraEditorFields").innerHTML=fields; $("infraEditorMessage").textContent=""; $("infraEditorBackdrop").classList.remove("hidden"); $("infraEditorModal").classList.remove("hidden"); }
+  function closeInfraEditor(){ $("infraEditorBackdrop").classList.add("hidden"); $("infraEditorModal").classList.add("hidden"); state.infraEditor=null; }
+  async function saveInfraEditor(event){ event.preventDefault(); const current=state.infraEditor;if(!current)return; const fd=new FormData(event.currentTarget); const payload=Object.fromEntries(fd.entries()); Object.keys(payload).forEach(k=>{if(payload[k]==="")payload[k]=null}); if(payload.system_code)payload.system_code=String(payload.system_code).toUpperCase(); if(payload.released_at)payload.released_at=new Date(payload.released_at).toISOString(); const table=infraTypeTables[current.type]; let query; if(current.type==="release"&&current.id==null&&current.item?.system_code){query=state.supabase.from(table).update(payload).eq("system_code",current.item.system_code).eq("component",current.item.component).eq("release_channel",current.item.release_channel||"stable");}else if(current.id){query=state.supabase.from(table).update(payload).eq("id",current.id);}else{query=state.supabase.from(table).insert(payload);} const {error}=await query;if(error){$("infraEditorMessage").textContent=error.message;return;} closeInfraEditor();toast("接続情報を保存しました。");await loadInfrastructureOverview(); }
+  function bindInfrastructureButtons(){ $$('[data-health-check]').forEach(b=>b.onclick=()=>runHealthCheck(b.dataset.healthCheck,b)); $$('[data-infra-edit]').forEach(b=>b.onclick=()=>openInfraEditor(b.dataset.infraEdit,b.dataset.infraId||null,b)); }
 
   async function loadWebsiteOverview() {
     const { data, error } = await state.supabase.from("cc_websites").select("*,cc_clients(display_name,client_code)").order("created_at");
@@ -925,7 +990,7 @@
     closeSidebar();
     try {
       if (view === "line") await loadLineOverview();
-      if (view === "systems") await loadSystemOverview();
+      if (view === "systems") await loadInfrastructureOverview();
       if (view === "websites") await loadWebsiteOverview();
       if (view === "tasks") await loadTaskOverview();
       if (view === "support") await loadSupportOverview();
@@ -945,7 +1010,16 @@
     $("menuButton").setAttribute("aria-expanded", "false");
   }
 
+  function bindInfrastructureStaticEvents(){
+    $$(".infrastructure-tab").forEach(button=>button.addEventListener("click",()=>switchInfrastructureTab(button.dataset.infraTab)));
+    $$('[data-infra-new]').forEach(button=>button.addEventListener("click",()=>openInfraEditor(button.dataset.infraNew)));
+    $$('[data-infra-close]').forEach(button=>button.addEventListener("click",closeInfraEditor));
+    $("infraEditorForm")?.addEventListener("submit",saveInfraEditor);
+    $("checkAllSystems")?.addEventListener("click",checkAllSystems);
+  }
+
   function bindEvents() {
+    bindInfrastructureStaticEvents();
     $$('[data-toggle-password]').forEach((button) => button.addEventListener("click", () => {
       const input = $(button.dataset.togglePassword);
       const visible = input.type === "text";
@@ -1065,7 +1139,7 @@
     $("refreshDashboard").addEventListener("click", async () => {
       const button = $("refreshDashboard");
       setBusy(button, true, "更新中…");
-      try { await Promise.all([loadDashboard(), loadClients()]); toast("最新情報へ更新しました。"); }
+      try { await loadClients(); await loadDashboard(); toast("最新情報へ更新しました。"); }
       catch (error) { toast(error.message || "更新できませんでした。", true); }
       finally { setBusy(button, false); }
     });
