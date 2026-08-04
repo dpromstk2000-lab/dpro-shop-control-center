@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#102a23">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'">
+  <title>DPRO SHOP CONTROL CENTER｜接続確認</title>
+  <link rel="stylesheet" href="app.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+</head>
+<body>
+  <main class="content" style="max-width:1000px;padding-top:40px">
+    <div class="page-head"><div><p class="eyebrow">SYSTEM CHECK</p><h1>DPRO SHOP CONTROL CENTER 接続確認</h1><p>公開してよい接続状態だけを確認します。Secretや顧客情報は表示しません。</p></div><a class="btn btn-secondary" href="index.html">管理画面へ戻る</a></div>
+    <section class="panel">
+      <div class="panel-head"><div><h2>検査結果</h2><p>Worker・DB・初期管理者・静的ファイルを確認</p></div><button id="runCheck" class="btn btn-primary" type="button">再検査</button></div>
+      <div id="checkSummary" class="metric-grid"></div>
+      <div id="checkRows" class="record-list"></div>
+    </section>
+  </main>
+<script>
+(() => {
+  const config = window.DPRO_CONTROL_CENTER_CONFIG || {};
+  const rows = document.getElementById('checkRows');
+  const summary = document.getElementById('checkSummary');
+  const esc = (v) => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+  const result = [];
+  function add(name, status, detail){ result.push({name,status,detail}); render(); }
+  function render(){
+    const pass=result.filter(r=>r.status==='PASS').length, warn=result.filter(r=>r.status==='WARN').length, fail=result.filter(r=>r.status==='FAIL').length;
+    summary.innerHTML=`<article class="metric-card"><b>${pass}</b><span>PASS</span><small>正常</small></article><article class="metric-card warning"><b>${warn}</b><span>WARN</span><small>確認事項</small></article><article class="metric-card danger"><b>${fail}</b><span>FAIL</span><small>要修正</small></article>`;
+    rows.innerHTML=result.map(r=>`<article class="record"><div class="record-head"><strong>${esc(r.name)}</strong><span class="pill ${r.status==='PASS'?'green':r.status==='WARN'?'amber':'red'}">${r.status}</span></div><p>${esc(r.detail)}</p></article>`).join('');
+  }
+  async function fetchJson(url){ const res=await fetch(url,{cache:'no-store'}); const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.message||data.error||`HTTP ${res.status}`); return data; }
+  async function run(){
+    result.length=0; render();
+    for(const file of ['index.html','app.css','app.js','config.js']){
+      try{ const res=await fetch(file,{cache:'no-store'}); add(`静的ファイル ${file}`,res.ok?'PASS':'FAIL',res.ok?`HTTP ${res.status}`:`HTTP ${res.status}`); }catch(e){ add(`静的ファイル ${file}`,'FAIL',e.message); }
+    }
+    try{
+      const health=await fetchJson(`${String(config.apiBaseUrl||'').replace(/\/$/,'')}/api/health`);
+      add('CONTROL CENTER Worker',health.ok?'PASS':'FAIL',`${health.version||'不明'} / ${health.status||'不明'}`);
+      add('CONTROL CENTER DB',health.dbOk?'PASS':'FAIL',`${health.databaseVersion||'不明'} / host ${health.hostProject||'不明'}`);
+      add('将来移行準備',health.migrationReady?'PASS':'WARN',health.migrationReady?'専用Supabase移行準備済み':'移行準備を確認してください');
+      add('初期管理者',health.staffPrepared?'PASS':'WARN',health.staffPrepared?'DPROスタッフ登録済み':'初回管理者登録が必要です');
+    }catch(e){ add('Worker・DB接続','FAIL',e.message); }
+    try{
+      const publicConfig=await fetchJson(`${String(config.apiBaseUrl||'').replace(/\/$/,'')}/api/public-config`);
+      add('公開設定API',publicConfig.ok&&publicConfig.supabaseUrl&&(publicConfig.supabasePublishableKey||publicConfig.supabaseAnonKey)?'PASS':'FAIL',publicConfig.workerVersion||'設定不足');
+    }catch(e){ add('公開設定API','FAIL',e.message); }
+    add('Supabase認証ライブラリ',window.supabase?.createClient?'PASS':'FAIL',window.supabase?.createClient?'読み込み済み':'CDNを確認してください');
+  }
+  document.getElementById('runCheck').addEventListener('click',run);
+  window.addEventListener('load',run);
+})();
+</script>
+</body>
+</html>
