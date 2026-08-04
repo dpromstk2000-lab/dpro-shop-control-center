@@ -29,7 +29,7 @@
         <div><strong>DPRO SHOP CONTROL CENTER</strong><small>初回管理者設定</small></div>
       </div>
       <div class="auth-heading">
-        <p class="eyebrow">CONTROL-CENTER-2</p>
+        <p class="eyebrow">CONTROL-CENTER-3</p>
         <h1 id="bootstrapTitle">最初のDPRO管理者を登録</h1>
         <p>この設定は最初の1回だけ実行できます。登録後は自動的に閉じます。</p>
       </div>
@@ -240,7 +240,39 @@
         </section>
 
         <section id="view-contracts" class="view hidden"><div class="page-head"><div><p class="eyebrow">CONTRACTS</p><h1>契約・サービス</h1><p>顧客詳細から契約内容を確認できます。編集機能は次工程で追加します。</p></div></div><div class="empty-state">全顧客から対象店舗を開き、「契約・サービス」を確認してください。</div></section>
-        <section id="view-line" class="view hidden"><div class="page-head"><div><p class="eyebrow">LINE OFFICIAL</p><h1>LINE公式運用</h1><p>LINE公式アカウントの運用状態を顧客詳細に集約しています。</p></div></div><div id="lineOverview" class="summary-list"></div></section>
+        <section id="view-line" class="view hidden">
+          <div class="page-head line-page-head">
+            <div><p class="eyebrow">LINE OFFICIAL OPERATIONS</p><h1>LINE公式運用</h1><p>配信・制作・承認・クーポン・ショップカード・リッチメニュー・対応履歴を一元管理します。</p></div>
+            <div class="page-actions">
+              <button class="btn btn-secondary" type="button" data-line-new="account">LINEアカウント登録</button>
+              <button class="btn btn-primary" type="button" data-line-new="campaign">配信予定を登録</button>
+            </div>
+          </div>
+          <div id="lineMetricGrid" class="metric-grid line-metrics" aria-live="polite"></div>
+          <div class="line-toolbar">
+            <input id="lineSearch" class="search-input" type="search" placeholder="顧客名・アカウント名・管理コードで検索">
+            <select id="lineAccountFilter"><option value="all">すべてのLINEアカウント</option></select>
+            <select id="lineCampaignStatusFilter"><option value="all">すべての配信状態</option><option value="copy_work">原稿作成</option><option value="image_work">画像作成</option><option value="client_review">オーナー確認</option><option value="approved">承認済み</option><option value="scheduled">配信予定</option><option value="delivered">配信済み</option><option value="cancelled">中止</option></select>
+            <select id="lineApprovalFilter"><option value="all">すべての承認状態</option><option value="waiting">承認待ち</option><option value="approved">承認済み</option><option value="changes_requested">修正依頼</option></select>
+            <button id="refreshLineOps" class="btn btn-secondary" type="button">最新情報</button>
+          </div>
+          <div class="line-tabs" role="tablist" aria-label="LINE運用メニュー">
+            <button class="line-tab active" type="button" data-line-tab="accounts">運用一覧</button>
+            <button class="line-tab" type="button" data-line-tab="campaigns">配信予定</button>
+            <button class="line-tab" type="button" data-line-tab="assets">原稿・画像</button>
+            <button class="line-tab" type="button" data-line-tab="rich-menus">リッチメニュー</button>
+            <button class="line-tab" type="button" data-line-tab="coupons">クーポン</button>
+            <button class="line-tab" type="button" data-line-tab="shop-cards">ショップカード</button>
+            <button class="line-tab" type="button" data-line-tab="history">対応履歴</button>
+          </div>
+          <section id="line-panel-accounts" class="line-panel"><div id="lineAccountBoard" class="line-account-grid"></div></section>
+          <section id="line-panel-campaigns" class="line-panel hidden"><div class="subpage-head"><div><h2>配信予定・承認進行</h2><p>原稿、画像、オーナー確認、配信日時を一つの進行表で管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="campaign">新しい配信予定</button></div><div id="lineCampaignBoard" class="table-wrap"></div></section>
+          <section id="line-panel-assets" class="line-panel hidden"><div class="subpage-head"><div><h2>原稿・画像などの制作物</h2><p>画像本体や顧客写真は保存せず、制作状態と安全な外部URLだけを管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="asset">制作物を登録</button></div><div id="lineAssetBoard" class="table-wrap"></div></section>
+          <section id="line-panel-rich-menus" class="line-panel hidden"><div class="subpage-head"><div><h2>リッチメニュー</h2><p>現在のメニュー、制作、承認、切替期間を管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="rich-menu">リッチメニューを登録</button></div><div id="lineRichMenuBoard" class="summary-list"></div></section>
+          <section id="line-panel-coupons" class="line-panel hidden"><div class="subpage-head"><div><h2>クーポン</h2><p>特典内容、承認状態、有効期間を管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="coupon">クーポンを登録</button></div><div id="lineCouponBoard" class="summary-list"></div></section>
+          <section id="line-panel-shop-cards" class="line-panel hidden"><div class="subpage-head"><div><h2>ショップカード</h2><p>必要ポイント、特典、承認状態、利用期間を管理します。</p></div><button class="btn btn-primary" type="button" data-line-new="shop-card">ショップカードを登録</button></div><div id="lineShopCardBoard" class="summary-list"></div></section>
+          <section id="line-panel-history" class="line-panel hidden"><div class="subpage-head"><div><h2>対応履歴</h2><p>電話・LINE・打合せ・設定変更などの業務履歴だけを記録します。個別LINE会話は保存しません。</p></div><button class="btn btn-primary" type="button" data-line-new="event">対応履歴を追加</button></div><div id="lineHistoryBoard" class="timeline"></div></section>
+        </section>
         <section id="view-systems" class="view hidden"><div class="page-head"><div><p class="eyebrow">DPRO SYSTEMS</p><h1>DPROシステム</h1><p>登録済みシステムと稼働状態を確認します。</p></div></div><div id="systemOverview" class="table-wrap"></div></section>
         <section id="view-websites" class="view hidden"><div class="page-head"><div><p class="eyebrow">WEBSITES</p><h1>ホームページ</h1><p>公開状態とDPRO連動準備を確認します。</p></div></div><div id="websiteOverview" class="summary-list"></div></section>
         <section id="view-tasks" class="view hidden"><div class="page-head"><div><p class="eyebrow">TASKS</p><h1>タスク・確認待ち</h1><p>期限、オーナー回答待ち、作業状態を確認します。</p></div></div><div id="taskOverview" class="table-wrap"></div></section>
@@ -248,6 +280,17 @@
       </main>
     </div>
   </div>
+
+
+  <div id="lineEditorBackdrop" class="modal-backdrop hidden" data-line-close></div>
+  <section id="lineEditorModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="lineEditorTitle">
+    <header class="modal-head"><div><p id="lineEditorEyebrow" class="eyebrow">LINE OPERATIONS</p><h2 id="lineEditorTitle">編集</h2></div><button class="modal-close" type="button" data-line-close aria-label="閉じる">×</button></header>
+    <form id="lineEditorForm" class="modal-body" novalidate>
+      <div id="lineEditorFields" class="form-grid"></div>
+      <div id="lineEditorMessage" class="form-message full" role="alert"></div>
+      <div class="modal-actions"><button class="btn btn-secondary" type="button" data-line-close>閉じる</button><button id="lineEditorSave" class="btn btn-primary" type="submit">保存</button></div>
+    </form>
+  </section>
 
   <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

@@ -17,6 +17,8 @@
     dashboard: null,
     pendingTasks: [],
     currentView: "dashboard",
+    lineTab: "accounts",
+    lineOps: { summary: null, accounts: [], campaigns: [], assets: [], richMenus: [], coupons: [], shopCards: [], events: [], sites: [] },
   };
 
   const roleLabels = {
@@ -30,6 +32,11 @@
   const taskStatusLabels = { todo: "未着手", in_progress: "対応中", waiting_client: "オーナー回答待ち", waiting_internal: "社内確認待ち", scheduled: "予定済み", done: "完了", cancelled: "中止" };
   const priorityLabels = { low: "低", normal: "通常", high: "高", urgent: "緊急", critical: "最重要" };
   const systemStatusLabels = { planned: "計画", preparing: "準備中", active: "稼働中", degraded: "要確認", paused: "停止中", ended: "終了" };
+  const lineCampaignStatusLabels = { idea:"アイデア",draft:"下書き",copy_work:"原稿作成",image_work:"画像作成",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",scheduled:"配信予定",delivered:"配信済み",cancelled:"中止",overdue:"期限超過",waiting_client:"承認待ち" };
+  const lineApprovalLabels = { not_required:"承認不要",not_requested:"未依頼",waiting:"オーナー承認待ち",approved:"承認済み",changes_requested:"修正依頼" };
+  const lineAssetStatusLabels = { draft:"下書き",in_progress:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",in_use:"使用中",archived:"保管" };
+  const lineItemStatusLabels = { draft:"下書き",designing:"制作中",internal_review:"社内確認",client_review:"オーナー確認",approved:"承認済み",scheduled:"開始予定",active:"運用中",inactive:"停止中",expired:"期限終了",stopped:"停止",archived:"保管" };
+  const lineEventLabels = { call:"電話",line:"LINE",email:"メール",meeting:"打合せ",note:"メモ",status_change:"状態変更",delivery:"配信",approval:"承認",design:"制作",settings:"設定",other:"その他" };
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -197,7 +204,7 @@
     const { data: aalData, error: aalError } = await state.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aalError) throw aalError;
 
-    // CONTROL-CENTER-2ではDB側もAAL2を必須にするため、
+    // CONTROL-CENTER-3ではDB側もAAL2を必須にするため、
     // スタッフ情報を読む前に二段階認証を完了させます。
     if (aalData.currentLevel !== "aal2") {
       if (aalData.nextLevel === "aal2") {
@@ -529,10 +536,346 @@
       </div>`;
   }
 
+  function canEditLineOperations() {
+    return ["owner_admin", "support", "technical_admin"].includes(state.staff?.role_key);
+  }
+
+  function lineAccountOptionHtml(selected = "", includeBlank = false) {
+    const items = state.lineOps.accounts || [];
+    return `${includeBlank ? '<option value="">選択してください</option>' : ''}${items.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.client_name)}｜${escapeHtml(item.account_name)}</option>`).join("")}`;
+  }
+
+  function lineClientOptionHtml(selected = "") {
+    return state.clients.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.client_code)}｜${escapeHtml(item.display_name)}</option>`).join("");
+  }
+
+  function lineSiteOptionHtml(selected = "", clientId = "") {
+    const sites = (state.lineOps.sites || []).filter((item) => !clientId || item.client_id === clientId);
+    return `<option value="">拠点を指定しない</option>${sites.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.site_code)}｜${escapeHtml(item.site_name)}</option>`).join("")}`;
+  }
+
+  function lineCampaignOptionHtml(selected = "", accountId = "") {
+    const rows = (state.lineOps.campaigns || []).filter((item) => !accountId || item.line_account_id === accountId);
+    return `<option value="">配信予定と紐付けない</option>${rows.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.campaign_code)}｜${escapeHtml(item.title)}</option>`).join("")}`;
+  }
+
+  function dateTimeLocalValue(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  function isoOrNull(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  function renderLineMetrics() {
+    const d = state.lineOps.summary || {};
+    const metrics = [
+      [d.active_accounts, "運用中アカウント", "LINE公式", ""],
+      [d.open_campaigns, "進行中の配信", `30日以内 ${d.scheduled_next_30d || 0}件`, ""],
+      [d.waiting_client_approval, "オーナー承認待ち", "確認漏れ防止", d.waiting_client_approval ? "warning" : ""],
+      [d.copy_in_progress, "原稿作成", "制作中", ""],
+      [d.image_in_progress, "画像作成", "制作・確認中", ""],
+      [d.active_coupons, "クーポン", "予定・運用中", ""],
+      [d.active_shop_cards, "ショップカード", "予定・運用中", ""],
+      [d.rich_menu_attention, "リッチメニュー要対応", "制作・承認", d.rich_menu_attention ? "warning" : ""],
+      [d.followups_due, "期限到来の対応", d.next_delivery_at ? `次回配信 ${formatDate(d.next_delivery_at, true)}` : "次回配信なし", d.followups_due ? "danger" : ""],
+    ];
+    $("lineMetricGrid").innerHTML = metrics.map(([value, label, note, tone]) => `<article class="metric-card ${tone}"><b>${Number(value || 0).toLocaleString("ja-JP")}</b><span>${escapeHtml(label)}</span><small>${escapeHtml(note)}</small></article>`).join("");
+  }
+
+  function filteredLineRows(rows, { statusField = "status", approvalField = "owner_approval_status" } = {}) {
+    const query = $("lineSearch").value.trim().toLowerCase();
+    const accountId = $("lineAccountFilter").value;
+    const status = $("lineCampaignStatusFilter").value;
+    const approval = $("lineApprovalFilter").value;
+    return (rows || []).filter((item) => {
+      if (accountId !== "all" && item.line_account_id !== accountId && item.id !== accountId) return false;
+      const haystack = `${item.client_name || ""} ${item.client_code || ""} ${item.account_name || ""} ${item.title || item.menu_name || item.coupon_name || item.card_name || item.subject || ""} ${item.campaign_code || item.asset_code || item.rich_menu_code || item.coupon_code || item.shop_card_code || item.event_code || ""}`.toLowerCase();
+      if (query && !haystack.includes(query)) return false;
+      if (status !== "all" && statusField && item[statusField] !== status) return false;
+      if (approval !== "all" && approvalField && item[approvalField] !== approval) return false;
+      return true;
+    });
+  }
+
+  function renderLineAccounts() {
+    const query = $("lineSearch").value.trim().toLowerCase();
+    const filter = $("lineAccountFilter").value;
+    const rows = (state.lineOps.accounts || []).filter((item) => {
+      if (filter !== "all" && item.id !== filter) return false;
+      return !query || `${item.client_name} ${item.client_code} ${item.account_name} ${item.basic_id || ""}`.toLowerCase().includes(query);
+    });
+    $("lineAccountBoard").innerHTML = rows.length ? rows.map((item) => `
+      <article class="line-account-card">
+        <div class="line-account-head"><div><span class="client-code">${escapeHtml(item.client_code)}</span><h2>${escapeHtml(item.client_name)}</h2><p>${escapeHtml(item.account_name)}・${escapeHtml(item.basic_id || "Basic ID未登録")}</p></div>${pill(item.status === "active" ? "運用中" : item.status, statusTone(item.status))}</div>
+        <div class="line-status-grid">
+          <div class="line-status-cell"><strong>権限</strong><span>${escapeHtml(item.permission_status)}</span></div>
+          <div class="line-status-cell"><strong>あいさつ</strong><span>${escapeHtml(item.greeting_status)}</span></div>
+          <div class="line-status-cell"><strong>リッチメニュー</strong><span>${escapeHtml(item.rich_menu_status)}</span></div>
+          <div class="line-status-cell"><strong>クーポン</strong><span>${escapeHtml(item.coupon_status)}</span></div>
+          <div class="line-status-cell"><strong>配信進行</strong><span>${item.open_campaign_count || 0}件</span></div>
+          <div class="line-status-cell"><strong>承認待ち</strong><span>${item.waiting_approval_count || 0}件</span></div>
+          <div class="line-status-cell"><strong>次回配信</strong><span>${formatDate(item.next_delivery_at, true)}</span></div>
+          <div class="line-status-cell"><strong>要フォロー</strong><span>${item.due_followup_count || 0}件</span></div>
+        </div>
+        <div class="line-account-foot"><p>最終接続確認 ${formatDate(item.last_connection_check_at, true)}</p><div class="inline-actions">${safeUrl(item.manager_url) ? `<a class="mini-button" href="${escapeHtml(safeUrl(item.manager_url))}" target="_blank" rel="noopener noreferrer">LINE管理画面</a>` : ""}<button class="mini-button primary" type="button" data-line-edit="account" data-id="${item.id}" ${canEditLineOperations() ? "" : "disabled"}>設定を編集</button></div></div>
+      </article>`).join("") : '<div class="empty-state">条件に一致するLINE公式アカウントはありません。</div>';
+    bindLineEditButtons($("lineAccountBoard"));
+  }
+
+  function renderLineCampaigns() {
+    const rows = filteredLineRows(state.lineOps.campaigns);
+    $("lineCampaignBoard").innerHTML = `<table><thead><tr><th>配信</th><th>顧客・アカウント</th><th>進行</th><th>画像</th><th>オーナー承認</th><th>配信日時</th><th>原稿</th><th></th></tr></thead><tbody>${rows.map((item) => `<tr><td><span class="line-table-title">${escapeHtml(item.title)}</span><span class="line-table-sub">${escapeHtml(item.campaign_code)}・${escapeHtml(item.campaign_type)}</span></td><td>${escapeHtml(item.client_name)}<br><span class="line-table-sub">${escapeHtml(item.account_name)}</span></td><td>${pill(lineCampaignStatusLabels[item.operational_state || item.status] || item.status, statusTone(item.operational_state || item.status))}</td><td>${escapeHtml(item.image_status)}</td><td>${pill(lineApprovalLabels[item.owner_approval_status] || item.owner_approval_status, statusTone(item.owner_approval_status))}</td><td>${formatDate(item.scheduled_at, true)}</td><td class="message-preview">${escapeHtml((item.message_draft || "原稿未登録").slice(0, 120))}</td><td><button class="mini-button primary" type="button" data-line-edit="campaign" data-id="${item.id}" ${canEditLineOperations() ? "" : "disabled"}>編集</button></td></tr>`).join("") || '<tr><td colspan="8">配信予定はありません。</td></tr>'}</tbody></table>`;
+    bindLineEditButtons($("lineCampaignBoard"));
+  }
+
+  function renderLineAssets() {
+    const rows = filteredLineRows(state.lineOps.assets, { statusField: null });
+    $("lineAssetBoard").innerHTML = `<table><thead><tr><th>制作物</th><th>顧客</th><th>種類</th><th>状態</th><th>承認</th><th>関連配信</th><th>外部URL</th><th></th></tr></thead><tbody>${rows.map((item) => `<tr><td><span class="line-table-title">${escapeHtml(item.title)}</span><span class="line-table-sub">${escapeHtml(item.asset_code)}・${escapeHtml(item.version_label || "版未設定")}</span></td><td>${escapeHtml(item.client_name)}</td><td>${escapeHtml(item.asset_type)}</td><td>${pill(lineAssetStatusLabels[item.status] || item.status, statusTone(item.status))}</td><td>${pill(lineApprovalLabels[item.owner_approval_status] || item.owner_approval_status, statusTone(item.owner_approval_status))}</td><td>${escapeHtml(item.campaign_code || "—")}<br><span class="line-table-sub">${escapeHtml(item.campaign_title || "")}</span></td><td>${safeUrl(item.external_url) ? `<a class="small-link" href="${escapeHtml(safeUrl(item.external_url))}" target="_blank" rel="noopener noreferrer">開く</a>` : "—"}</td><td><button class="mini-button primary" type="button" data-line-edit="asset" data-id="${item.id}" ${canEditLineOperations() ? "" : "disabled"}>編集</button></td></tr>`).join("") || '<tr><td colspan="8">制作物はありません。</td></tr>'}</tbody></table>`;
+    bindLineEditButtons($("lineAssetBoard"));
+  }
+
+  function renderLineItemCards(targetId, rows, kind, nameKey, codeKey, periodStart, periodEnd) {
+    const filtered = filteredLineRows(rows, { statusField: null });
+    $(targetId).innerHTML = filtered.length ? filtered.map((item) => `<article class="summary-card"><div class="record-head"><h2>${escapeHtml(item[nameKey])}</h2>${pill(lineItemStatusLabels[item.status] || item.status, statusTone(item.status))}</div><p>${escapeHtml(item.client_name)}・${escapeHtml(item.account_name)}</p><p>${escapeHtml(item[codeKey])}・承認 ${escapeHtml(lineApprovalLabels[item.owner_approval_status] || item.owner_approval_status)}</p><p>期間 ${formatDate(item[periodStart], true)} ～ ${formatDate(item[periodEnd], true)}</p>${item.benefit_summary ? `<p>${escapeHtml(item.benefit_summary)}</p>` : item.layout_summary ? `<p>${escapeHtml(item.layout_summary)}</p>` : ""}<div class="record-actions">${safeUrl(item.external_url) ? `<a class="small-link" href="${escapeHtml(safeUrl(item.external_url))}" target="_blank" rel="noopener noreferrer">外部管理を開く</a>` : ""}<button class="mini-button primary" type="button" data-line-edit="${kind}" data-id="${item.id}" ${canEditLineOperations() ? "" : "disabled"}>編集</button></div></article>`).join("") : '<div class="empty-state">登録はありません。</div>';
+    bindLineEditButtons($(targetId));
+  }
+
+  function renderLineHistory() {
+    const rows = filteredLineRows(state.lineOps.events, { statusField: null, approvalField: null });
+    $("lineHistoryBoard").innerHTML = rows.length ? rows.map((item) => `<article class="timeline-item"><div class="timeline-time">${formatDate(item.occurred_at, true)}<br>${escapeHtml(item.event_code)}</div><div class="timeline-body"><strong>${escapeHtml(lineEventLabels[item.event_type] || item.event_type)}｜${escapeHtml(item.subject)}</strong><p>${escapeHtml(item.client_name)}・${escapeHtml(item.account_name)}</p>${item.detail ? `<p>${escapeHtml(item.detail)}</p>` : ""}<small>${escapeHtml(item.actor_name || "自動記録")}</small></div>${item.follow_up_due_at ? `<div class="timeline-next">次回 ${formatDate(item.follow_up_due_at, true)}<br>${escapeHtml(item.next_action || "確認")}</div>` : ""}</article>`).join("") : '<div class="empty-state">対応履歴はありません。</div>';
+  }
+
+  function renderActiveLineTab() {
+    if (state.lineTab === "accounts") renderLineAccounts();
+    if (state.lineTab === "campaigns") renderLineCampaigns();
+    if (state.lineTab === "assets") renderLineAssets();
+    if (state.lineTab === "rich-menus") renderLineItemCards("lineRichMenuBoard", state.lineOps.richMenus, "rich-menu", "menu_name", "rich_menu_code", "active_from", "active_until");
+    if (state.lineTab === "coupons") renderLineItemCards("lineCouponBoard", state.lineOps.coupons, "coupon", "coupon_name", "coupon_code", "valid_from", "valid_until");
+    if (state.lineTab === "shop-cards") renderLineItemCards("lineShopCardBoard", state.lineOps.shopCards, "shop-card", "card_name", "shop_card_code", "valid_from", "valid_until");
+    if (state.lineTab === "history") renderLineHistory();
+  }
+
+  function activateLineTab(tab) {
+    state.lineTab = tab;
+    $$(".line-tab").forEach((button) => button.classList.toggle("active", button.dataset.lineTab === tab));
+    $$(".line-panel").forEach((panel) => panel.classList.add("hidden"));
+    $(`line-panel-${tab}`)?.classList.remove("hidden");
+    renderActiveLineTab();
+  }
+
+  function bindLineEditButtons(scope) {
+    $$('[data-line-edit]', scope).forEach((button) => button.addEventListener("click", () => openLineEditor(button.dataset.lineEdit, button.dataset.id)));
+  }
+
   async function loadLineOverview() {
-    const { data, error } = await state.supabase.from("cc_line_accounts").select("*,cc_clients(display_name,client_code),cc_sites(site_name)").order("next_delivery_at", { ascending: true, nullsFirst: false });
-    if (error) throw error;
-    $("lineOverview").innerHTML = (data || []).length ? data.map((item) => `<article class="summary-card"><h2>${escapeHtml(item.cc_clients?.display_name || item.account_name)}</h2><p>${escapeHtml(item.account_name)}・${escapeHtml(item.basic_id || "Basic ID未登録")}</p><p>権限 ${escapeHtml(item.permission_status)}／リッチメニュー ${escapeHtml(item.rich_menu_status)}／クーポン ${escapeHtml(item.coupon_status)}</p><p>次回配信 ${formatDate(item.next_delivery_at, true)}</p></article>`).join("") : '<div class="empty-state">LINE公式アカウントは未登録です。</div>';
+    const queries = [
+      state.supabase.from("cc_v_line_operations_summary").select("*").single(),
+      state.supabase.from("cc_v_line_accounts_management").select("*").order("client_name"),
+      state.supabase.from("cc_v_line_campaign_schedule").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
+      state.supabase.from("cc_v_line_assets_board").select("*").order("updated_at", { ascending: false }),
+      state.supabase.from("cc_v_line_rich_menu_board").select("*").order("updated_at", { ascending: false }),
+      state.supabase.from("cc_v_line_coupon_board").select("*").order("updated_at", { ascending: false }),
+      state.supabase.from("cc_v_line_shop_card_board").select("*").order("updated_at", { ascending: false }),
+      state.supabase.from("cc_v_line_operation_history").select("*").order("occurred_at", { ascending: false }).limit(200),
+      state.supabase.from("cc_sites").select("id,client_id,site_code,site_name,status").order("site_code"),
+    ];
+    const results = await Promise.all(queries);
+    const names = ["summary","accounts","campaigns","assets","richMenus","coupons","shopCards","events","sites"];
+    results.forEach((result, index) => { if (result.error) throw result.error; state.lineOps[names[index]] = result.data || (index === 0 ? {} : []); });
+    const currentAccount = $("lineAccountFilter").value;
+    $("lineAccountFilter").innerHTML = `<option value="all">すべてのLINEアカウント</option>${state.lineOps.accounts.map((item) => `<option value="${item.id}">${escapeHtml(item.client_name)}｜${escapeHtml(item.account_name)}</option>`).join("")}`;
+    if ([...$("lineAccountFilter").options].some((option) => option.value === currentAccount)) $("lineAccountFilter").value = currentAccount;
+    renderLineMetrics();
+    renderActiveLineTab();
+  }
+
+  function recordByKind(kind, id) {
+    const source = { account:"accounts", campaign:"campaigns", asset:"assets", "rich-menu":"richMenus", coupon:"coupons", "shop-card":"shopCards", event:"events" }[kind];
+    return (state.lineOps[source] || []).find((item) => item.id === id) || null;
+  }
+
+  function optionList(options, selected = "") {
+    return options.map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+  }
+
+  function fieldHtml(id, label, control, note = "") {
+    return `<div class="field ${control.includes("textarea") ? "full" : ""}"><label for="${id}">${escapeHtml(label)}</label>${control}${note ? `<small>${escapeHtml(note)}</small>` : ""}</div>`;
+  }
+
+  function openLineEditor(kind, id = "") {
+    if (!canEditLineOperations()) return toast("閲覧専用権限では変更できません。", true);
+    const item = recordByKind(kind, id) || {};
+    const editing = Boolean(id);
+    $("lineEditorModal").dataset.kind = kind;
+    $("lineEditorModal").dataset.recordId = id;
+    const titles = { account:"LINE公式アカウント",campaign:"配信予定",asset:"制作物","rich-menu":"リッチメニュー",coupon:"クーポン","shop-card":"ショップカード",event:"対応履歴" };
+    $("lineEditorTitle").textContent = `${titles[kind]}を${editing ? "編集" : "登録"}`;
+    $("lineEditorEyebrow").textContent = editing ? "UPDATE" : "NEW RECORD";
+    let fields = "";
+    if (kind === "account") {
+      fields += fieldHtml("leClient", "顧客", `<select id="leClient" ${editing ? "disabled" : ""}>${lineClientOptionHtml(item.client_id || state.clients[0]?.id || "")}</select>`);
+      fields += fieldHtml("leSite", "拠点", `<select id="leSite">${lineSiteOptionHtml(item.site_id || "", item.client_id || state.clients[0]?.id || "")}</select>`);
+      fields += fieldHtml("leAccountName", "LINE公式アカウント名", `<input id="leAccountName" maxlength="160" required value="${escapeHtml(item.account_name || "")}">`);
+      fields += fieldHtml("leBasicId", "Basic ID", `<input id="leBasicId" maxlength="120" value="${escapeHtml(item.basic_id || "")}">`);
+      fields += fieldHtml("leManagerUrl", "LINE管理画面URL", `<input id="leManagerUrl" type="url" value="${escapeHtml(item.manager_url || "")}">`, "Secretやパスワードは入力しません。");
+      fields += fieldHtml("lePermission", "権限付与", `<select id="lePermission">${optionList([["not_requested","未依頼"],["requested","依頼済み"],["granted","付与済み"],["revoked","解除"],["error","要確認"]], item.permission_status || "not_requested")}</select>`);
+      fields += fieldHtml("leGreeting", "あいさつメッセージ", `<select id="leGreeting">${optionList([["not_checked","未確認"],["draft","下書き"],["configured","設定済み"],["needs_update","要更新"]], item.greeting_status || "not_checked")}</select>`);
+      fields += fieldHtml("leRichStatus", "リッチメニュー", `<select id="leRichStatus">${optionList([["not_checked","未確認"],["draft","下書き"],["configured","設定済み"],["needs_update","要更新"]], item.rich_menu_status || "not_checked")}</select>`);
+      fields += fieldHtml("leCouponStatus", "クーポン", `<select id="leCouponStatus">${optionList([["not_used","未使用"],["active","運用中"],["expired","期限終了"],["needs_update","要更新"]], item.coupon_status || "not_used")}</select>`);
+      fields += fieldHtml("leShopCardStatus", "ショップカード", `<select id="leShopCardStatus">${optionList([["not_used","未使用"],["active","運用中"],["needs_update","要更新"]], item.shop_card_status || "not_used")}</select>`);
+      fields += fieldHtml("leAccountStatus", "運用状態", `<select id="leAccountStatus">${optionList([["preparing","準備中"],["active","運用中"],["paused","一時停止"],["ended","終了"]], item.status || "active")}</select>`);
+      fields += fieldHtml("leInternalNote", "内部メモ", `<textarea id="leInternalNote" maxlength="2000">${escapeHtml(item.internal_note || "")}</textarea>`);
+    }
+    if (kind === "campaign") {
+      const accountId = item.line_account_id || state.lineOps.accounts[0]?.id || "";
+      fields += fieldHtml("leLineAccount", "LINE公式アカウント", `<select id="leLineAccount" required>${lineAccountOptionHtml(accountId, true)}</select>`);
+      fields += fieldHtml("leCampaignTitle", "配信タイトル", `<input id="leCampaignTitle" maxlength="180" required value="${escapeHtml(item.title || "")}">`);
+      fields += fieldHtml("leCampaignType", "配信区分", `<select id="leCampaignType">${optionList([["broadcast","一斉配信"],["segment","絞り込み配信"],["step","ステップ配信"],["coupon_notice","クーポン案内"],["shop_card_notice","ショップカード案内"],["rich_menu_notice","リッチメニュー案内"],["greeting_notice","あいさつ案内"],["other","その他"]], item.campaign_type || "broadcast")}</select>`);
+      fields += fieldHtml("leCampaignStatus", "進行状態", `<select id="leCampaignStatus">${optionList(Object.entries(lineCampaignStatusLabels).filter(([v]) => !["overdue","waiting_client"].includes(v)), item.status || "idea")}</select>`);
+      fields += fieldHtml("leCampaignSchedule", "配信予定日時", `<input id="leCampaignSchedule" type="datetime-local" value="${dateTimeLocalValue(item.scheduled_at)}">`);
+      fields += fieldHtml("leImageStatus", "画像進行", `<select id="leImageStatus">${optionList([["not_required","画像不要"],["not_started","未着手"],["in_progress","制作中"],["internal_review","社内確認"],["client_review","オーナー確認"],["approved","承認済み"]], item.image_status || "not_required")}</select>`);
+      fields += fieldHtml("leOwnerApproval", "オーナー承認", `<select id="leOwnerApproval">${optionList(Object.entries(lineApprovalLabels), item.owner_approval_status || "not_requested")}</select>`);
+      fields += fieldHtml("leApprovalReference", "承認記録", `<input id="leApprovalReference" maxlength="300" value="${escapeHtml(item.owner_approval_reference || "")}" placeholder="例：2026/08/04 LINEで承認">`);
+      fields += '<div class="form-section-title">配信内容</div>';
+      fields += fieldHtml("leObjective", "目的", `<textarea id="leObjective" maxlength="2000">${escapeHtml(item.objective || "")}</textarea>`);
+      fields += fieldHtml("leAudience", "対象の説明", `<textarea id="leAudience" maxlength="1000">${escapeHtml(item.audience_summary || "")}</textarea>`, "個別LINEユーザー名やLINE User IDは入力しません。");
+      fields += fieldHtml("leMessageDraft", "配信原稿", `<textarea id="leMessageDraft" maxlength="5000">${escapeHtml(item.message_draft || "")}</textarea>`);
+      fields += fieldHtml("leImageBrief", "画像制作指示", `<textarea id="leImageBrief" maxlength="2000">${escapeHtml(item.image_brief || "")}</textarea>`);
+      fields += fieldHtml("leCampaignNote", "内部メモ", `<textarea id="leCampaignNote" maxlength="2000">${escapeHtml(item.internal_note || "")}</textarea>`);
+      fields += fieldHtml("leReach", "配信到達数（集計）", `<input id="leReach" type="number" min="0" value="${item.aggregate_reach_count ?? ""}">`, "個別ユーザー情報ではなく集計値のみ。");
+      fields += fieldHtml("leClicks", "クリック数（集計）", `<input id="leClicks" type="number" min="0" value="${item.aggregate_click_count ?? ""}">`);
+    }
+    if (kind === "asset") {
+      const accountId = item.line_account_id || state.lineOps.accounts[0]?.id || "";
+      fields += fieldHtml("leLineAccount", "LINE公式アカウント", `<select id="leLineAccount" required>${lineAccountOptionHtml(accountId, true)}</select>`);
+      fields += fieldHtml("leCampaign", "関連する配信", `<select id="leCampaign">${lineCampaignOptionHtml(item.campaign_id || "", accountId)}</select>`);
+      fields += fieldHtml("leAssetTitle", "制作物名", `<input id="leAssetTitle" maxlength="180" required value="${escapeHtml(item.title || "")}">`);
+      fields += fieldHtml("leAssetType", "種類", `<select id="leAssetType">${optionList([["copy","配信原稿"],["image","配信画像"],["rich_menu","リッチメニュー"],["coupon","クーポン"],["shop_card","ショップカード"],["greeting","あいさつ"],["pop","店頭POP"],["other","その他"]], item.asset_type || "image")}</select>`);
+      fields += fieldHtml("leAssetStatus", "制作状態", `<select id="leAssetStatus">${optionList(Object.entries(lineAssetStatusLabels), item.status || "draft")}</select>`);
+      fields += fieldHtml("leOwnerApproval", "オーナー承認", `<select id="leOwnerApproval">${optionList(Object.entries(lineApprovalLabels), item.owner_approval_status || "not_requested")}</select>`);
+      fields += fieldHtml("leVersion", "版", `<input id="leVersion" maxlength="60" value="${escapeHtml(item.version_label || "")}" placeholder="例：V1.2">`);
+      fields += fieldHtml("leExternalUrl", "外部ファイルURL", `<input id="leExternalUrl" type="url" value="${escapeHtml(item.external_url || "")}">`, "画像本体はCONTROL CENTERに保存しません。HTTPSのURLだけ登録します。");
+      fields += fieldHtml("leDescription", "制作内容", `<textarea id="leDescription" maxlength="3000">${escapeHtml(item.description || "")}</textarea>`);
+      fields += fieldHtml("leApprovalReference", "承認記録", `<input id="leApprovalReference" maxlength="300" value="${escapeHtml(item.owner_approval_reference || "")}">`);
+      fields += fieldHtml("leInternalNote", "内部メモ", `<textarea id="leInternalNote" maxlength="2000">${escapeHtml(item.internal_note || "")}</textarea>`);
+    }
+    if (["rich-menu","coupon","shop-card"].includes(kind)) {
+      const accountId = item.line_account_id || state.lineOps.accounts[0]?.id || "";
+      fields += fieldHtml("leLineAccount", "LINE公式アカウント", `<select id="leLineAccount" required>${lineAccountOptionHtml(accountId, true)}</select>`);
+      if (kind === "rich-menu") {
+        fields += fieldHtml("leItemName", "リッチメニュー名", `<input id="leItemName" maxlength="180" required value="${escapeHtml(item.menu_name || "")}">`);
+        fields += fieldHtml("leItemSummary", "レイアウト・導線", `<textarea id="leItemSummary" maxlength="2000">${escapeHtml(item.layout_summary || "")}</textarea>`);
+        fields += fieldHtml("leItemStatus", "状態", `<select id="leItemStatus">${optionList([["draft","下書き"],["designing","制作中"],["internal_review","社内確認"],["client_review","オーナー確認"],["approved","承認済み"],["scheduled","開始予定"],["active","運用中"],["inactive","停止中"],["archived","保管"]], item.status || "draft")}</select>`);
+      } else if (kind === "coupon") {
+        fields += fieldHtml("leItemName", "クーポン名", `<input id="leItemName" maxlength="180" required value="${escapeHtml(item.coupon_name || "")}">`);
+        fields += fieldHtml("leItemSummary", "特典内容", `<textarea id="leItemSummary" maxlength="2000">${escapeHtml(item.benefit_summary || "")}</textarea>`);
+        fields += fieldHtml("leItemStatus", "状態", `<select id="leItemStatus">${optionList([["draft","下書き"],["client_review","オーナー確認"],["approved","承認済み"],["scheduled","開始予定"],["active","運用中"],["expired","期限終了"],["stopped","停止"],["archived","保管"]], item.status || "draft")}</select>`);
+      } else {
+        fields += fieldHtml("leItemName", "ショップカード名", `<input id="leItemName" maxlength="180" required value="${escapeHtml(item.card_name || "")}">`);
+        fields += fieldHtml("leItemSummary", "特典内容", `<textarea id="leItemSummary" maxlength="2000">${escapeHtml(item.benefit_summary || "")}</textarea>`);
+        fields += fieldHtml("lePoints", "特典までのポイント数", `<input id="lePoints" type="number" min="1" value="${item.points_required ?? ""}">`);
+        fields += fieldHtml("leItemStatus", "状態", `<select id="leItemStatus">${optionList([["draft","下書き"],["client_review","オーナー確認"],["approved","承認済み"],["scheduled","開始予定"],["active","運用中"],["inactive","停止中"],["archived","保管"]], item.status || "draft")}</select>`);
+      }
+      fields += fieldHtml("leOwnerApproval", "オーナー承認", `<select id="leOwnerApproval">${optionList(Object.entries(lineApprovalLabels), item.owner_approval_status || "not_requested")}</select>`);
+      fields += fieldHtml("leStartAt", "開始日時", `<input id="leStartAt" type="datetime-local" value="${dateTimeLocalValue(item.active_from || item.valid_from)}">`);
+      fields += fieldHtml("leEndAt", "終了日時", `<input id="leEndAt" type="datetime-local" value="${dateTimeLocalValue(item.active_until || item.valid_until)}">`);
+      fields += fieldHtml("leExternalUrl", "外部管理URL", `<input id="leExternalUrl" type="url" value="${escapeHtml(item.external_url || "")}">`);
+      fields += fieldHtml("leApprovalReference", "承認記録", `<input id="leApprovalReference" maxlength="300" value="${escapeHtml(item.owner_approval_reference || "")}">`);
+      fields += fieldHtml("leInternalNote", "内部メモ", `<textarea id="leInternalNote" maxlength="2000">${escapeHtml(item.internal_note || "")}</textarea>`);
+    }
+    if (kind === "event") {
+      const accountId = item.line_account_id || state.lineOps.accounts[0]?.id || "";
+      fields += fieldHtml("leLineAccount", "LINE公式アカウント", `<select id="leLineAccount" required>${lineAccountOptionHtml(accountId, true)}</select>`);
+      fields += fieldHtml("leEventType", "対応区分", `<select id="leEventType">${optionList(Object.entries(lineEventLabels), item.event_type || "note")}</select>`);
+      fields += fieldHtml("leEventSubject", "件名", `<input id="leEventSubject" maxlength="180" required value="${escapeHtml(item.subject || "")}">`);
+      fields += fieldHtml("leOccurredAt", "対応日時", `<input id="leOccurredAt" type="datetime-local" value="${dateTimeLocalValue(item.occurred_at || new Date())}">`);
+      fields += fieldHtml("leEventDetail", "対応内容", `<textarea id="leEventDetail" maxlength="4000">${escapeHtml(item.detail || "")}</textarea>`, "個別のLINE会話全文や顧客の個人情報は貼り付けません。");
+      fields += fieldHtml("leNextAction", "次の対応", `<input id="leNextAction" maxlength="500" value="${escapeHtml(item.next_action || "")}">`);
+      fields += fieldHtml("leFollowUp", "次回確認期限", `<input id="leFollowUp" type="datetime-local" value="${dateTimeLocalValue(item.follow_up_due_at)}">`);
+    }
+    $("lineEditorFields").innerHTML = fields || '<div class="readonly-note">編集項目を準備できませんでした。</div>';
+    setMessage("lineEditorMessage", "");
+    $("lineEditorBackdrop").classList.remove("hidden");
+    $("lineEditorModal").classList.remove("hidden");
+    document.body.classList.add("dialog-open");
+    if (kind === "account" && !editing) {
+      $("leClient").addEventListener("change", () => { $("leSite").innerHTML = lineSiteOptionHtml("", $("leClient").value); });
+    }
+    if (kind === "asset") {
+      $("leLineAccount").addEventListener("change", () => { $("leCampaign").innerHTML = lineCampaignOptionHtml("", $("leLineAccount").value); });
+    }
+  }
+
+  function closeLineEditor() {
+    $("lineEditorBackdrop").classList.add("hidden");
+    $("lineEditorModal").classList.add("hidden");
+    document.body.classList.remove("dialog-open");
+  }
+
+  function accountContext(accountId) {
+    const account = state.lineOps.accounts.find((item) => item.id === accountId);
+    if (!account) throw new Error("LINE公式アカウントを選択してください。");
+    return account;
+  }
+
+  async function saveLineEditor(event) {
+    event.preventDefault();
+    if (!canEditLineOperations()) return;
+    const kind = $("lineEditorModal").dataset.kind;
+    const id = $("lineEditorModal").dataset.recordId;
+    const editing = Boolean(id);
+    const now = new Date().toISOString();
+    let table = "";
+    let payload = {};
+    if (kind === "account") {
+      table = "cc_line_accounts";
+      const clientId = editing ? recordByKind(kind, id).client_id : $("leClient").value;
+      payload = { client_id: clientId, site_id: $("leSite").value || null, account_name: $("leAccountName").value.trim(), basic_id: $("leBasicId").value.trim() || null, manager_url: $("leManagerUrl").value.trim() || null, permission_status: $("lePermission").value, greeting_status: $("leGreeting").value, rich_menu_status: $("leRichStatus").value, coupon_status: $("leCouponStatus").value, shop_card_status: $("leShopCardStatus").value, status: $("leAccountStatus").value, internal_note: $("leInternalNote").value.trim() || null, updated_by: state.staff.id };
+      if (!editing) payload.created_by = state.staff.id;
+    }
+    if (kind === "campaign") {
+      table = "cc_line_campaigns"; const account = accountContext($("leLineAccount").value); const approval = $("leOwnerApproval").value;
+      payload = { client_id: account.client_id, site_id: account.site_id || null, line_account_id: account.id, campaign_type: $("leCampaignType").value, title: $("leCampaignTitle").value.trim(), objective: $("leObjective").value.trim() || null, audience_summary: $("leAudience").value.trim() || null, message_draft: $("leMessageDraft").value.trim() || null, image_brief: $("leImageBrief").value.trim() || null, image_status: $("leImageStatus").value, status: $("leCampaignStatus").value, owner_approval_status: approval, owner_approval_requested_at: approval === "waiting" ? (recordByKind(kind,id)?.owner_approval_requested_at || now) : null, owner_approved_at: approval === "approved" ? (recordByKind(kind,id)?.owner_approved_at || now) : null, owner_approval_reference: $("leApprovalReference").value.trim() || null, scheduled_at: isoOrNull($("leCampaignSchedule").value), delivered_at: $("leCampaignStatus").value === "delivered" ? (recordByKind(kind,id)?.delivered_at || now) : null, aggregate_reach_count: $("leReach").value === "" ? null : Number($("leReach").value), aggregate_click_count: $("leClicks").value === "" ? null : Number($("leClicks").value), internal_note: $("leCampaignNote").value.trim() || null, updated_by: state.staff.id };
+      if (!editing) payload.created_by = state.staff.id;
+    }
+    if (kind === "asset") {
+      table = "cc_line_assets"; const account = accountContext($("leLineAccount").value); const approval = $("leOwnerApproval").value;
+      payload = { client_id: account.client_id, site_id: account.site_id || null, line_account_id: account.id, campaign_id: $("leCampaign").value || null, asset_type: $("leAssetType").value, title: $("leAssetTitle").value.trim(), description: $("leDescription").value.trim() || null, status: $("leAssetStatus").value, version_label: $("leVersion").value.trim() || null, external_url: $("leExternalUrl").value.trim() || null, owner_approval_status: approval, owner_approval_reference: $("leApprovalReference").value.trim() || null, approved_at: approval === "approved" ? (recordByKind(kind,id)?.approved_at || now) : null, internal_note: $("leInternalNote").value.trim() || null, updated_by: state.staff.id };
+      if (!editing) payload.created_by = state.staff.id;
+    }
+    if (["rich-menu","coupon","shop-card"].includes(kind)) {
+      const account = accountContext($("leLineAccount").value); const approval = $("leOwnerApproval").value;
+      table = kind === "rich-menu" ? "cc_line_rich_menus" : kind === "coupon" ? "cc_line_coupons" : "cc_line_shop_cards";
+      payload = { client_id: account.client_id, site_id: account.site_id || null, line_account_id: account.id, status: $("leItemStatus").value, owner_approval_status: approval, owner_approval_reference: $("leApprovalReference").value.trim() || null, external_url: $("leExternalUrl").value.trim() || null, internal_note: $("leInternalNote").value.trim() || null, updated_by: state.staff.id };
+      if (kind === "rich-menu") Object.assign(payload, { menu_name: $("leItemName").value.trim(), layout_summary: $("leItemSummary").value.trim() || null, active_from: isoOrNull($("leStartAt").value), active_until: isoOrNull($("leEndAt").value) });
+      if (kind === "coupon") Object.assign(payload, { coupon_name: $("leItemName").value.trim(), benefit_summary: $("leItemSummary").value.trim() || null, valid_from: isoOrNull($("leStartAt").value), valid_until: isoOrNull($("leEndAt").value) });
+      if (kind === "shop-card") Object.assign(payload, { card_name: $("leItemName").value.trim(), benefit_summary: $("leItemSummary").value.trim() || null, points_required: $("lePoints").value === "" ? null : Number($("lePoints").value), valid_from: isoOrNull($("leStartAt").value), valid_until: isoOrNull($("leEndAt").value) });
+      if (!editing) payload.created_by = state.staff.id;
+    }
+    if (kind === "event") {
+      table = "cc_line_operation_events"; const account = accountContext($("leLineAccount").value);
+      payload = { client_id: account.client_id, site_id: account.site_id || null, line_account_id: account.id, event_type: $("leEventType").value, subject: $("leEventSubject").value.trim(), detail: $("leEventDetail").value.trim() || null, next_action: $("leNextAction").value.trim() || null, follow_up_due_at: isoOrNull($("leFollowUp").value), occurred_at: isoOrNull($("leOccurredAt").value) || now, actor_staff_id: state.staff.id };
+    }
+    if (!table) return setMessage("lineEditorMessage", "保存対象を確認できませんでした。");
+    if (Object.values(payload).some((value) => typeof value === "string" && /(?:sb_secret_|service_role|channel_secret|access[_-]?token)/i.test(value))) return setMessage("lineEditorMessage", "Secret・アクセストークン・パスワードはCONTROL CENTERへ保存できません。");
+    const button = $("lineEditorSave"); setBusy(button, true, "保存しています…"); setMessage("lineEditorMessage", "");
+    try {
+      let query = editing ? state.supabase.from(table).update(payload).eq("id", id) : state.supabase.from(table).insert(payload);
+      const { error } = await query;
+      if (error) throw error;
+      closeLineEditor();
+      await Promise.all([loadLineOverview(), loadDashboard()]);
+      toast("LINE運用情報を保存しました。");
+    } catch (error) { setMessage("lineEditorMessage", error.message || "保存できませんでした。"); }
+    finally { setBusy(button, false); }
   }
 
   async function loadSystemOverview() {
@@ -564,7 +907,7 @@
     clients: ["全顧客", "LINE公式運用のみを含む全契約先"],
     "client-detail": ["顧客詳細", "契約・接続・対応状況を確認します"],
     contracts: ["契約・サービス", "契約内容の確認"],
-    line: ["LINE公式運用", "LINE公式の運用状況"],
+    line: ["LINE公式運用", "配信・制作・承認・販促設定・対応履歴"],
     systems: ["DPROシステム", "接続・バージョン・稼働状態"],
     websites: ["ホームページ", "公開・自動連動状態"],
     tasks: ["タスク・確認待ち", "対応期限と回答待ち"],
@@ -704,6 +1047,15 @@
       } catch { toast("コピーできませんでした。", true); }
     });
 
+    $$("[data-line-new]").forEach((button) => button.addEventListener("click", () => openLineEditor(button.dataset.lineNew)));
+    $$("[data-line-close]").forEach((button) => button.addEventListener("click", closeLineEditor));
+    $("lineEditorForm").addEventListener("submit", saveLineEditor);
+    $$(".line-tab").forEach((button) => button.addEventListener("click", () => activateLineTab(button.dataset.lineTab)));
+    ["lineSearch","lineAccountFilter","lineCampaignStatusFilter","lineApprovalFilter"].forEach((id) => {
+      const element = $(id); if (!element) return;
+      element.addEventListener(id === "lineSearch" ? "input" : "change", renderActiveLineTab);
+    });
+    $("refreshLineOps").addEventListener("click", async () => { const button = $("refreshLineOps"); setBusy(button,true,"更新中…"); try { await loadLineOverview(); toast("LINE運用情報を更新しました。"); } catch(error){ toast(error.message||"更新できませんでした。",true); } finally { setBusy(button,false); } });
     $$(".nav-button").forEach((button) => button.addEventListener("click", () => activateView(button.dataset.view)));
     $$('[data-go-view]').forEach((button) => button.addEventListener("click", () => activateView(button.dataset.goView)));
     $("clientSearch").addEventListener("input", renderClientGrid);
