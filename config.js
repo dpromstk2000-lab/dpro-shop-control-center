@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-10-FRONTEND-20260808",
+  version: "CONTROL-CENTER-10-FRONTEND-20260808-FAVICON1",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -10,6 +10,26 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
 (() => {
   "use strict";
+
+  const installFavicon = () => {
+    if (document.querySelector('link[data-dpro-favicon="control-center"]')) return;
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="14" fill="#0b5f49"/>
+        <path fill="#ffffff" d="M15 13h18c11 0 19 8 19 19s-8 19-19 19H15V13zm10 9v20h8c6 0 10-4 10-10s-4-10-10-10h-8z"/>
+        <path fill="#9fe3bd" d="M46 8c5 0 9 4 9 9-5 0-9-4-9-9z"/>
+      </svg>
+    `.trim();
+
+    const existing = document.querySelector('link[rel~="icon"]');
+    const link = existing || document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/svg+xml";
+    link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    link.dataset.dproFavicon = "control-center";
+    if (!existing) document.head.appendChild(link);
+  };
 
   const ensureStyle = () => {
     if (document.getElementById("cc10-addon-link-style")) return;
@@ -64,6 +84,8 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     const monitor = installMonitorLink(nav);
     return contact && monitor;
   };
+
+  installFavicon();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", installLinks, { once: true });
