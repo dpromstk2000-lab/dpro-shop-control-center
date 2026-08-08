@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>DPRO CONTACT System Check</title>
+  <link rel="stylesheet" href="contact-v1-system-check.css?v=DPRO-CONTACT-1-SYSTEM-CHECK-20260808">
+  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808"></script>
+  <script defer src="contact-v1-system-check.js?v=DPRO-CONTACT-1-SYSTEM-CHECK-20260808"></script>
+</head>
+<body>
+  <main class="sc-shell">
+    <header class="sc-head">
+      <div>
+        <p class="sc-eyebrow">DPRO INTERNAL / SYSTEM CHECK</p>
+        <h1>DPRO CONTACT</h1>
+        <p>DB・Worker・LINE・暗号化・権限・CORSを一括検査します。</p>
+      </div>
+      <div class="sc-actions">
+        <a id="backLink" class="sc-btn secondary" href="contact-v1.html">顧客対応へ戻る</a>
+        <button id="runButton" class="sc-btn primary" type="button">一括チェック</button>
+      </div>
+    </header>
+
+    <section id="authMessage" class="sc-notice">
+      ログイン状態を確認しています…
+    </section>
+
+    <section id="summary" class="sc-summary hidden">
+      <article><span>総合</span><strong id="overall">—</strong></article>
+      <article><span>Worker</span><strong id="workerVersion">—</strong></article>
+      <article><span>DB</span><strong id="dbVersion">—</strong></article>
+      <article><span>最終Webhook</span><strong id="webhookState">—</strong></article>
+    </section>
+
+    <section id="warningBox" class="sc-warning hidden"></section>
+
+    <section id="checkGrid" class="sc-grid hidden"></section>
+
+    <section id="details" class="sc-panel hidden">
+      <div class="sc-panel-head">
+        <h2>詳細</h2>
+        <button id="toggleRaw" class="sc-btn secondary small" type="button">JSONを表示</button>
+      </div>
+      <dl id="detailList" class="sc-details"></dl>
+      <pre id="rawJson" class="hidden"></pre>
+    </section>
+
+    <footer>
+      <strong>DPRO CONTACT System Check</strong>
+      <span id="checkedAt">未実行</span>
+      <small>オーナー向け通常画面には表示しない内部検査ページです。</small>
+    </footer>
+  </main>
+</body>
+</html>

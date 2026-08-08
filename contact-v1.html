@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#0b5f49">
+  <title>顧客対応 | DPRO CONTACT</title>
+  <link rel="stylesheet" href="contact-v1.css?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808">
+  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808"></script>
+  <script defer src="contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808"></script>
+</head>
+<body data-dpro-contact-page="true">
+  <div id="loading" class="dc-state">
+    <div class="dc-spinner"></div>
+    <strong id="loadingTitle">DPRO CONTACT</strong>
+    <p>ログイン状態と接続を確認しています…</p>
+  </div>
+
+  <div id="disabledScreen" class="dc-state dc-hidden">
+    <div class="dc-state-card">
+      <span class="dc-state-icon">OFF</span>
+      <h1>顧客対応は現在利用しません</h1>
+      <p id="disabledText">このシステムではDPRO CONTACTが無効になっています。</p>
+      <a id="disabledReturn" class="dc-btn dc-primary" href="owner.html">管理画面へ戻る</a>
+    </div>
+  </div>
+
+  <div id="authRequired" class="dc-state dc-hidden">
+    <div class="dc-state-card">
+      <span class="dc-state-icon">鍵</span>
+      <h1>ログインしてください</h1>
+      <p id="authText">顧客対応は管理者・スタッフ専用です。</p>
+      <a id="loginReturn" class="dc-btn dc-primary" href="owner.html">管理画面へ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="dc-state dc-hidden">
+    <div class="dc-state-card">
+      <span class="dc-state-icon dc-error">!</span>
+      <h1>顧客対応を開けません</h1>
+      <p id="errorText">接続を確認してください。</p>
+      <div class="dc-state-actions">
+        <button id="retryButton" class="dc-btn dc-primary" type="button">再確認</button>
+        <a id="errorReturn" class="dc-btn dc-secondary" href="owner.html">管理画面へ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="dc-app dc-hidden">
+    <aside id="sidebar" class="dc-sidebar">
+      <a id="brandLink" class="dc-brand" href="owner.html">
+        <span id="brandMark">D</span>
+        <div>
+          <strong id="brandName">DPRO</strong>
+          <small id="systemName">OWNER SYSTEM</small>
+        </div>
+      </a>
+
+      <nav class="dc-nav">
+        <a id="homeLink" href="owner.html"><i>⌂</i><span id="homeLabel">管理画面</span></a>
+        <a class="active" href="contact-v1.html"><i>話</i><span>顧客対応</span></a>
+      </nav>
+
+      <div class="dc-sidebar-note">
+        <strong>DPRO CONTACT V1.0</strong>
+        <span id="channelName">LINE Inbox</span>
+        <small>共通顧客対応モジュール</small>
+      </div>
+    </aside>
+
+    <main class="dc-main">
+      <header class="dc-topbar">
+        <button id="menuButton" class="dc-menu" type="button" aria-label="メニュー">☰</button>
+        <button id="mobileBackButton" class="dc-mobile-back dc-hidden" type="button" aria-label="会話一覧へ戻る">‹</button>
+        <div class="dc-top-title">
+          <strong>顧客対応</strong>
+          <small id="topbarDescription">LINE公式の問い合わせを確認・返信</small>
+        </div>
+        <div class="dc-operator">
+          <span id="operatorInitial">D</span>
+          <div>
+            <strong id="operatorName">ログイン中</strong>
+            <small id="operatorRole">確認中</small>
+          </div>
+        </div>
+      </header>
+
+      <div class="dc-content">
+        <section class="dc-page-head">
+          <div>
+            <p class="dc-eyebrow">DPRO CONTACT / LINE</p>
+            <h1 id="pageTitle">問い合わせを<br>管理画面で完結</h1>
+            <p id="pageLead">LINE公式に届いた問い合わせを確認し、そのまま返信できます。</p>
+          </div>
+          <button id="refreshButton" class="dc-btn dc-secondary" type="button">最新情報に更新</button>
+        </section>
+
+        <section class="dc-metrics" aria-label="顧客対応サマリー">
+          <article><b id="metricUnread">—</b><span>未読メッセージ</span></article>
+          <article><b id="metricOpen">—</b><span>対応中</span></article>
+          <article><b id="metricToday">—</b><span>本日の会話</span></article>
+          <article><b id="metricClosed">—</b><span>対応完了</span></article>
+        </section>
+
+        <section id="inbox" class="dc-inbox">
+          <div id="threadPane" class="dc-thread-pane">
+            <div class="dc-thread-tools">
+              <input id="threadSearch" type="search" autocomplete="off" placeholder="名前・メッセージで検索">
+              <label><input id="unreadOnly" type="checkbox"> 未読のみ</label>
+              <select id="statusFilter" aria-label="対応状態">
+                <option value="all">すべて</option>
+                <option value="open">対応中</option>
+                <option value="closed">対応完了</option>
+              </select>
+            </div>
+            <div id="threadList" class="dc-thread-list"></div>
+          </div>
+
+          <div id="conversationPane" class="dc-conversation-pane">
+            <div id="emptyConversation" class="dc-conversation-empty">
+              <span>LINE</span>
+              <h2>会話を選択してください</h2>
+              <p>問い合わせを選ぶと、ここに会話履歴が表示されます。</p>
+            </div>
+
+            <div id="conversation" class="dc-conversation dc-hidden">
+              <div class="dc-conversation-head">
+                <div>
+                  <strong id="conversationName">LINEユーザー</strong>
+                  <small id="conversationMeta">—</small>
+                </div>
+                <button id="statusButton" class="dc-btn dc-small dc-secondary" type="button">対応完了にする</button>
+              </div>
+
+              <div id="messageList" class="dc-messages" aria-live="polite"></div>
+
+              <form id="replyForm" class="dc-composer">
+                <textarea id="replyText" rows="3" maxlength="5000" placeholder="返信を入力してください"></textarea>
+                <div class="dc-composer-foot">
+                  <small id="composerHint">送信ボタンでLINEへ送信します</small>
+                  <button id="sendButton" class="dc-btn dc-primary" type="submit">LINEへ返信</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <p id="securityNote" class="dc-security-note">
+          LINEユーザーID・表示名・会話本文はWorker側で暗号化して保存します。Secretはブラウザへ配置しません。
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="dc-toast dc-hidden" role="status"></div>
+</body>
+</html>
