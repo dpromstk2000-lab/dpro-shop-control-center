@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-10-FRONTEND-20260808-FAVICON1",
+  version: "CONTROL-CENTER-11-FRONTEND-20260809-CENTER2",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -32,9 +32,9 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   };
 
   const ensureStyle = () => {
-    if (document.getElementById("cc10-addon-link-style")) return;
+    if (document.getElementById("cc-addon-link-style")) return;
     const style = document.createElement("style");
-    style.id = "cc10-addon-link-style";
+    style.id = "cc-addon-link-style";
     style.textContent = `
       .cc-addon-link{text-decoration:none!important}
       .cc-addon-link::after{
@@ -42,6 +42,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         background:#dff7ec;color:#096245;font-size:9px;font-weight:900;letter-spacing:.08em
       }
       .cc-contact-link span{background:rgba(53,180,137,.22)!important;color:#d9fff0!important}
+      .cc-delivery-link span{background:rgba(255,198,79,.18)!important;color:#ffe8ad!important}
     `;
     document.head.appendChild(style);
   };
@@ -76,13 +77,29 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installDeliveryLink = (nav) => {
+    if (document.body?.dataset.cc11DeliveryPage === "true") return true;
+    if (nav.querySelector("[data-cc11-delivery-link]")) return true;
+    const link = document.createElement("a");
+    link.href = "delivery.html";
+    link.className = "nav-button cc-addon-link cc-delivery-link";
+    link.dataset.cc11DeliveryLink = "true";
+    link.innerHTML = "<span>納</span>制作・納品";
+    link.setAttribute("aria-label", "DPRO制作・納品管理を開く");
+    const contractButton = nav.querySelector('[data-view="contracts"]');
+    if (contractButton) contractButton.insertAdjacentElement("afterend", link);
+    else nav.appendChild(link);
+    return true;
+  };
+
   const installLinks = () => {
     const nav = document.querySelector(".side-nav");
     if (!nav) return false;
     ensureStyle();
+    const delivery = installDeliveryLink(nav);
     const contact = installContactLink(nav);
     const monitor = installMonitorLink(nav);
-    return contact && monitor;
+    return delivery && contact && monitor;
   };
 
   installFavicon();
