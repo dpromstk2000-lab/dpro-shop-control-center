@@ -7,16 +7,16 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>制作・納品｜DPRO SHOP CONTROL CENTER</title>
-  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-11-CENTER2">
+  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-11-CENTER3">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="config.js?v=CONTROL-CENTER-11-CENTER2"></script>
-  <script defer src="delivery.js?v=CONTROL-CENTER-11-CENTER2"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-11-CENTER3"></script>
+  <script defer src="delivery.js?v=CONTROL-CENTER-11-CENTER3"></script>
 </head>
 <body data-cc11-delivery-page="true">
   <div id="loadingScreen" class="state-screen">
     <div class="spinner"></div>
     <strong>DPRO 制作・納品管理</strong>
-    <p id="loadingText">ログイン状態とCENTER-1データを確認しています…</p>
+    <p id="loadingText">ログイン状態とDPRO STANDARDと制作データを確認しています…</p>
   </div>
 
   <div id="authScreen" class="state-screen hidden">
@@ -32,7 +32,7 @@
     <div class="state-card">
       <span class="state-icon error">!</span>
       <h1>制作・納品管理を開けません</h1>
-      <p id="errorText">CENTER-1のDB設定と接続を確認してください。</p>
+      <p id="errorText">制作・納品DBと接続を確認してください。</p>
       <div class="state-actions">
         <button id="retryButton" class="btn primary" type="button">再確認</button>
         <a class="btn secondary" href="index.html">CONTROL CENTERへ戻る</a>
@@ -59,7 +59,7 @@
         <span id="sideStandard">V1.1</span>
         <small>契約 → 制作 → 検査 → 納品</small>
       </div>
-      <div class="version">CONTROL-CENTER-11<br><span>CENTER-2</span></div>
+      <div class="version">CONTROL-CENTER-11<br><span>CENTER-3</span></div>
     </aside>
 
     <main class="main">
