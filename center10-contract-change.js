@@ -5,7 +5,7 @@
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-24-CENTER10-R5-LEGACY-IMPORT-20260810";
+  const BUILD = "CONTROL-CENTER-25-CENTER10-R6-PRODUCTION-GUARD-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -171,6 +171,28 @@
     return !!system && !["ended","cancelled"].includes(String(system.status||""));
   }
 
+  function systemEnvironment(system) {
+    const raw=String(system?.environment||"").trim().toLowerCase();
+    if(["production","prod","live","本番"].includes(raw)) return "production";
+    if(["demo","demonstration","デモ"].includes(raw)) return "demo";
+    if(["staging","stage","stg","検証","検証環境"].includes(raw)) return "staging";
+    if(["test","testing","テスト"].includes(raw)) return "test";
+    return raw||"unknown";
+  }
+
+  function isProductionSystem(system) {
+    return systemEnvironment(system)==="production";
+  }
+
+  function environmentLabel(system) {
+    const env=systemEnvironment(system);
+    if(env==="production") return "PRODUCTION";
+    if(env==="demo") return "DEMO";
+    if(env==="staging") return "STAGING";
+    if(env==="test") return "TEST";
+    return "環境未確認";
+  }
+
   function projectPriority(status) {
     const order={
       live:1,
@@ -213,7 +235,9 @@
     );
 
     const sameClientSystems=systems.filter((s)=>normId(s.client_id)===clientId);
-    const importSystems=[...sameClientSystems].sort((a,b)=>
+    const productionSystems=sameClientSystems.filter(isProductionSystem);
+    const nonProductionSystems=sameClientSystems.filter((s)=>!isProductionSystem(s));
+    const importSystems=[...productionSystems].sort((a,b)=>
       String(b.created_at||"").localeCompare(String(a.created_at||""))
     );
 
@@ -238,7 +262,7 @@
       linkedSystem=systems.find(
         (s)=>normId(s.id)===normId(candidateProject.system_instance_id)
       )||null;
-      if(linkedSystem) systemMode="linked";
+      if(linkedSystem) systemMode=isProductionSystem(linkedSystem)?"linked":"linked_non_production";
     }
 
     if(!linkedSystem && candidateProject){
@@ -249,7 +273,7 @@
       );
 
       const byCode=code
-        ? sameClientSystems.filter((s)=>normCode(s.system_code)===code)
+        ? productionSystems.filter((s)=>normCode(s.system_code)===code)
         : [];
 
       if(byCode.length===1){
@@ -257,20 +281,26 @@
         systemMode="unique_code";
       }else if(byCode.length>1){
         systemMode="multiple";
-      }else if(sameClientSystems.length===1){
-        candidateSystem=sameClientSystems[0];
+      }else if(productionSystems.length===1){
+        candidateSystem=productionSystems[0];
         systemMode="unique_client";
-      }else if(sameClientSystems.length>1){
+      }else if(productionSystems.length>1){
         systemMode="multiple";
       }
     }
 
     const readiness=contractReadiness(c);
+    const candidateProjectHasUnsafeSystem=
+      !!candidateProject?.system_instance_id &&
+      !!linkedSystem &&
+      !isProductionSystem(linkedSystem);
+
     const canLinkProject=
       readiness.contractUsable &&
       !readiness.projectLinked &&
       projectMode==="unique" &&
-      !!candidateProject;
+      !!candidateProject &&
+      !candidateProjectHasUnsafeSystem;
 
     const canLinkSystem=
       readiness.contractUsable &&
@@ -278,6 +308,7 @@
       !readiness.systemLinked &&
       !!candidateProject &&
       !!candidateSystem &&
+      isProductionSystem(candidateSystem) &&
       ["unique_code","unique_client"].includes(systemMode);
 
     const importSystemMode=
@@ -285,11 +316,17 @@
       importSystems.length>1 ? "multiple" :
       "none";
 
+    const onlyNonProductionSystems=
+      importSystems.length===0 && nonProductionSystems.length>0;
+
     const canImportExisting=
       readiness.contractUsable &&
       !readiness.projectLinked &&
       projectMode==="none" &&
       importSystems.length>0;
+
+    const linkedToNonProduction=
+      !!linkedSystem && !isProductionSystem(linkedSystem);
 
     return {
       contract:c,
@@ -300,13 +337,18 @@
       linkedSystem,
       candidateSystem,
       sameClientSystems,
+      productionSystems,
+      nonProductionSystems,
       projectMode,
       systemMode,
       canLinkProject,
       canLinkSystem,
+      candidateProjectHasUnsafeSystem,
       importSystems,
       importSystemMode,
+      onlyNonProductionSystems,
       canImportExisting,
+      linkedToNonProduction,
     };
   }
 
@@ -324,7 +366,7 @@
     return [
       system.system_name||system.system_code||"",
       system.facility_code||"",
-      system.environment||""
+      environmentLabel(system)
     ].filter(Boolean).join("｜");
   }
 
@@ -333,8 +375,11 @@
     if(!a.readiness?.contractUsable){
       return {tone:"bad",text:"終了・取消済みのため連動対象外です。"};
     }
+    if(a.linkedToNonProduction){
+      return {tone:"bad",text:`${environmentLabel(a.linkedSystem)}環境が紐付いています。実契約ではPRODUCTION本番システムとして扱いません。`};
+    }
     if(a.readiness?.fullLinked){
-      return {tone:"ok",text:"契約・制作案件・本番システムまで連動済みです。"};
+      return {tone:"ok",text:"契約・制作案件・PRODUCTION本番システムまで連動済みです。"};
     }
     if(a.readiness?.projectLinked && !a.readiness?.systemLinked){
       if(a.canLinkSystem){
@@ -353,6 +398,9 @@
           :"同じ顧客の未紐付け制作案件が1件だけ見つかりました。契約だけ安全に紐付けできます。"
       };
     }
+    if(a.candidateProjectHasUnsafeSystem){
+      return {tone:"bad",text:`制作案件候補はありますが、紐付いているシステムが${environmentLabel(a.linkedSystem)}です。実契約には自動紐付けしません。`};
+    }
     if(a.projectMode==="multiple"){
       return {tone:"warn",text:`同じ顧客の未紐付け制作案件が${a.unlinkedSameClient.length}件あります。誤紐付け防止のため自動候補にはしません。`};
     }
@@ -364,8 +412,12 @@
           :`制作案件はありません。同じ顧客の既存DPROシステムが${a.importSystems.length}件あるため、取り込み時に対象システムを選択してください。`
       };
     }
+    if(a.onlyNonProductionSystems){
+      const envs=[...new Set(a.nonProductionSystems.map(environmentLabel))].join(" / ");
+      return {tone:"warn",text:`同じ顧客のDPROシステムは確認できましたが、${envs}のみです。実契約への候補にはせず「本番システム未登録」と判定します。`};
+    }
     if(a.importSystemMode==="none"){
-      return {tone:"warn",text:"制作案件・既存DPROシステムとも未確認です。LINE運用等の非DPRO契約は無理に制作案件へ変換しません。"};
+      return {tone:"warn",text:"制作案件・PRODUCTION本番DPROシステムとも未確認です。LINE運用等の非DPRO契約は無理に制作案件へ変換しません。"};
     }
     return {tone:"warn",text:"同じ顧客の未紐付け制作案件が見つかりません。先に制作案件の登録が必要です。"};
   }
@@ -458,7 +510,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R5</span>
+        <span class="c10-pill green">CENTER-10 R6</span>
       </div>
 
       <div class="c10-guide">
@@ -659,16 +711,16 @@
 
     const contracts=state.overview?.contracts||[];
     const usable=contracts.filter((c)=>contractReadiness(c).contractUsable);
-    const projectLinked=usable.filter((c)=>contractReadiness(c).projectLinked).length;
-    const systemLinked=usable.filter((c)=>contractReadiness(c).systemLinked).length;
-    const featureReady=usable.filter((c)=>contractReadiness(c).featureChangeAllowed).length;
-    const issues=usable.filter((c)=>!contractReadiness(c).fullLinked);
     const audits=usable.map(auditForContract);
+    const projectLinked=audits.filter((a)=>a.readiness.projectLinked).length;
+    const systemLinked=audits.filter((a)=>a.readiness.systemLinked&&a.linkedSystem&&isProductionSystem(a.linkedSystem)).length;
+    const featureReady=audits.filter((a)=>a.readiness.featureChangeAllowed&&!a.linkedToNonProduction).length;
+    const issues=audits.filter((a)=>!a.readiness.fullLinked||a.linkedToNonProduction);
 
     const auditRows=audits.map((a)=>{
       const msg=auditMessage(a);
       const project=a.exactProject||a.candidateProject;
-      const system=a.linkedSystem||a.candidateSystem||(a.importSystems?.length===1?a.importSystems[0]:null);
+      const system=a.linkedSystem||a.candidateSystem||(a.importSystems?.length===1?a.importSystems[0]:null)||(a.nonProductionSystems?.length===1?a.nonProductionSystems[0]:null);
 
       let action="";
       if(a.canLinkProject){
@@ -677,10 +729,14 @@
         action=`<button class="btn secondary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">本番システムを紐付け</button>`;
       }else if(a.canImportExisting){
         action=`<button class="btn primary c10-link-button" type="button" data-c10-import-contract="${esc(a.contract.contract_id)}">既存導入を取り込む</button>`;
+      }else if(a.linkedToNonProduction||a.candidateProjectHasUnsafeSystem){
+        action=pill("非本番環境・要修正","red");
       }else if(a.readiness.fullLinked){
-        action=pill("連動済","green");
+        action=pill("PRODUCTION連動済","green");
       }else if(a.projectMode==="multiple"){
         action=pill("候補複数","amber");
+      }else if(a.onlyNonProductionSystems){
+        action=pill("本番システム未登録","amber");
       }else if(a.importSystemMode==="none"){
         action=pill("DPROシステムなし","gray");
       }else{
@@ -698,8 +754,8 @@
             <span>${esc(msg.text)}</span>
           </div>
           <div class="c10-audit-sub">
-            <strong>本番システム：${esc(system?systemLabel(system):"未確認")}</strong>
-            <span>${a.candidateProject&&!a.exactProject?"候補として照合":"現在の連動状態"}</span>
+            <strong>${system&&!isProductionSystem(system)?"参考環境":"本番システム"}：${esc(system?systemLabel(system):"未確認")}</strong>
+            <span>${system&&!isProductionSystem(system)?"DEMO / STAGING / TEST は実契約へ紐付け不可":a.candidateProject&&!a.exactProject?"PRODUCTION候補として照合":"現在の連動状態"}</span>
           </div>
           <div class="c10-audit-action">${action}</div>
         </article>
@@ -714,12 +770,12 @@
       <div class="c10-link-grid">
         <div class="c10-link-cell"><b>${usable.length}</b><span>変更対象にできる契約</span></div>
         <div class="c10-link-cell"><b>${projectLinked}</b><span>制作案件まで紐付け済み</span></div>
-        <div class="c10-link-cell"><b>${systemLinked}</b><span>システム台帳まで紐付け済み</span></div>
+        <div class="c10-link-cell"><b>${systemLinked}</b><span>PRODUCTION本番システムまで紐付け済み</span></div>
         <div class="c10-link-cell"><b>${featureReady}</b><span>Feature変更の下書き作成可</span></div>
       </div>
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。R5は既存制作案件があれば安全照合し、制作案件がなくても既存DPROシステムを確認できる契約は「既存導入取り込み」を案内します。自動で本番稼働にはしません。
+          連動確認が必要な契約 ${issues.length}件。R6は実契約に対してPRODUCTION環境だけを正式候補にします。DEMO / STAGING / TEST は参考表示のみで、自動紐付け・既存導入取り込みには使用しません。
         </div>
       `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
       <div class="c10-audit-list">${auditRows}</div>
@@ -782,7 +838,7 @@
 
         <div class="c10-grid" style="margin-top:14px">
           <div class="c10-field full">
-            <label>既存の本番DPROシステム</label>
+            <label>既存のPRODUCTION本番DPROシステム</label>
             <select id="c10ImportSystem">
               ${systems.length>1?'<option value="">対象システムを選択</option>':""}
               ${systems.map((s)=>`
@@ -847,11 +903,15 @@
 
     const system=(audit.importSystems||[]).find((s)=>String(s.id)===String(systemId))||null;
     if(!system){
-      alert("既存の本番DPROシステムを選択してください。");
+      alert("既存のPRODUCTION本番DPROシステムを選択してください。");
       return;
     }
     if(String(system.client_id||"")!==String(contract.client_id||"")){
       alert("契約者と本番DPROシステムの顧客が一致しないため、取り込みを中止しました。");
+      return;
+    }
+    if(!isProductionSystem(system)){
+      alert(`${environmentLabel(system)}環境は実契約へ取り込めません。PRODUCTION本番システムを選択してください。`);
       return;
     }
     if(!system.system_code){
@@ -965,6 +1025,14 @@
     }
 
     const system=audit.linkedSystem||audit.candidateSystem||null;
+    if(system&&!isProductionSystem(system)){
+      alert(`${environmentLabel(system)}環境は実契約の本番システムとして紐付けできません。PRODUCTION環境を確認してください。`);
+      return;
+    }
+    if(audit.candidateProjectHasUnsafeSystem){
+      alert("制作案件候補が非本番環境に紐付いているため、実契約へは紐付けません。");
+      return;
+    }
     const mode=audit.canLinkProject?"契約と制作案件":"本番システム";
     const confirmText=[
       `${mode}を紐付けます。`,
@@ -1212,16 +1280,19 @@
 
     const c=contractById(contractEl.value);
     const r=contractReadiness(c);
+    const a=auditForContract(c);
     const type=typeEl.value;
-    const featureBlocked=type==="feature_change"&&!r.featureChangeAllowed;
+    const nonProductionBlocked=type==="feature_change"&&a.linkedToNonProduction;
+    const featureBlocked=type==="feature_change"&&(!r.featureChangeAllowed||nonProductionBlocked);
     const contractBlocked=!r.contractUsable;
     const blocked=featureBlocked||contractBlocked;
 
     let note="";
     if(contractBlocked){
       note="この契約は終了済みのため、新しい変更案件を登録できません。";
+    } else if(type==="feature_change"&&a.linkedToNonProduction){
+      note=`Feature変更対象のシステムが${environmentLabel(a.linkedSystem)}環境です。実契約ではPRODUCTION本番システムを確認してから変更案件を登録してください。`;
     } else if(type==="feature_change"&&!r.projectLinked){
-      const a=auditForContract(c);
       note=a.canLinkProject
         ?"Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が1件だけ見つかったため、この画面から内容確認後に紐付けできます。"
         :a.canImportExisting
@@ -1279,6 +1350,7 @@
     const contractId=contractSelect?.value||"";
     const contract=contractById(contractId);
     const readiness=contractReadiness(contract);
+    const audit=auditForContract(contract);
     const projectId=contract?.project_id||null;
     const changeType=$("c10NewType")?.value||"";
     const title=$("c10NewTitle")?.value.trim()||"";
@@ -1298,6 +1370,11 @@
       return;
     }
 
+    if(changeType==="feature_change"&&audit.linkedToNonProduction){
+      alert(`${environmentLabel(audit.linkedSystem)}環境は実契約のFeature変更対象にできません。PRODUCTION本番システムを確認してください。`);
+      renderNewContractReadiness($("c10NewModal")||document);
+      return;
+    }
     if(changeType==="feature_change"&&!readiness.featureChangeAllowed){
       renderNewContractReadiness($("c10NewModal")||document);
       return;
