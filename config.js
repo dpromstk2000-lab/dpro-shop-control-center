@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-21-CENTER9-20260809",
+  version: "CONTROL-CENTER-22-CENTER10-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
