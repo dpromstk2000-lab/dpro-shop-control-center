@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-18-CENTER6-20260809",
+  version: "CONTROL-CENTER-18-CENTER6-R1-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -166,23 +166,42 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
     if (!tab || !document.getElementById("view-products")) return;
 
-    const selector =
+    const tabSelector =
       tab === "features" ? "[data-center4-tab]" :
       tab === "recommendations" ? "[data-center5-tab]" :
       null;
 
-    if (!selector) return;
+    if (!tabSelector) return;
 
     let tries = 0;
+    let productsOpened = false;
     const timer = setInterval(() => {
       tries += 1;
-      const button = document.querySelector(selector);
-      if (button) {
+
+      const appShell = document.getElementById("appShell");
+      const productsNav = document.querySelector('.nav-button[data-view="products"]');
+
+      if (!productsOpened && appShell && !appShell.classList.contains("hidden") && productsNav) {
+        productsNav.click();
+        productsOpened = true;
+      }
+
+      const tabButton = document.querySelector(tabSelector);
+      const productsView = document.getElementById("view-products");
+      const productsVisible = productsView && !productsView.classList.contains("hidden");
+
+      if (productsOpened && productsVisible && tabButton) {
+        tabButton.click();
         clearInterval(timer);
-        button.click();
+
+        const clean = new URL(location.href);
+        clean.searchParams.delete("system");
+        clean.searchParams.delete("product_tab");
+        history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
         return;
       }
-      if (tries >= 80) clearInterval(timer);
+
+      if (tries >= 160) clearInterval(timer);
     }, 125);
   };
 
