@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-21-CENTER9-20260809";
+  const BUILD = "CONTROL-CENTER-21-CENTER9-R3-20260809";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -88,25 +88,16 @@
     document.head.appendChild(style);
   }
 
-  function installPanel() {
-    const tabs=document.querySelector(".tabs");
-    const goLiveTab=document.querySelector("[data-center8-go-live]");
-    const goLivePanel=$("panel-go-live");
+  function findGoLiveTab() {
+    return document.querySelector('.tab[data-tab="go-live"]')
+      || document.querySelector('[data-center8-go-live]')
+      || Array.from(document.querySelectorAll('.tabs .tab, .tabs button'))
+        .find((el) => (el.textContent || '').trim() === '本番稼働')
+      || null;
+  }
 
-    if(!tabs||!goLiveTab||!goLivePanel||$("panel-maintenance")) return false;
-
-    const button=document.createElement("button");
-    button.className="tab";
-    button.type="button";
-    button.dataset.tab="maintenance";
-    button.dataset.center9Maintenance="true";
-    button.textContent="保守・更新";
-    goLiveTab.insertAdjacentElement("afterend",button);
-
-    const panel=document.createElement("section");
-    panel.id="panel-maintenance";
-    panel.className="tab-panel hidden";
-    panel.innerHTML=`
+  function maintenancePanelHtml() {
+    return `
       <div class="c9-head">
         <div>
           <h2>保守・更新管理</h2>
@@ -137,26 +128,64 @@
       <div id="c9List" class="c9-list"><div class="c9-empty">保守対象を確認しています…</div></div>
       <div id="c9Detail"></div>
     `;
+  }
 
-    goLivePanel.insertAdjacentElement("afterend",panel);
+  function bindMaintenancePanel(button, panel) {
+    if (button.dataset.center9Bound === "true") return;
 
-    button.addEventListener("click",async()=>{
-      $$(".tab").forEach((b)=>b.classList.toggle("active",b===button));
-      $$(".tab-panel").forEach((p)=>p.classList.add("hidden"));
+    button.dataset.center9Bound = "true";
+    button.addEventListener("click", async () => {
+      $$(".tab").forEach((b) => b.classList.toggle("active", b === button));
+      $$(".tab-panel").forEach((p) => p.classList.add("hidden"));
       panel.classList.remove("hidden");
       await loadOverview();
     });
 
-    $("c9Search").addEventListener("input",()=>{
-      state.search=$("c9Search").value.trim().toLowerCase();
+    $("c9Search")?.addEventListener("input", () => {
+      state.search = $("c9Search").value.trim().toLowerCase();
       renderList();
     });
-    $("c9Filter").addEventListener("change",()=>{
-      state.filter=$("c9Filter").value;
-      renderList();
-    });
-    $("c9Reload").addEventListener("click",loadOverview);
 
+    $("c9Filter")?.addEventListener("change", () => {
+      state.filter = $("c9Filter").value;
+      renderList();
+    });
+
+    $("c9Reload")?.addEventListener("click", loadOverview);
+  }
+
+  function installPanel() {
+    const tabs = document.querySelector(".tabs");
+    const goLiveTab = findGoLiveTab();
+    const goLivePanel = $("panel-go-live");
+
+    if (!tabs || !goLiveTab || !goLivePanel) return false;
+
+    let button = document.querySelector('.tab[data-tab="maintenance"]');
+    if (!button) {
+      button = document.createElement("button");
+      button.className = "tab";
+      button.type = "button";
+      button.dataset.tab = "maintenance";
+      button.dataset.center9Tab = "true";
+      button.textContent = "保守・更新";
+      goLiveTab.insertAdjacentElement("afterend", button);
+    } else if (button.previousElementSibling !== goLiveTab) {
+      goLiveTab.insertAdjacentElement("afterend", button);
+    }
+
+    let panel = $("panel-maintenance");
+    if (!panel) {
+      panel = document.createElement("section");
+      panel.id = "panel-maintenance";
+      panel.className = "tab-panel hidden";
+      panel.innerHTML = maintenancePanelHtml();
+      goLivePanel.insertAdjacentElement("afterend", panel);
+    } else if (!$("c9List")) {
+      panel.innerHTML = maintenancePanelHtml();
+    }
+
+    bindMaintenancePanel(button, panel);
     return true;
   }
 
@@ -544,12 +573,38 @@
 
   function boot(){
     installStyle();
-    if(installPanel()) return;
-    const observer=new MutationObserver(()=>{
-      if(installPanel()) observer.disconnect();
+
+    let observer = null;
+    let timer = null;
+    let stopped = false;
+
+    const cleanup = () => {
+      if (stopped) return;
+      stopped = true;
+      if (observer) observer.disconnect();
+      if (timer) clearInterval(timer);
+    };
+
+    const attempt = () => {
+      if (installPanel()) {
+        cleanup();
+        return true;
+      }
+      return false;
+    };
+
+    if (attempt()) return;
+
+    observer = new MutationObserver(() => {
+      attempt();
     });
-    observer.observe(document.documentElement,{childList:true,subtree:true});
-    setTimeout(()=>observer.disconnect(),18000);
+    observer.observe(document.documentElement, {childList:true, subtree:true});
+
+    // Dynamic script / Pages / slow device の順番に依存しないよう定期再確認。
+    timer = setInterval(attempt, 250);
+
+    // 1分以内にCENTER-8が生成されれば必ず追従。
+    setTimeout(cleanup, 60000);
   }
 
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot,{once:true});
