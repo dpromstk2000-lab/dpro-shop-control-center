@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-19-CENTER7-20260809";
+  const BUILD = "CONTROL-CENTER-19-CENTER7-R1-20260809";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -165,7 +165,7 @@
       const [setupRes,deliveryRes,metaRes,standardRes] = await Promise.all([
         sb.from("cc_v_contract_setup_overview").select("*").order("project_code"),
         sb.from("cc_v_delivery_project_overview_v2").select("*").order("updated_at",{ascending:false}),
-        sb.from("cc_delivery_projects").select("id,project_code,project_name,contract_id,system_instance_id,product_system_code,product_name_snapshot,status,standard_version_code"),
+        sb.from("cc_delivery_projects").select("id,project_code,project_name,contract_id,system_instance_id,product_system_code,product_name_snapshot,status,standard_version_id"),
         sb.from("cc_standard_versions").select("version_code,effective_date").eq("standard_code","DPRO_STANDARD").eq("status","current").order("effective_date",{ascending:false}).limit(1).maybeSingle(),
       ]);
       for (const r of [setupRes,deliveryRes,metaRes,standardRes]) if (r.error) throw r.error;
@@ -187,7 +187,7 @@
           client_name:s.client_name||d.client_name||"契約者",
           system_name:s.system_name||d.effective_system_name||d.system_name||m.product_name_snapshot||m.product_system_code||"",
           system_code:s.system_code||d.effective_system_code||d.system_code||m.product_system_code||"",
-          standard_version:s.standard_version||d.standard_version||m.standard_version_code||"",
+          standard_version:s.standard_version||d.standard_version||"",
         };
       });
 
