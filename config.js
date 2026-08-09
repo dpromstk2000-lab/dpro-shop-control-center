@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-16-CENTER4-20260809",
+  version: "CONTROL-CENTER-17-CENTER5-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -128,6 +128,16 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installCenter5IndustryTemplates = () => {
+    if (!document.getElementById("view-products")) return false;
+    if (document.querySelector('script[data-center5-industry-templates]')) return true;
+    const script = document.createElement("script");
+    script.src = "./center5-industry-templates.js?v=CONTROL-CENTER-17-CENTER5";
+    script.dataset.center5IndustryTemplates = "true";
+    document.head.appendChild(script);
+    return true;
+  };
+
   const installLinks = () => {
     const nav = document.querySelector(".side-nav");
     if (!nav) return false;
@@ -150,11 +160,13 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
       installLinks();
       installDeliveryCompatibility();
       installCenter4ProductFeatures();
+      installCenter5IndustryTemplates();
     }, { once: true });
   } else {
     installLinks();
     installDeliveryCompatibility();
     installCenter4ProductFeatures();
+    installCenter5IndustryTemplates();
   }
 
   const observer = new MutationObserver(() => {
