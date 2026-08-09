@@ -5,7 +5,7 @@
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-26-CENTER10-R7-PRODUCTION-REGISTER-20260810";
+  const BUILD = "CONTROL-CENTER-27-CENTER10-R7-R1-CONTRACT-GATE-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -25,6 +25,7 @@
       projects:[],
       systems:[],
       workers:[],
+      setups:[],
       standardVersion:null,
     },
   };
@@ -151,6 +152,60 @@
     };
   }
 
+  function formalContractStatus(contract) {
+    return String(contract?.contract_status||"").trim().toLowerCase()==="active";
+  }
+
+  function contractStartRegistered(contract) {
+    return Boolean(String(contract?.starts_on||"").trim());
+  }
+
+  function setupConfirmed(setup) {
+    return ["confirmed","locked"].includes(String(setup?.setup_status||"").trim().toLowerCase());
+  }
+
+  function productionRegistrationGate(audit) {
+    const a=audit||{};
+    const c=a.contract||{};
+    const project=a.exactProject||null;
+    const setup=a.linkedSetup||null;
+
+    if(!formalContractStatus(c)){
+      return {ok:false,key:"contract_status",label:"契約成立待ち",
+        message:"契約状態が正式な active になるまでPRODUCTION本番環境は登録できません。"};
+    }
+    if(!contractStartRegistered(c)){
+      return {ok:false,key:"contract_start",label:"契約開始日未登録",
+        message:"契約開始日が未登録です。契約成立後、契約・サービスで開始日を確定してください。"};
+    }
+    if(!project){
+      return {ok:false,key:"project",label:"制作案件未登録",
+        message:"契約成立後、先に「新しい制作を登録」でこの契約の正式な制作案件を作成してください。"};
+    }
+    if(normId(project.contract_id)!==normId(c.contract_id)){
+      return {ok:false,key:"project_contract",label:"制作案件未接続",
+        message:"制作案件がこの契約へ正式に紐付いていません。先に契約との接続を確認してください。"};
+    }
+    if(!setup){
+      return {ok:false,key:"setup_missing",label:"契約セットアップ未開始",
+        message:"制作案件はありますが、契約セットアップが未開始です。契約開始ナビから設定してください。"};
+    }
+    if(!setupConfirmed(setup)){
+      return {ok:false,key:"setup",label:"契約セットアップ未確定",
+        message:`契約セットアップは「${setup.setup_status||"draft"}」です。「契約内容確定」後にPRODUCTION本番を登録できます。`};
+    }
+    if(a.productionSystems?.length){
+      return {ok:false,key:"already_production",label:"PRODUCTION登録済み",
+        message:"この顧客にはすでにPRODUCTION本番システムがあります。新規登録ではなく既存システムとの接続を確認してください。"};
+    }
+    if(!a.nonProductionSystems?.length){
+      return {ok:false,key:"reference",label:"製品参照元未確認",
+        message:"参照できるDEMO / STAGING製品がありません。DPRO製品台帳を確認してください。"};
+    }
+    return {ok:true,key:"ready",label:"PRODUCTION登録可能",
+      message:"契約成立・制作案件・契約セットアップ確定まで確認済みです。PRODUCTION本番システムを登録できます。"};
+  }
+
   function readinessTone(ok,warning=false) {
     if(ok) return "green";
     return warning?"amber":"red";
@@ -268,6 +323,7 @@
     const c=contract||{};
     const projects=(state.linkAudit?.projects||[]).filter(activeProject);
     const systems=(state.linkAudit?.systems||[]).filter(activeSystem);
+    const setups=state.linkAudit?.setups||[];
     const contractId=normId(c.contract_id);
     const clientId=normId(c.client_id);
 
@@ -275,6 +331,9 @@
       projects.filter((p)=>normId(p.contract_id)===contractId)
     );
     const exactProject=exactProjects[0]||null;
+    const linkedSetup=exactProject
+      ? setups.find((s)=>normId(s.project_id)===normId(exactProject.id))||null
+      : null;
 
     const unlinkedSameClient=sortProjects(
       projects.filter((p)=>
@@ -381,6 +440,7 @@
       contract:c,
       readiness,
       exactProject,
+      linkedSetup,
       candidateProject,
       unlinkedSameClient,
       linkedSystem,
@@ -463,7 +523,13 @@
     }
     if(a.onlyNonProductionSystems){
       const envs=[...new Set(a.nonProductionSystems.map(environmentLabel))].join(" / ");
-      return {tone:"warn",text:`同じ顧客のDPROシステムは確認できましたが、${envs}のみです。実契約への候補にはせず「本番システム未登録」と判定します。`};
+      const gate=productionRegistrationGate(a);
+      return {
+        tone:"warn",
+        text:gate.ok
+          ?`同じ顧客のDPROシステムは${envs}のみです。契約成立・制作案件・契約セットアップ確定済みのため、PRODUCTION本番を新規登録できます。`
+          :`${envs}環境は参考表示のみです。${gate.message}`
+      };
     }
     if(a.importSystemMode==="none"){
       return {tone:"warn",text:"制作案件・PRODUCTION本番DPROシステムとも未確認です。LINE運用等の非DPRO契約は無理に制作案件へ変換しません。"};
@@ -565,7 +631,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R7</span>
+        <span class="c10-pill green">CENTER-10 R7-R1</span>
       </div>
 
       <div class="c10-guide">
@@ -714,9 +780,9 @@
   }
 
   async function loadLinkAuditData(sb) {
-    state.linkAudit={loaded:false,error:"",projects:[],systems:[],workers:[],standardVersion:null};
+    state.linkAudit={loaded:false,error:"",projects:[],systems:[],workers:[],setups:[],standardVersion:null};
 
-    const [projectsResult,systemsResult,workersResult,standardResult]=await Promise.all([
+    const [projectsResult,systemsResult,workersResult,setupsResult,standardResult]=await Promise.all([
       sb.from("cc_v_delivery_project_overview_v2")
         .select("*")
         .order("updated_at",{ascending:false}),
@@ -726,6 +792,8 @@
       sb.from("cc_workers")
         .select("id,client_id,system_instance_id,worker_name,worker_url,health_url,environment,status,expected_version,created_at")
         .order("created_at",{ascending:false}),
+      sb.from("cc_v_contract_setup_overview")
+        .select("project_id,project_code,setup_status,setup_ready,feature_tasks_open,dependency_issues,standard_version"),
       sb.from("cc_standard_versions")
         .select("id,standard_code,version_code,title,status,effective_date")
         .eq("status","current")
@@ -737,6 +805,7 @@
     if(projectsResult.error) throw projectsResult.error;
     if(systemsResult.error) throw systemsResult.error;
     if(workersResult.error) throw workersResult.error;
+    if(setupsResult.error) throw setupsResult.error;
     if(standardResult.error) throw standardResult.error;
 
     state.linkAudit={
@@ -745,6 +814,7 @@
       projects:projectsResult.data||[],
       systems:systemsResult.data||[],
       workers:workersResult.data||[],
+      setups:setupsResult.data||[],
       standardVersion:standardResult.data||null,
     };
   }
@@ -796,9 +866,10 @@
       }else if(a.projectMode==="multiple"){
         action=pill("候補複数","amber");
       }else if(a.onlyNonProductionSystems){
-        action=canRegisterProductionSystem()
+        const gate=productionRegistrationGate(a);
+        action=gate.ok&&canRegisterProductionSystem()
           ?`<button class="btn primary c10-link-button" type="button" data-c10-prod-register="${esc(a.contract.contract_id)}">PRODUCTION本番を登録</button>`
-          :pill("本番システム未登録","amber");
+          :pill(gate.label,gate.key==="contract_status"?"gray":"amber");
       }else if(a.importSystemMode==="none"){
         action=pill("DPROシステムなし","gray");
       }else{
@@ -837,7 +908,7 @@
       </div>
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。R7はPRODUCTION本番環境が未登録の場合、DEMO等を参考にしながら本番台帳を新規登録し、そのまま契約・制作案件へ安全に接続できます。DEMOのURL・施設コードは本番へ流用しません。
+          連動確認が必要な契約 ${issues.length}件。R7-R1ではPRODUCTION本番登録に「契約active＋契約開始日＋正式制作案件＋契約セットアップ確定」を必須化しました。契約前・準備途中では本番登録ボタンを表示しません。
         </div>
       `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
       <div class="c10-audit-list">${auditRows}</div>
@@ -866,12 +937,9 @@
       alert("この契約はPRODUCTION本番システム登録の対象にできません。");
       return;
     }
-    if(audit.productionSystems?.length){
-      alert("この顧客にはすでにPRODUCTION本番システムがあります。新規登録せず、既存システムとの紐付けを確認してください。");
-      return;
-    }
-    if(!audit.nonProductionSystems?.length){
-      alert("参照できるDEMO / STAGINGシステムがありません。DPROシステム台帳から製品を確認して登録してください。");
+    const gate=productionRegistrationGate(audit);
+    if(!gate.ok){
+      alert(`${gate.label}\n\n${gate.message}`);
       return;
     }
     if(!state.linkAudit?.standardVersion?.version_code){
@@ -952,16 +1020,11 @@
             <input id="c10ProdExpectedDb" maxlength="160">
           </div>
 
-          <div class="c10-field full">
-            <label>制作履歴名</label>
-            <input id="c10ProdProjectName" maxlength="160" value="${esc(`${contract.client_name} ${defaultName} 本番導入`)}">
-          </div>
-
           <label class="c10-prod-check full">
-            <input id="c10ProdCreateProject" type="checkbox" checked>
+            <input type="checkbox" checked disabled>
             <span>
-              <strong>登録後、この契約の制作案件も作成して正式接続する</strong>
-              <span>契約・PRODUCTION本番システム・DPRO製品・DPRO STANDARDを接続します。制作案件の状態は「準備中」で始まり、自動で納品済みにはしません。</span>
+              <strong>既存の正式制作案件へPRODUCTION本番を接続します</strong>
+              <span>${esc(audit.exactProject?.project_code||"")}｜${esc(audit.exactProject?.project_name||"")}｜契約セットアップ ${esc(audit.linkedSetup?.setup_status||"")}</span>
             </span>
           </label>
 
@@ -995,7 +1058,6 @@
         .replace(/\s*[（(]?(demo|デモ|staging|stage|test)[）)]?\s*/ig," ")
         .trim();
       modal.querySelector("#c10ProdSystemName").value=clean;
-      modal.querySelector("#c10ProdProjectName").value=`${contract.client_name} ${clean} 本番導入`;
     });
 
     workerInput?.addEventListener("input",()=>{
@@ -1025,16 +1087,20 @@
     const systemCheckUrl=normalizeHttpUrl(modal?.querySelector("#c10ProdSystemCheckUrl")?.value||"");
     const expectedWorker=String(modal?.querySelector("#c10ProdExpectedWorker")?.value||"").trim();
     const expectedDb=String(modal?.querySelector("#c10ProdExpectedDb")?.value||"").trim();
-    const projectName=String(modal?.querySelector("#c10ProdProjectName")?.value||"").trim();
-    const createProject=Boolean(modal?.querySelector("#c10ProdCreateProject")?.checked);
 
     if(!contract||!audit.readiness.contractUsable){
       alert("契約状態を確認できないため処理を中止しました。");
       return;
     }
-    if(audit.productionSystems?.length){
-      alert("最新情報では、すでにPRODUCTION本番システムが登録されています。二重登録防止のため中止しました。");
+    const gate=productionRegistrationGate(audit);
+    if(!gate.ok){
+      alert(`${gate.label}\n\n${gate.message}\n\n最新情報へ更新してから再確認してください。`);
       await loadOverview();
+      return;
+    }
+    const project=audit.exactProject;
+    if(!project){
+      alert("正式制作案件を確認できないため処理を中止しました。");
       return;
     }
     if(!ref||!systemCode||systemCode!==String(ref.system_code||"").trim().toUpperCase()){
@@ -1071,10 +1137,6 @@
     }
     if(systemCheckUrl && looksNonProductionText(systemCheckUrl)){
       alert("system-check URLに demo / staging / test が含まれています。PRODUCTION用URLを確認してください。");
-      return;
-    }
-    if(createProject&&!projectName){
-      alert("制作履歴名を入力してください。");
       return;
     }
     if(!state.linkAudit?.standardVersion?.version_code){
@@ -1117,10 +1179,11 @@
       `本番Worker：${workerUrl}`,
       "環境：PRODUCTION",
       "初期状態：準備中",
-      createProject?`制作案件：作成して契約へ接続（${projectName}）`:"制作案件：今回は作成しない",
+      `接続先制作案件：${project.project_code||project.project_name||project.id}`,
+      `契約セットアップ：${audit.linkedSetup?.setup_status||"未確認"}`,
       "",
       "DEMO / STAGINGのURLや施設コードは使用しません。",
-      "この内容で登録しますか？"
+      "この内容で登録・接続しますか？"
     ].join("\n");
     if(!confirm(confirmText)) return;
 
@@ -1135,16 +1198,41 @@
       const sb=await client();
 
       // DB直前再検査
-      const [systemCheck,workerCheck]=await Promise.all([
+      const [systemCheck,workerCheck,contractCheck,projectCheck,setupCheck]=await Promise.all([
         sb.from("cc_system_instances")
           .select("id,client_id,system_code,facility_code,environment,status")
           .or(`facility_code.eq.${facilityCode},and(client_id.eq.${contract.client_id},system_code.eq.${systemCode},environment.eq.production)`),
         sb.from("cc_workers")
           .select("id,worker_url,system_instance_id")
           .eq("worker_url",workerUrl),
+        sb.from("cc_contracts")
+          .select("id,status,starts_on")
+          .eq("id",contract.contract_id)
+          .maybeSingle(),
+        sb.from("cc_delivery_projects")
+          .select("id,contract_id,client_id,status")
+          .eq("id",project.id)
+          .maybeSingle(),
+        sb.from("cc_delivery_project_setup")
+          .select("project_id,setup_status,confirmed_at")
+          .eq("project_id",project.id)
+          .maybeSingle(),
       ]);
       if(systemCheck.error) throw systemCheck.error;
       if(workerCheck.error) throw workerCheck.error;
+      if(contractCheck.error) throw contractCheck.error;
+      if(projectCheck.error) throw projectCheck.error;
+      if(setupCheck.error) throw setupCheck.error;
+
+      if(!contractCheck.data || contractCheck.data.status!=="active" || !contractCheck.data.starts_on){
+        throw new Error("契約成立ガード: 契約active・契約開始日の確認が取れません。");
+      }
+      if(!projectCheck.data || String(projectCheck.data.contract_id||"")!==String(contract.contract_id||"")){
+        throw new Error("契約成立ガード: 正式制作案件が契約へ接続されていません。");
+      }
+      if(!setupCheck.data || !["confirmed","locked"].includes(String(setupCheck.data.setup_status||""))){
+        throw new Error("契約成立ガード: 契約セットアップが未確定です。");
+      }
 
       if((systemCheck.data||[]).length){
         throw new Error("二重登録防止: 同じ事業所コード、または同じ顧客・製品のPRODUCTION本番システムがDBに存在します。");
@@ -1193,32 +1281,26 @@
         throw new Error(`PRODUCTION本番システムは登録されましたが、Worker台帳の接続に失敗しました：${workerError.message}`);
       }
 
-      if(createProject){
-        button.textContent="契約・制作案件を接続中…";
-        const {error:projectError}=await sb.rpc("cc_center4_create_delivery_project",{
-          p_client_id:contract.client_id,
-          p_contract_id:contract.contract_id,
-          p_system_instance_id:systemId,
-          p_product_system_code:systemCode,
-          p_product_name:systemName,
-          p_project_name:projectName,
-          p_target_delivery_date:null,
-          p_project_code:null,
-          p_standard_version_code:state.linkAudit.standardVersion.version_code,
-        });
-        if(projectError){
-          modal?.remove();
-          await loadOverview();
-          alert([
-            "PRODUCTION本番システムとWorker台帳までは正常に登録しました。",
-            "制作案件の自動接続だけ完了していません。",
-            "",
-            projectError.message||"",
-            "",
-            "CENTER-10を再確認すると「既存導入を取り込む」から安全に続行できます。"
-          ].filter(Boolean).join("\n"));
-          return;
-        }
+      button.textContent="正式制作案件へ接続中…";
+      const {error:projectLinkError}=await sb.rpc("cc_center4_update_project_links",{
+        p_project_id:project.id,
+        p_contract_id:contract.contract_id,
+        p_system_instance_id:systemId,
+        p_product_system_code:systemCode,
+        p_product_name:systemName,
+      });
+      if(projectLinkError){
+        modal?.remove();
+        await loadOverview();
+        alert([
+          "PRODUCTION本番システムとWorker台帳までは正常に登録しました。",
+          "既存制作案件への接続だけ完了していません。",
+          "",
+          projectLinkError.message||"",
+          "",
+          "新しい制作案件は作成していません。既存制作案件との接続状態を確認してください。"
+        ].filter(Boolean).join("\n"));
+        return;
       }
 
       modal?.remove();
@@ -1226,11 +1308,11 @@
 
       alert([
         "PRODUCTION本番システムを正式登録しました。",
-        createProject?"契約・制作案件・本番システムも接続済みです。":"制作案件は今回は作成していません。",
+        "既存の正式制作案件・契約・本番システムを接続済みです。",
         "",
-        "制作案件は「準備中」から開始します。",
+        "本番システムは「準備中」から開始します。",
         "納品・本番稼働は自動確定していません。",
-        createProject?"CENTER-10でFeature変更の下書きが利用できる状態になったか確認してください。":"必要なら「既存導入を取り込む」で制作案件を接続してください。"
+        "CENTER-10でFeature変更の下書きが利用できる状態になったか確認してください。"
       ].join("\n"));
     }catch(error){
       console.error(BUILD,error);
@@ -1751,7 +1833,9 @@
         :a.canImportExisting
           ?"Feature変更には制作案件が必要です。PRODUCTION本番システムを確認できたため、「既存導入取り込み」で管理履歴を作成できます。"
           :a.onlyNonProductionSystems
-            ?"Feature変更にはPRODUCTION本番環境が必要です。DEMO等は参考表示だけなので、「PRODUCTION本番を登録して接続」から正式台帳を作成してください。"
+            ?(productionRegistrationGate(a).ok
+              ?"Feature変更にはPRODUCTION本番環境が必要です。契約成立・セットアップ確定済みなので「PRODUCTION本番を登録して接続」から正式台帳を作成できます。"
+              :`Feature変更はまだ開始できません。${productionRegistrationGate(a).message}`)
           :a.projectMode==="multiple"
             ?`Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が${a.unlinkedSameClient.length}件あるため、自動では決めません。`
             :"Feature変更には制作案件が必要です。既存DPROシステムが確認できない契約は、無理に制作案件へ変換しません。";
@@ -1785,7 +1869,7 @@
           <button class="btn secondary" type="button" data-c10-modal-import="${esc(c?.contract_id||"")}">既存導入をCONTROL CENTERへ取り込む</button>
         </div>
       `:""}
-      ${featureBlocked&&auditForContract(c).onlyNonProductionSystems&&canRegisterProductionSystem()?`
+      ${featureBlocked&&auditForContract(c).onlyNonProductionSystems&&productionRegistrationGate(auditForContract(c)).ok&&canRegisterProductionSystem()?`
         <div class="c10-modal-link-action">
           <button class="btn primary" type="button" data-c10-modal-prod="${esc(c?.contract_id||"")}">PRODUCTION本番を登録して接続</button>
         </div>
