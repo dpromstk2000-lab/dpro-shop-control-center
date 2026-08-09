@@ -7,10 +7,10 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>制作・納品｜DPRO SHOP CONTROL CENTER</title>
-  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-13-CENTER5-R1">
+  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-14-CENTER7">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="config.js?v=CONTROL-CENTER-13-CENTER5-R1"></script>
-  <script defer src="delivery.js?v=CONTROL-CENTER-13-CENTER5-R1"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-14-CENTER7"></script>
+  <script defer src="delivery.js?v=CONTROL-CENTER-14-CENTER7"></script>
 </head>
 <body data-cc11-delivery-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -59,7 +59,7 @@
         <span id="sideStandard">V1.1</span>
         <small>契約 → 制作 → 検査 → 納品</small>
       </div>
-      <div class="version">CONTROL-CENTER-13<br><span>CENTER-5 R1</span></div>
+      <div class="version">CONTROL-CENTER-14<br><span>CENTER-7</span></div>
     </aside>
 
     <main class="main">
@@ -213,6 +213,33 @@
       <div id="profileEditorMessage" class="form-message"></div>
 
       <button id="profileSaveButton" class="btn primary full" type="button">製品標準を保存</button>
+    </div>
+  </div>
+
+  <div id="handoffModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="handoffTitle">
+    <div class="modal-card handoff-card">
+      <button class="modal-close" type="button" data-handoff-close>×</button>
+      <div class="modal-head">
+        <p class="eyebrow">DPRO DEVELOPMENT HANDOFF</p>
+        <h2 id="handoffTitle">制作指示書・引き継ぎ</h2>
+        <p>管理センターの現在情報から、ChatGPTの新しい開発チャットへそのまま渡せる指示書を生成します。</p>
+      </div>
+
+      <div class="handoff-guide">
+        <strong>使い方</strong>
+        <span>「ChatGPT用をコピー」→ 新しい開発チャットの最初に貼り付けます。必要ならコピー前に内容を追記・修正できます。</span>
+      </div>
+
+      <div class="handoff-meta" id="handoffMeta"></div>
+
+      <textarea id="handoffText" class="handoff-textarea" spellcheck="false"></textarea>
+
+      <div class="handoff-actions">
+        <button id="regenerateHandoff" class="btn secondary" type="button">現在情報から再生成</button>
+        <button id="downloadHandoff" class="btn secondary" type="button">TEXT保存</button>
+        <button id="copyHandoff" class="btn primary" type="button">ChatGPT用をコピー</button>
+      </div>
+      <div id="handoffMessage" class="form-message"></div>
     </div>
   </div>
 

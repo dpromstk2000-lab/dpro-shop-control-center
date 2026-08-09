@@ -95,3 +95,35 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
   .profile-toolbar,.profile-tools{grid-template-columns:1fr}
   .profile-card-meta{display:grid}
 }
+
+
+/* CENTER-7 制作指示書・引き継ぎ */
+.handoff-launch{
+  margin-top:16px;padding:15px 16px;border:1px solid #a9d7c4;border-radius:15px;
+  background:linear-gradient(135deg,#eff9f5,#ffffff);
+  display:flex;align-items:center;justify-content:space-between;gap:18px
+}
+.handoff-launch h3{margin:4px 0 0;font-size:16px}
+.handoff-launch p{margin:5px 0 0;color:var(--muted);font-size:9px;line-height:1.65}
+.handoff-card{width:min(980px,100%)}
+.handoff-guide{
+  margin:12px 0;padding:12px 14px;border:1px solid #b9decf;border-radius:12px;background:#eff9f5
+}
+.handoff-guide strong,.handoff-guide span{display:block}
+.handoff-guide strong{font-size:10px;color:var(--green)}
+.handoff-guide span{margin-top:4px;color:var(--muted);font-size:9px;line-height:1.65}
+.handoff-meta{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.handoff-textarea{
+  width:100%;min-height:52vh;resize:vertical;padding:15px;border:1px solid var(--line);border-radius:13px;
+  background:#f8fbf9;color:#16251f;font:12px/1.75 Consolas,"Yu Gothic UI",monospace;white-space:pre-wrap
+}
+.handoff-textarea:focus{outline:2px solid #9fd3bf;outline-offset:1px}
+.handoff-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:11px}
+.form-message.success{color:#087253}
+@media(max-width:700px){
+  .handoff-launch{display:grid}
+  .handoff-launch .btn{width:100%}
+  .handoff-actions{display:grid}
+  .handoff-actions .btn{width:100%}
+  .handoff-textarea{min-height:58vh;font-size:11px}
+}

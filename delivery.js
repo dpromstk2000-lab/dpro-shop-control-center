@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const CENTER5_BUILD = "CONTROL-CENTER-13-CENTER5-R1-20260809";
+  const CENTER7_BUILD = "CONTROL-CENTER-14-CENTER7-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -26,6 +26,7 @@
     profileEditorCode: null,
     currentTab: "projects",
     currentProject: null,
+    currentHandoffText: "",
   };
 
   const projectStatusLabels = {
@@ -746,6 +747,7 @@
   function closeModals() {
     $("projectModal").classList.add("hidden");
     $("detailModal").classList.add("hidden");
+    closeHandoffModal();
   }
 
   async function createProject(event) {
@@ -915,6 +917,15 @@
         <p>${p.ready_for_delivery ? "最終実機確認・オーナー確認など、実際の納品条件を確認して本番稼働へ進めます。" : "未完了の制作STEPまたはDPRO STANDARDを上から確認してください。"}</p>
       </div>
 
+      <section class="handoff-launch">
+        <div>
+          <span class="project-code">CENTER-7 / DEVELOPMENT HANDOFF</span>
+          <h3>制作指示書・引き継ぎ</h3>
+          <p>この案件の現在情報を、次のChatGPT開発チャットへそのまま渡せる形にまとめます。</p>
+        </div>
+        <button id="openHandoffButton" class="btn primary" type="button">制作指示書を作成</button>
+      </section>
+
       <section class="detail-section">
         <div class="detail-section-head">
           <div><h3>制作案件の状態</h3><p class="lead">準備中から本番稼働まで、ここで進行状態を管理します。</p></div>
@@ -979,7 +990,184 @@
     bindDetailActions();
   }
 
+
+  function featureStatusLine(feature, featureMap) {
+    const def = featureMap.get(feature.feature_code) || {};
+    const label = def.feature_name || feature.feature_code;
+    return `- ${label}: ${feature.enabled ? "ON" : "OFF"}`;
+  }
+
+  function stepStatusLine(step) {
+    return `- [${stepStatusLabels[step.status] || step.status}] ${step.step_name} (${step.step_code})`;
+  }
+
+  function checkStatusLine(check, itemMap) {
+    const item = itemMap.get(check.standard_item_id) || {};
+    const label = item.item_name || "標準項目";
+    const code = item.item_code ? ` / ${item.item_code}` : "";
+    const condition = item.condition_feature_code ? ` / 条件:${item.condition_feature_code}` : "";
+    return `- [${checkStatusLabels[check.status] || check.status}] ${label}${code}${condition}`;
+  }
+
+  function buildHandoffText() {
+    const d = state.currentProject;
+    if (!d) return "";
+
+    const p = d.overview;
+    const project = d.project;
+    const featureMap = featureDefinitionMap();
+    const itemMap = standardItemMap();
+    const effectiveCode = p.effective_system_code || project.product_system_code || "";
+    const product = productByCode(effectiveCode);
+    const contract = state.contracts.find((x) => x.id === project.contract_id) || null;
+    const system = state.systems.find((x) => x.id === project.system_instance_id) || null;
+    const enabled = d.projectFeatures.filter((x) => x.enabled);
+    const disabled = d.projectFeatures.filter((x) => !x.enabled);
+    const openSteps = d.steps.filter((x) => !["done","not_applicable"].includes(x.status));
+    const openChecks = d.checks.filter((x) => !["done","not_applicable"].includes(x.status));
+    const now = new Intl.DateTimeFormat("ja-JP", {
+      year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"
+    }).format(new Date());
+
+    const lines = [
+      "# DPRO 本番制作指示書・開発引き継ぎ",
+      "",
+      "この内容は DPRO SHOP CONTROL CENTER から生成した制作案件の現在情報です。",
+      "以下を今回の開発の正式な前提として引き継いでください。",
+      "",
+      "## 0. 最重要ルール",
+      `- DPRO STANDARD ${p.standard_version || state.standardVersion?.version_code || "V1.1"} に従う。`,
+      "- 使用しない共通機能は削除せず、Feature FlagでOFFにする。",
+      "- 本番とDEMOを混在させない。production_guardを維持する。",
+      "- オーナー・顧客向け画面には技術用語やsystem-check等の内部情報を出さない。",
+      "- 公開URL・画面・Worker/API・構文・連携・回帰確認など、ChatGPT側で確認できることは先に確認する。",
+      "- ユーザー本人しかできない操作だけを、1つずつ場所が分かる形で案内する。",
+      "- 既存の製品原本・既存コードがある場合、まず内容を確認し、共通標準を壊さず更新する。",
+      "",
+      "## 1. 制作案件",
+      `- 制作コード: ${p.project_code || "未設定"}`,
+      `- 契約者: ${p.client_name || "未設定"}${p.client_code ? ` (${p.client_code})` : ""}`,
+      `- 制作名: ${p.project_name || project.project_name || "未設定"}`,
+      `- DPRO製品: ${product?.product_name || p.effective_system_name || project.product_name_snapshot || "未設定"}${effectiveCode ? ` (${effectiveCode})` : ""}`,
+      `- 制作状態: ${projectStatusLabels[project.status] || project.status || "未設定"}`,
+      `- 納品予定日: ${project.target_delivery_date ? formatDate(project.target_delivery_date) : "未設定"}`,
+      `- 生成日時: ${now}`,
+      "",
+      "## 2. 契約・本番環境",
+      `- 契約: ${contract ? `${contract.contract_name} (${contract.contract_code})` : "未登録 / 後で紐付け"}`,
+      `- 本番システム: ${system ? `${system.system_name} (${system.system_code})` : "未登録 / 制作中に後で紐付け"}`,
+      `- 施設コード: ${system?.facility_code || "未登録"}`,
+      "",
+      "## 3. 使用機能 / Feature Flag",
+      "### ON",
+      ...(enabled.length
+        ? enabled.sort((a,b)=>(featureMap.get(a.feature_code)?.sort_order||999)-(featureMap.get(b.feature_code)?.sort_order||999)).map((x)=>featureStatusLine(x,featureMap))
+        : ["- なし"]),
+      "",
+      "### OFF",
+      ...(disabled.length
+        ? disabled.sort((a,b)=>(featureMap.get(a.feature_code)?.sort_order||999)-(featureMap.get(b.feature_code)?.sort_order||999)).map((x)=>featureStatusLine(x,featureMap))
+        : ["- なし"]),
+      "",
+      "## 4. 制作STEP 現在状況",
+      ...d.steps.map(stepStatusLine),
+      "",
+      "## 5. DPRO STANDARD 現在状況",
+      ...d.checks
+        .map((x)=>({...x,item:itemMap.get(x.standard_item_id)}))
+        .sort((a,b)=>(a.item?.sort_order||9999)-(b.item?.sort_order||9999))
+        .map((x)=>checkStatusLine(x,itemMap)),
+      "",
+      "## 6. 現在の未完了",
+      `- 制作STEP未完了: ${openSteps.length}件`,
+      `- DPRO STANDARD未完了: ${openChecks.length}件`,
+      ...(openSteps.length ? ["", "### 未完了 制作STEP", ...openSteps.map(stepStatusLine)] : []),
+      ...(openChecks.length ? ["", "### 未完了 DPRO STANDARD", ...openChecks.map((x)=>checkStatusLine(x,itemMap))] : []),
+      "",
+      "## 7. このチャットでの進め方",
+      "- まず上記内容を引き継いだことを整理する。",
+      "- すぐに大規模なコード変更をせず、既存状態と今回の次STEPを確認する。",
+      "- 変更は小さなSTEP単位で進める。",
+      "- 各STEPで、対象ファイル・変更内容・自動検査・完了条件・次STEPを明確にする。",
+      "- ZIP納品が必要な場合は、ユーザーが迷わないよう実行対象を少なくし、フォルダの中に同名フォルダを作らない。",
+      "- GitHub / Cloudflare / Supabase / LINEなど、貼る場所・押す場所を具体的に案内する。",
+      "",
+      "## 8. 管理センター",
+      "- 制作の正式な進捗・Feature Flag・DPRO STANDARD判定はDPRO SHOP CONTROL CENTERを基準にする。",
+      "- 開発中に共通化すべき改善が見つかった場合は、横展開候補として扱う。",
+      "- より良い共通仕様を採用した場合は、DPRO STANDARD更新候補として残す。",
+      "",
+      "以上を前提として、この制作案件を続けてください。"
+    ];
+
+    return lines.join("\n");
+  }
+
+  function renderHandoffPreview() {
+    const text = buildHandoffText();
+    state.currentHandoffText = text;
+    $("handoffText").value = text;
+
+    const p = state.currentProject?.overview;
+    const project = state.currentProject?.project;
+    $("handoffMeta").innerHTML = `
+      <span>${pill(p?.project_code || "制作コード未設定","green")}</span>
+      <span>${pill(p?.effective_system_code || project?.product_system_code || "製品未設定","blue")}</span>
+      <span>${pill(state.standardVersion?.version_code || p?.standard_version || "標準未設定")}</span>
+    `;
+    $("handoffMessage").textContent = "";
+  }
+
+  function openHandoffModal() {
+    if (!state.currentProject) return toast("制作案件を開いてから実行してください。", true);
+    renderHandoffPreview();
+    $("handoffModal").classList.remove("hidden");
+    $("handoffModal").setAttribute("aria-hidden","false");
+  }
+
+  function closeHandoffModal() {
+    $("handoffModal")?.classList.add("hidden");
+    $("handoffModal")?.setAttribute("aria-hidden","true");
+  }
+
+  async function copyHandoffText() {
+    const text = $("handoffText").value;
+    const message = $("handoffMessage");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        $("handoffText").focus();
+        $("handoffText").select();
+        if (!document.execCommand("copy")) throw new Error("copy failed");
+      }
+      message.className = "form-message success";
+      message.textContent = "コピーしました。新しいChatGPT開発チャットの最初に貼り付けてください。";
+      toast("制作指示書をコピーしました。");
+    } catch {
+      message.className = "form-message";
+      message.textContent = "自動コピーできませんでした。テキストを選択してコピーしてください。";
+    }
+  }
+
+  function downloadHandoffText() {
+    const text = $("handoffText").value;
+    const p = state.currentProject?.overview;
+    const safe = String(p?.project_code || "DPRO-HANDOFF").replace(/[^A-Za-z0-9_-]+/g,"_");
+    const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safe}_DPRO_制作指示書.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("制作指示書をTEXT保存しました。");
+  }
+
   function bindDetailActions() {
+    $("openHandoffButton")?.addEventListener("click", openHandoffModal);
     $("detailSystemInput")?.addEventListener("change", () => {
       const system = state.systems.find((x) => x.id === $("detailSystemInput").value);
       if (system?.system_code && productByCode(system.system_code)) {
@@ -1256,6 +1444,13 @@
       if (event.target === $("profileModal")) closeProfileEditor();
       if (event.target.closest?.("[data-profile-close]")) closeProfileEditor();
     });
+    $("regenerateHandoff")?.addEventListener("click", renderHandoffPreview);
+    $("copyHandoff")?.addEventListener("click", copyHandoffText);
+    $("downloadHandoff")?.addEventListener("click", downloadHandoffText);
+    document.querySelector("[data-handoff-close]")?.addEventListener("click", closeHandoffModal);
+    $("handoffModal")?.addEventListener("click", (event) => {
+      if (event.target === $("handoffModal")) closeHandoffModal();
+    });
     $("refreshButton").addEventListener("click", refreshAll);
     $("newProjectButton").addEventListener("click", openNewProjectModal);
     $("formClient").addEventListener("change", () => {
@@ -1288,6 +1483,7 @@
       if (event.key === "Escape") {
         closeModals();
         closeProfileEditor();
+        closeHandoffModal();
       }
     });
     $("menuButton").addEventListener("click", () => $("sidebar").classList.toggle("open"));
