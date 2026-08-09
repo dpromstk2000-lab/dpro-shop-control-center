@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-20-CENTER8-20260809",
+  version: "CONTROL-CENTER-21-CENTER9-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -144,6 +144,16 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     document.head.appendChild(script);
   };
 
+  const installCenter9Maintenance = () => {
+    if (document.body?.dataset.cc11DeliveryPage !== "true") return;
+    if (document.querySelector('script[data-center9-maintenance]')) return;
+    const script = document.createElement("script");
+    script.src = "./center9-maintenance.js?v=CONTROL-CENTER-21-CENTER9";
+    script.defer = true;
+    script.dataset.center9Maintenance = "true";
+    document.head.appendChild(script);
+  };
+
   const installDeliveryCompatibility = () => {
     if (document.body?.dataset.cc11DeliveryPage !== "true") return;
     if (document.querySelector('script[data-center3-compat]')) return;
@@ -280,6 +290,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   installDeliveryCompatibility();
   installCenter7DeliveryQuality();
   installCenter8GoLive();
+  installCenter9Maintenance();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
@@ -287,6 +298,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
       installDeliveryCompatibility();
       installCenter7DeliveryQuality();
       installCenter8GoLive();
+      installCenter9Maintenance();
       installProductMasterDeepLink();
       installCenter4ProductFeatures();
       installCenter5IndustryTemplates();
@@ -296,6 +308,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     installDeliveryCompatibility();
     installCenter7DeliveryQuality();
     installCenter8GoLive();
+    installCenter9Maintenance();
     installProductMasterDeepLink();
     installCenter4ProductFeatures();
     installCenter5IndustryTemplates();
