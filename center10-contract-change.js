@@ -5,7 +5,7 @@
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-23-CENTER10-R4-SAFE-LINK-20260810";
+  const BUILD = "CONTROL-CENTER-24-CENTER10-R5-LEGACY-IMPORT-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -24,6 +24,7 @@
       error:"",
       projects:[],
       systems:[],
+      standardVersion:null,
     },
   };
 
@@ -212,6 +213,9 @@
     );
 
     const sameClientSystems=systems.filter((s)=>normId(s.client_id)===clientId);
+    const importSystems=[...sameClientSystems].sort((a,b)=>
+      String(b.created_at||"").localeCompare(String(a.created_at||""))
+    );
 
     let candidateProject=null;
     let projectMode="none";
@@ -276,6 +280,17 @@
       !!candidateSystem &&
       ["unique_code","unique_client"].includes(systemMode);
 
+    const importSystemMode=
+      importSystems.length===1 ? "unique" :
+      importSystems.length>1 ? "multiple" :
+      "none";
+
+    const canImportExisting=
+      readiness.contractUsable &&
+      !readiness.projectLinked &&
+      projectMode==="none" &&
+      importSystems.length>0;
+
     return {
       contract:c,
       readiness,
@@ -289,6 +304,9 @@
       systemMode,
       canLinkProject,
       canLinkSystem,
+      importSystems,
+      importSystemMode,
+      canImportExisting,
     };
   }
 
@@ -337,6 +355,17 @@
     }
     if(a.projectMode==="multiple"){
       return {tone:"warn",text:`同じ顧客の未紐付け制作案件が${a.unlinkedSameClient.length}件あります。誤紐付け防止のため自動候補にはしません。`};
+    }
+    if(a.canImportExisting){
+      return {
+        tone:"warn",
+        text:a.importSystemMode==="unique"
+          ?"制作案件はありませんが、同じ顧客の既存DPROシステムが1件確認できました。既存導入案件として安全に取り込めます。"
+          :`制作案件はありません。同じ顧客の既存DPROシステムが${a.importSystems.length}件あるため、取り込み時に対象システムを選択してください。`
+      };
+    }
+    if(a.importSystemMode==="none"){
+      return {tone:"warn",text:"制作案件・既存DPROシステムとも未確認です。LINE運用等の非DPRO契約は無理に制作案件へ変換しません。"};
     }
     return {tone:"warn",text:"同じ顧客の未紐付け制作案件が見つかりません。先に制作案件の登録が必要です。"};
   }
@@ -404,8 +433,12 @@
       .c10-audit-note{margin-top:8px;font-size:12px;color:#65736d;line-height:1.65}
       .c10-link-button{white-space:nowrap}
       .c10-modal-link-action{margin-top:9px;display:flex;justify-content:flex-end}
+      .c10-import-info{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+      .c10-import-cell{padding:12px;border:1px solid #dce6e1;border-radius:10px;background:#f8fbf9}
+      .c10-import-cell small,.c10-import-cell strong{display:block}.c10-import-cell small{font-size:11px;color:#6d7b75}.c10-import-cell strong{margin-top:5px;font-size:13px}
+      .c10-import-warning{margin-top:12px;padding:13px 15px;border:1px solid #ead18b;border-radius:10px;background:#fff9e9;color:#765600;font-size:12px;line-height:1.7}
       @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-link-grid,.c10-readiness-grid{grid-template-columns:repeat(2,1fr)}.c10-audit-row{grid-template-columns:1fr 1fr}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
-      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task,.c10-audit-row{grid-template-columns:1fr}.c10-hero{display:block}}
+      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task,.c10-audit-row,.c10-import-info{grid-template-columns:1fr}.c10-hero{display:block}}
     `;
     document.head.appendChild(style);
   }
@@ -425,7 +458,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R4</span>
+        <span class="c10-pill green">CENTER-10 R5</span>
       </div>
 
       <div class="c10-guide">
@@ -574,25 +607,33 @@
   }
 
   async function loadLinkAuditData(sb) {
-    state.linkAudit={loaded:false,error:"",projects:[],systems:[]};
+    state.linkAudit={loaded:false,error:"",projects:[],systems:[],standardVersion:null};
 
-    const [projectsResult,systemsResult]=await Promise.all([
+    const [projectsResult,systemsResult,standardResult]=await Promise.all([
       sb.from("cc_v_delivery_project_overview_v2")
         .select("*")
         .order("updated_at",{ascending:false}),
       sb.from("cc_system_instances")
         .select("id,client_id,system_code,system_name,facility_code,status,environment,created_at")
         .order("created_at",{ascending:false}),
+      sb.from("cc_standard_versions")
+        .select("id,standard_code,version_code,title,status,effective_date")
+        .eq("status","current")
+        .order("effective_date",{ascending:false})
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     if(projectsResult.error) throw projectsResult.error;
     if(systemsResult.error) throw systemsResult.error;
+    if(standardResult.error) throw standardResult.error;
 
     state.linkAudit={
       loaded:true,
       error:"",
       projects:projectsResult.data||[],
       systems:systemsResult.data||[],
+      standardVersion:standardResult.data||null,
     };
   }
 
@@ -627,17 +668,21 @@
     const auditRows=audits.map((a)=>{
       const msg=auditMessage(a);
       const project=a.exactProject||a.candidateProject;
-      const system=a.linkedSystem||a.candidateSystem;
+      const system=a.linkedSystem||a.candidateSystem||(a.importSystems?.length===1?a.importSystems[0]:null);
 
       let action="";
       if(a.canLinkProject){
         action=`<button class="btn primary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">候補を確認して紐付け</button>`;
       }else if(a.canLinkSystem){
         action=`<button class="btn secondary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">本番システムを紐付け</button>`;
+      }else if(a.canImportExisting){
+        action=`<button class="btn primary c10-link-button" type="button" data-c10-import-contract="${esc(a.contract.contract_id)}">既存導入を取り込む</button>`;
       }else if(a.readiness.fullLinked){
         action=pill("連動済","green");
       }else if(a.projectMode==="multiple"){
         action=pill("候補複数","amber");
+      }else if(a.importSystemMode==="none"){
+        action=pill("DPROシステムなし","gray");
       }else{
         action=pill("制作案件が必要","amber");
       }
@@ -674,7 +719,7 @@
       </div>
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。R4は同じ顧客の候補が1件に一意に決まる場合だけ「紐付け候補」として表示します。複数候補は自動決定しません。
+          連動確認が必要な契約 ${issues.length}件。R5は既存制作案件があれば安全照合し、制作案件がなくても既存DPROシステムを確認できる契約は「既存導入取り込み」を案内します。自動で本番稼働にはしません。
         </div>
       `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
       <div class="c10-audit-list">${auditRows}</div>
@@ -683,6 +728,216 @@
     $$("[data-c10-link-contract]",host).forEach((button)=>{
       button.addEventListener("click",()=>linkContractCandidate(button.dataset.c10LinkContract));
     });
+    $$("[data-c10-import-contract]",host).forEach((button)=>{
+      button.addEventListener("click",()=>openLegacyImportModal(button.dataset.c10ImportContract));
+    });
+  }
+
+  function openLegacyImportModal(contractId) {
+    const contract=contractById(contractId);
+    const audit=auditForContract(contract);
+
+    if(!contract||!audit.readiness.contractUsable){
+      alert("この契約は既存導入取り込みの対象にできません。");
+      return;
+    }
+    if(audit.readiness.projectLinked||audit.projectMode!=="none"){
+      alert("すでに制作案件がある、または制作案件候補があるため、新しい取り込み案件は作成しません。");
+      return;
+    }
+    if(!audit.importSystems?.length){
+      alert("この顧客には既存DPROシステムが確認できません。LINE運用等の契約は制作案件を無理に作成しません。");
+      return;
+    }
+    if(!state.linkAudit?.standardVersion?.version_code){
+      alert("現在のDPRO STANDARDを確認できないため、取り込みを開始できません。");
+      return;
+    }
+
+    document.querySelectorAll('#c10ImportModal,[data-c10-import-modal="true"]').forEach((el)=>el.remove());
+
+    const systems=audit.importSystems||[];
+    const single=systems.length===1?systems[0]:null;
+    const defaultName=`${contract.client_name} ${single?.system_name||"DPRO"} 既存導入取り込み`;
+
+    const modal=document.createElement("div");
+    modal.id="c10ImportModal";
+    modal.className="c10-modal";
+    modal.dataset.c10ImportModal="true";
+    modal.innerHTML=`
+      <div class="c10-modal-card" role="dialog" aria-modal="true" aria-labelledby="c10ImportTitle">
+        <div class="c10-modal-head">
+          <div>
+            <p class="eyebrow">LEGACY INSTALL IMPORT</p>
+            <h2 id="c10ImportTitle">既存導入済み案件を取り込む</h2>
+          </div>
+          <button class="c10-close" type="button" data-c10-import-close aria-label="閉じる">×</button>
+        </div>
+
+        <div class="c10-import-info">
+          <div class="c10-import-cell"><small>契約</small><strong>${esc(contract.contract_name)}</strong></div>
+          <div class="c10-import-cell"><small>契約コード</small><strong>${esc(contract.contract_code)}</strong></div>
+          <div class="c10-import-cell"><small>DPRO STANDARD</small><strong>${esc(state.linkAudit.standardVersion.version_code)}</strong></div>
+        </div>
+
+        <div class="c10-grid" style="margin-top:14px">
+          <div class="c10-field full">
+            <label>既存の本番DPROシステム</label>
+            <select id="c10ImportSystem">
+              ${systems.length>1?'<option value="">対象システムを選択</option>':""}
+              ${systems.map((s)=>`
+                <option value="${esc(s.id)}" ${single?.id===s.id?"selected":""}>
+                  ${esc(systemLabel(s))}
+                </option>
+              `).join("")}
+            </select>
+          </div>
+
+          <div class="c10-field full">
+            <label>制作履歴名</label>
+            <input id="c10ImportProjectName" maxlength="160" value="${esc(defaultName)}">
+          </div>
+
+          <div class="c10-import-warning full">
+            これは「過去に制作したことにする」処理ではありません。既存導入済みシステムをCONTROL CENTERへ取り込み、
+            現在のFeature・制作STEP・DPRO STANDARDを改めて確認するための管理履歴を作成します。
+            作成直後は準備中です。品質確認が完了するまで、本番稼働・納品完了には変更しません。
+          </div>
+
+          <div class="c10-actions full">
+            <button id="c10ImportCreate" class="btn primary" type="button">既存導入履歴を作成</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close=()=>modal.remove();
+    modal.querySelector("[data-c10-import-close]")?.addEventListener("click",close);
+    modal.addEventListener("click",(event)=>{ if(event.target===modal) close(); });
+
+    const systemSelect=modal.querySelector("#c10ImportSystem");
+    const nameInput=modal.querySelector("#c10ImportProjectName");
+    systemSelect?.addEventListener("change",()=>{
+      const system=systems.find((s)=>String(s.id)===String(systemSelect.value));
+      if(system) nameInput.value=`${contract.client_name} ${system.system_name||system.system_code} 既存導入取り込み`;
+    });
+
+    modal.querySelector("#c10ImportCreate")?.addEventListener("click",()=>createLegacyImport(contractId,modal));
+  }
+
+  async function createLegacyImport(contractId,modal) {
+    const contract=contractById(contractId);
+    const audit=auditForContract(contract);
+    const systemId=modal?.querySelector("#c10ImportSystem")?.value||"";
+    const projectName=modal?.querySelector("#c10ImportProjectName")?.value.trim()||"";
+    const standardVersion=state.linkAudit?.standardVersion?.version_code||"";
+
+    if(!contract||!audit.readiness.contractUsable){
+      alert("契約状態を再確認してください。");
+      return;
+    }
+
+    // 直前再検査: 二重作成を防ぐ
+    if(audit.readiness.projectLinked||audit.projectMode!=="none"){
+      alert("制作案件の状態が変わりました。二重登録を防ぐため処理を中止しました。最新情報に更新してください。");
+      return;
+    }
+
+    const system=(audit.importSystems||[]).find((s)=>String(s.id)===String(systemId))||null;
+    if(!system){
+      alert("既存の本番DPROシステムを選択してください。");
+      return;
+    }
+    if(String(system.client_id||"")!==String(contract.client_id||"")){
+      alert("契約者と本番DPROシステムの顧客が一致しないため、取り込みを中止しました。");
+      return;
+    }
+    if(!system.system_code){
+      alert("DPRO製品コードを確認できないため、取り込みを中止しました。");
+      return;
+    }
+    if(!projectName){
+      alert("制作履歴名を入力してください。");
+      return;
+    }
+    if(!standardVersion){
+      alert("現在のDPRO STANDARDを確認できません。");
+      return;
+    }
+
+    const confirmText=[
+      "既存導入済み案件をCONTROL CENTERへ取り込みます。",
+      "",
+      `契約：${contract.client_name}｜${contract.contract_name}｜${contract.contract_code}`,
+      `本番DPROシステム：${systemLabel(system)}`,
+      `制作履歴名：${projectName}`,
+      `DPRO STANDARD：${standardVersion}`,
+      "",
+      "作成直後は「準備中」です。",
+      "自動で本番稼働・納品完了にはしません。",
+      "この内容で取り込みますか？"
+    ].join("\n");
+
+    if(!confirm(confirmText)) return;
+
+    const button=modal?.querySelector("#c10ImportCreate");
+    if(button){
+      button.disabled=true;
+      button.textContent="取り込み中…";
+    }
+
+    try{
+      const sb=await client();
+
+      // DB書込直前に同契約・同顧客の制作案件を再確認
+      const {data:currentProjects,error:projectCheckError}=await sb
+        .from("cc_v_delivery_project_overview_v2")
+        .select("id,client_id,contract_id,status,project_code,project_name")
+        .eq("client_id",contract.client_id);
+      if(projectCheckError) throw projectCheckError;
+
+      const active=(currentProjects||[]).filter((p)=>String(p.status||"")!=="cancelled");
+      const conflict=active.find((p)=>
+        String(p.contract_id||"")===String(contract.contract_id||"") ||
+        !String(p.contract_id||"")
+      );
+      if(conflict){
+        throw new Error(`二重登録防止: 既存または未紐付け制作案件 ${conflict.project_code||conflict.project_name||conflict.id} を確認してください。`);
+      }
+
+      const {data:projectId,error}=await sb.rpc("cc_center4_create_delivery_project",{
+        p_client_id:contract.client_id,
+        p_contract_id:contract.contract_id,
+        p_system_instance_id:system.id,
+        p_product_system_code:system.system_code,
+        p_product_name:system.system_name||system.system_code,
+        p_project_name:projectName,
+        p_target_delivery_date:null,
+        p_project_code:null,
+        p_standard_version_code:standardVersion,
+      });
+      if(error) throw error;
+
+      modal?.remove();
+      await loadOverview();
+
+      const created=(state.linkAudit?.projects||[]).find((p)=>String(p.id)===String(projectId));
+      alert([
+        "既存導入済み案件をCONTROL CENTERへ取り込みました。",
+        created?.project_code?`制作コード：${created.project_code}`:"",
+        "状態は「準備中」のままです。",
+        "次に「制作中・契約者」でFeature・制作STEP・DPRO STANDARDを確認してください。"
+      ].filter(Boolean).join("\n"));
+    }catch(error){
+      console.error(BUILD,error);
+      alert(error.message||"既存導入案件を取り込めませんでした。");
+      if(button){
+        button.disabled=false;
+        button.textContent="既存導入履歴を作成";
+      }
+    }
   }
 
   async function linkContractCandidate(contractId,modal=null) {
@@ -969,9 +1224,11 @@
       const a=auditForContract(c);
       note=a.canLinkProject
         ?"Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が1件だけ見つかったため、この画面から内容確認後に紐付けできます。"
-        :a.projectMode==="multiple"
-          ?`Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が${a.unlinkedSameClient.length}件あるため、自動では決めません。`
-          :"Feature変更には制作案件の紐付けが必要です。同じ顧客の未紐付け制作案件がないため、先に制作案件を登録してください。";
+        :a.canImportExisting
+          ?"Feature変更には制作案件が必要です。既存DPROシステムを確認できたため、「既存導入取り込み」で管理履歴を作成できます。"
+          :a.projectMode==="multiple"
+            ?`Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が${a.unlinkedSameClient.length}件あるため、自動では決めません。`
+            :"Feature変更には制作案件が必要です。既存DPROシステムが確認できない契約は、無理に制作案件へ変換しません。";
     } else if(type==="feature_change"&&r.projectLinked&&!r.systemLinked){
       note="Feature変更の下書きは作成できます。ただしシステム台帳が未紐付けなので、本番反映前に紐付け確認が必要です。";
     } else if(type==="feature_change"){
@@ -997,11 +1254,20 @@
           <button class="btn secondary" type="button" data-c10-modal-link="${esc(c?.contract_id||"")}">制作案件候補を確認して紐付け</button>
         </div>
       `:""}
+      ${featureBlocked&&auditForContract(c).canImportExisting?`
+        <div class="c10-modal-link-action">
+          <button class="btn secondary" type="button" data-c10-modal-import="${esc(c?.contract_id||"")}">既存導入をCONTROL CENTERへ取り込む</button>
+        </div>
+      `:""}
     `;
 
     const linkButton=host.querySelector("[data-c10-modal-link]");
     if(linkButton){
       linkButton.addEventListener("click",()=>linkContractCandidate(linkButton.dataset.c10ModalLink,modal));
+    }
+    const importButton=host.querySelector("[data-c10-modal-import]");
+    if(importButton){
+      importButton.addEventListener("click",()=>openLegacyImportModal(importButton.dataset.c10ModalImport));
     }
 
     button.disabled=blocked;
