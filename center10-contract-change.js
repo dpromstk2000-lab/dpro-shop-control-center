@@ -4,8 +4,9 @@
   if (window.__DPRO_CENTER10_RUNTIME__ || window.__DPRO_CENTER10_RUNTIME_R1__) return;
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
+  window.__DPRO_CENTER10_RUNTIME_R2__ = true;
 
-  const BUILD = "CONTROL-CENTER-27-CENTER10-R7-R1-CONTRACT-GATE-20260810";
+  const BUILD = "CONTROL-CENTER-28-CENTER10-R7-R2-DEMO-SCOPE-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -26,6 +27,7 @@
       systems:[],
       workers:[],
       setups:[],
+      clients:[],
       standardVersion:null,
     },
   };
@@ -152,6 +154,63 @@
     };
   }
 
+  function clientRecordForContract(contract) {
+    const clientId=normId(contract?.client_id);
+    return (state.linkAudit?.clients||[]).find((client)=>normId(client.id)===clientId)||null;
+  }
+
+  function scopeText(record) {
+    return String(
+      record?.record_scope ??
+      record?.data_scope ??
+      record?.environment ??
+      record?.mode ??
+      ""
+    ).trim().toLowerCase();
+  }
+
+  function isDemoClientRecord(client) {
+    if(!client) return false;
+    if(client.is_demo===true || client.is_test===true) return true;
+
+    const scope=scopeText(client);
+    if(["demo","test","testing","staging","sample","fixture"].includes(scope)) return true;
+
+    const code=String(client.client_code||"").trim().toUpperCase();
+    if(code.startsWith("CL-DEMO-") || code.startsWith("DEMO-") || code.startsWith("TEST-")) return true;
+
+    return false;
+  }
+
+  function isDemoContract(contract) {
+    if(!contract) return false;
+    if(contract.is_demo===true || contract.is_test===true) return true;
+
+    const scope=scopeText(contract);
+    if(["demo","test","testing","staging","sample","fixture"].includes(scope)) return true;
+
+    const code=String(contract.contract_code||"").trim().toUpperCase();
+    if(code.startsWith("CTR-DEMO-") || code.startsWith("DEMO-") || code.startsWith("TEST-")) return true;
+
+    return isDemoClientRecord(clientRecordForContract(contract));
+  }
+
+  function contractScopeLabel(contract) {
+    return isDemoContract(contract) ? "DEMO / テスト" : "実契約";
+  }
+
+  function contractForRequest(request) {
+    return contractById(request?.contract_id)
+      || (state.overview?.contracts||[]).find(
+        (c)=>String(c.contract_code||"")===String(request?.contract_code||"")
+      )
+      || null;
+  }
+
+  function isDemoRequest(request) {
+    return isDemoContract(contractForRequest(request));
+  }
+
   function formalContractStatus(contract) {
     return String(contract?.contract_status||"").trim().toLowerCase()==="active";
   }
@@ -169,6 +228,15 @@
     const c=a.contract||{};
     const project=a.exactProject||null;
     const setup=a.linkedSetup||null;
+
+    if(a.isDemoContract){
+      return {
+        ok:false,
+        key:"demo_scope",
+        label:"DEMO / テスト契約",
+        message:"DEMO / テスト用の契約は本番件数・PRODUCTION本番登録・正式納品の対象外です。検査データとしてのみ使用します。"
+      };
+    }
 
     if(!formalContractStatus(c)){
       return {ok:false,key:"contract_status",label:"契約成立待ち",
@@ -326,6 +394,8 @@
     const setups=state.linkAudit?.setups||[];
     const contractId=normId(c.contract_id);
     const clientId=normId(c.client_id);
+    const clientRecord=clientRecordForContract(c);
+    const demoContract=isDemoContract(c);
 
     const exactProjects=sortProjects(
       projects.filter((p)=>normId(p.contract_id)===contractId)
@@ -438,6 +508,8 @@
 
     return {
       contract:c,
+      clientRecord,
+      isDemoContract:demoContract,
       readiness,
       exactProject,
       linkedSetup,
@@ -481,6 +553,12 @@
 
   function auditMessage(audit) {
     const a=audit||{};
+    if(a.isDemoContract){
+      return {
+        tone:"demo",
+        text:"DEMO / テスト用契約です。本番の契約件数・PRODUCTION連動・Feature本番可否から除外し、動作確認用として別管理します。"
+      };
+    }
     if(!a.readiness?.contractUsable){
       return {tone:"bad",text:"終了・取消済みのため連動対象外です。"};
     }
@@ -565,10 +643,11 @@
       .c10-link-health{margin:12px 0;padding:16px;border:1px solid #cfe0d9;border-radius:14px;background:#fff}
       .c10-link-health-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
       .c10-link-health-head strong{font-size:16px}.c10-link-health-head span{font-size:12px;color:#6b7974}
-      .c10-link-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+      .c10-link-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
       .c10-link-cell{padding:12px;border:1px solid #e0e8e4;border-radius:11px;background:#f9fbfa}
       .c10-link-cell b{display:block;font-size:21px;color:#0b5f49}.c10-link-cell span{display:block;margin-top:4px;font-size:11px;color:#6b7974;line-height:1.5}
       .c10-link-warn{margin-top:10px;padding:11px 12px;border-radius:10px;background:#fff7df;color:#7d5a00;font-size:12px;line-height:1.65}
+      .c10-demo-info{margin-top:10px;padding:11px 12px;border-radius:10px;background:#f1f6fa;color:#506776;border:1px solid #d6e2eb;font-size:12px;line-height:1.65}
       .c10-readiness{padding:14px;border:1px solid #cfdfd8;border-radius:12px;background:#f8fbfa}
       .c10-readiness-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
       .c10-readiness-title strong{font-size:15px}.c10-readiness-title span{font-size:11px;color:#6b7974}
@@ -593,6 +672,7 @@
       .c10-audit-row.ok{border-color:#b9dccd;background:#f7fcf9}
       .c10-audit-row.warn{border-color:#ead18b;background:#fffdf7}
       .c10-audit-row.bad{border-color:#efc3cc;background:#fff9fa}
+      .c10-audit-row.demo{border-color:#cbd9e6;background:#f5f8fb}
       .c10-audit-main strong,.c10-audit-main span,.c10-audit-sub strong,.c10-audit-sub span{display:block}
       .c10-audit-main strong{font-size:14px}.c10-audit-main span{margin-top:4px;font-size:11px;color:#6d7b75}
       .c10-audit-sub strong{font-size:12px}.c10-audit-sub span{margin-top:4px;font-size:11px;color:#6d7b75;line-height:1.45}
@@ -631,11 +711,11 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R7-R1</span>
+        <span class="c10-pill green">CENTER-10 R7-R2</span>
       </div>
 
       <div class="c10-guide">
-        Feature追加・サービス変更・料金変更・休止・再開・解約・引き継ぎを一元管理します。変更を「完了」するまで既存契約には反映しません。
+        Feature追加・サービス変更・料金変更・休止・再開・解約・引き継ぎを一元管理します。実契約とDEMO / テスト契約は自動で分離し、変更を「完了」するまで既存契約には反映しません。
       </div>
 
       <div class="c10-safety">
@@ -656,6 +736,7 @@
           <option value="verification">最終確認</option>
           <option value="cancellation">解約・引き継ぎ</option>
           <option value="completed">完了</option>
+          <option value="demo">DEMO / テストのみ</option>
         </select>
         <button id="c10New" class="btn primary" type="button">＋ 契約変更を登録</button>
       </div>
@@ -780,9 +861,9 @@
   }
 
   async function loadLinkAuditData(sb) {
-    state.linkAudit={loaded:false,error:"",projects:[],systems:[],workers:[],setups:[],standardVersion:null};
+    state.linkAudit={loaded:false,error:"",projects:[],systems:[],workers:[],setups:[],clients:[],standardVersion:null};
 
-    const [projectsResult,systemsResult,workersResult,setupsResult,standardResult]=await Promise.all([
+    const [projectsResult,systemsResult,workersResult,setupsResult,clientsResult,standardResult]=await Promise.all([
       sb.from("cc_v_delivery_project_overview_v2")
         .select("*")
         .order("updated_at",{ascending:false}),
@@ -794,6 +875,8 @@
         .order("created_at",{ascending:false}),
       sb.from("cc_v_contract_setup_overview")
         .select("project_id,project_code,setup_status,setup_ready,feature_tasks_open,dependency_issues,standard_version"),
+      sb.from("cc_clients")
+        .select("*"),
       sb.from("cc_standard_versions")
         .select("id,standard_code,version_code,title,status,effective_date")
         .eq("status","current")
@@ -806,6 +889,7 @@
     if(systemsResult.error) throw systemsResult.error;
     if(workersResult.error) throw workersResult.error;
     if(setupsResult.error) throw setupsResult.error;
+    if(clientsResult.error) throw clientsResult.error;
     if(standardResult.error) throw standardResult.error;
 
     state.linkAudit={
@@ -815,21 +899,35 @@
       systems:systemsResult.data||[],
       workers:workersResult.data||[],
       setups:setupsResult.data||[],
+      clients:clientsResult.data||[],
       standardVersion:standardResult.data||null,
     };
   }
 
   function renderSummary() {
-    const s=state.overview?.summary||{};
+    const requests=(state.overview?.requests||[]).filter((request)=>!isDemoRequest(request));
+    const open=(request)=>!["completed","rejected","cancelled"].includes(String(request.status||""));
+    const today=todayIso();
+    const dueLimit=(()=>{
+      const d=new Date(`${today}T00:00:00`);
+      d.setDate(d.getDate()+7);
+      return d.toISOString().slice(0,10);
+    })();
+
     const rows=[
-      [s.open_count||0,"進行中",""],
-      [s.owner_wait_count||0,"オーナー確認待ち",(s.owner_wait_count||0)?"warn":""],
-      [s.implementing_count||0,"実装・対応中",""],
-      [s.verification_count||0,"最終確認",""],
-      [s.cancellation_count||0,"解約・引き継ぎ",(s.cancellation_count||0)?"warn":""],
-      [s.effective_due_count||0,"7日以内に適用",(s.effective_due_count||0)?"warn":""],
-      [s.completed_count||0,"完了",""],
+      [requests.filter(open).length,"進行中",""],
+      [requests.filter((x)=>open(x)&&(x.status==="owner_approval"||(x.owner_approval_required&&!x.owner_approved_at))).length,"オーナー確認待ち",
+        requests.some((x)=>open(x)&&(x.status==="owner_approval"||(x.owner_approval_required&&!x.owner_approved_at)))?"warn":""],
+      [requests.filter((x)=>x.status==="implementing").length,"実装・対応中",""],
+      [requests.filter((x)=>x.status==="verification").length,"最終確認",""],
+      [requests.filter((x)=>open(x)&&["cancellation","handoff"].includes(x.change_type)).length,"解約・引き継ぎ",
+        requests.some((x)=>open(x)&&["cancellation","handoff"].includes(x.change_type))?"warn":""],
+      [requests.filter((x)=>open(x)&&x.desired_effective_on&&String(x.desired_effective_on)>=today&&String(x.desired_effective_on)<=dueLimit).length,
+        "7日以内に適用",
+        requests.some((x)=>open(x)&&x.desired_effective_on&&String(x.desired_effective_on)>=today&&String(x.desired_effective_on)<=dueLimit)?"warn":""],
+      [requests.filter((x)=>x.status==="completed").length,"完了",""],
     ];
+
     $("c10Summary").innerHTML=rows.map(([v,l,t])=>
       `<article class="c10-metric ${t}"><b>${esc(v)}</b><span>${esc(l)}</span></article>`
     ).join("");
@@ -840,20 +938,24 @@
     if(!host) return;
 
     const contracts=state.overview?.contracts||[];
-    const usable=contracts.filter((c)=>contractReadiness(c).contractUsable);
-    const audits=usable.map(auditForContract);
+    const usableAll=contracts.filter((c)=>contractReadiness(c).contractUsable);
+    const allAudits=usableAll.map(auditForContract);
+    const demoAudits=allAudits.filter((a)=>a.isDemoContract);
+    const audits=allAudits.filter((a)=>!a.isDemoContract);
     const projectLinked=audits.filter((a)=>a.readiness.projectLinked).length;
     const systemLinked=audits.filter((a)=>a.readiness.systemLinked&&a.linkedSystem&&isProductionSystem(a.linkedSystem)).length;
     const featureReady=audits.filter((a)=>a.readiness.featureChangeAllowed&&!a.linkedToNonProduction).length;
     const issues=audits.filter((a)=>!a.readiness.fullLinked||a.linkedToNonProduction);
 
-    const auditRows=audits.map((a)=>{
+    const auditRows=[...audits,...demoAudits].map((a)=>{
       const msg=auditMessage(a);
       const project=a.exactProject||a.candidateProject;
       const system=a.linkedSystem||a.candidateSystem||(a.importSystems?.length===1?a.importSystems[0]:null)||(a.nonProductionSystems?.length===1?a.nonProductionSystems[0]:null);
 
       let action="";
-      if(a.canLinkProject){
+      if(a.isDemoContract){
+        action=pill("DEMO / テスト","gray");
+      }else if(a.canLinkProject){
         action=`<button class="btn primary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">候補を確認して紐付け</button>`;
       }else if(a.canLinkSystem){
         action=`<button class="btn secondary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">本番システムを紐付け</button>`;
@@ -880,7 +982,7 @@
         <article class="c10-audit-row ${esc(msg.tone)}">
           <div class="c10-audit-main">
             <strong>${esc(a.contract.client_name)}｜${esc(a.contract.contract_name)}</strong>
-            <span>${esc(a.contract.contract_code)} / ${esc(a.contract.contract_status||"")}</span>
+            <span>${esc(a.contract.contract_code)} / ${esc(a.contract.contract_status||"")} / ${esc(contractScopeLabel(a.contract))}</span>
           </div>
           <div class="c10-audit-sub">
             <strong>制作案件：${esc(project?projectLabel(project):"未確認")}</strong>
@@ -901,16 +1003,24 @@
         <span>契約 → 制作案件 → システム台帳 → Feature変更可否を自動判定</span>
       </div>
       <div class="c10-link-grid">
-        <div class="c10-link-cell"><b>${usable.length}</b><span>変更対象にできる契約</span></div>
+        <div class="c10-link-cell"><b>${audits.length}</b><span>実契約・変更対象</span></div>
+        <div class="c10-link-cell"><b>${demoAudits.length}</b><span>DEMO / テスト契約</span></div>
         <div class="c10-link-cell"><b>${projectLinked}</b><span>制作案件まで紐付け済み</span></div>
-        <div class="c10-link-cell"><b>${systemLinked}</b><span>PRODUCTION本番システムまで紐付け済み</span></div>
+        <div class="c10-link-cell"><b>${systemLinked}</b><span>PRODUCTION本番まで紐付け済み</span></div>
         <div class="c10-link-cell"><b>${featureReady}</b><span>Feature変更の下書き作成可</span></div>
       </div>
+      ${demoAudits.length?`
+        <div class="c10-demo-info">
+          DEMO / テスト契約 ${demoAudits.length}件は本番集計から除外しています。検査用データは残したまま、PRODUCTION本番登録・正式納品の対象にはしません。
+        </div>
+      `:""}
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。R7-R1ではPRODUCTION本番登録に「契約active＋契約開始日＋正式制作案件＋契約セットアップ確定」を必須化しました。契約前・準備途中では本番登録ボタンを表示しません。
+          実契約で連動確認が必要な契約 ${issues.length}件。PRODUCTION本番登録には「契約active＋契約開始日＋正式制作案件＋契約セットアップ確定」が必要です。
         </div>
-      `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
+      `:audits.length
+        ?`<div class="c10-readiness-note ok">現在の実契約は、必要な連動状態を満たしています。</div>`
+        :`<div class="c10-readiness-note ok">現在、PRODUCTION対象の実契約はありません。</div>`}
       <div class="c10-audit-list">${auditRows}</div>
     `;
 
@@ -1644,6 +1754,10 @@
       if(!hay.includes(state.search)) return false;
     }
 
+    const demo=isDemoRequest(x);
+    if(state.filter==="demo") return demo;
+    if(demo) return false;
+
     if(state.filter==="open") return !["completed","rejected","cancelled"].includes(x.status);
     if(state.filter==="owner") return x.status==="owner_approval" || (x.owner_approval_required&&!x.owner_approved_at);
     if(state.filter==="implementing") return x.status==="implementing";
@@ -1670,7 +1784,7 @@
       return `
         <article class="c10-card ${due?"urgent":""}">
           <div class="c10-main">
-            <small>${esc(x.change_code)} / ${esc(x.contract_code||"")}</small>
+            <small>${esc(x.change_code)} / ${esc(x.contract_code||"")}${isDemoRequest(x)?" / DEMO・テスト":""}</small>
             <strong>${esc(x.client_name)}｜${esc(x.title)}</strong>
             <span>${esc(TYPE_LABELS[x.change_type]||x.change_type)} / ${esc(x.system_name||x.contract_name||"")}</span>
           </div>
@@ -1706,6 +1820,8 @@
       alert("変更対象にできる契約がありません。先に「契約・サービス」で契約を登録してください。");
       return;
     }
+    const productionContracts=contracts.filter((c)=>!isDemoContract(c));
+    const demoContracts=contracts.filter(isDemoContract);
 
     document.querySelectorAll('#c10NewModal,[data-c10-new-modal="true"]').forEach((el)=>el.remove());
 
@@ -1728,14 +1844,25 @@
             <div class="c10-field full">
               <label>変更対象の契約</label>
               <select id="c10NewContract">
-                ${contracts.map((c)=>{
-                  const r=contractReadiness(c);
-                  const a=auditForContract(c);
-                  let link=r.projectLinked?"制作案件あり":"制作案件未紐付";
-                  if(!r.projectLinked&&a.canLinkProject) link="制作案件候補1件";
-                  else if(!r.projectLinked&&a.projectMode==="multiple") link=`制作案件候補${a.unlinkedSameClient.length}件`;
-                  return `<option value="${esc(c.contract_id)}">${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}［${esc(link)}］</option>`;
-                }).join("")}
+                ${productionContracts.length?`
+                  <optgroup label="実契約">
+                    ${productionContracts.map((c)=>{
+                      const r=contractReadiness(c);
+                      const a=auditForContract(c);
+                      let link=r.projectLinked?"制作案件あり":"制作案件未紐付";
+                      if(!r.projectLinked&&a.canLinkProject) link="制作案件候補1件";
+                      else if(!r.projectLinked&&a.projectMode==="multiple") link=`制作案件候補${a.unlinkedSameClient.length}件`;
+                      return `<option value="${esc(c.contract_id)}">${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}［${esc(link)}］</option>`;
+                    }).join("")}
+                  </optgroup>
+                `:""}
+                ${demoContracts.length?`
+                  <optgroup label="DEMO / テスト（検査用）">
+                    ${demoContracts.map((c)=>
+                      `<option value="${esc(c.contract_id)}">［DEMO］${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}</option>`
+                    ).join("")}
+                  </optgroup>
+                `:""}
               </select>
             </div>
 
@@ -1823,7 +1950,9 @@
     const blocked=featureBlocked||contractBlocked;
 
     let note="";
-    if(contractBlocked){
+    if(a.isDemoContract){
+      note="DEMO / テスト用契約です。本番集計・PRODUCTION登録・正式納品からは除外されています。契約変更フローの動作確認には利用できます。";
+    } else if(contractBlocked){
       note="この契約は終了済みのため、新しい変更案件を登録できません。";
     } else if(type==="feature_change"&&a.linkedToNonProduction){
       note=`Feature変更対象のシステムが${environmentLabel(a.linkedSystem)}環境です。実契約ではPRODUCTION本番システムを確認してから変更案件を登録してください。`;
@@ -1850,7 +1979,7 @@
     host.innerHTML=`
       <div class="c10-readiness-title">
         <strong>この契約の連動状態</strong>
-        <span>${esc(c?.contract_code||"—")}</span>
+        <span>${esc(c?.contract_code||"—")} / ${esc(contractScopeLabel(c))}</span>
       </div>
       <div class="c10-readiness-grid">
         <div class="c10-readiness-item"><small>契約台帳</small><b>${readinessPill(r.contractUsable,"登録済","要確認")}</b></div>
