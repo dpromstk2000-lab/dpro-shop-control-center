@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-18-CENTER6-R2-20260809",
+  version: "CONTROL-CENTER-19-CENTER7-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -122,6 +122,16 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     if (contractButton) contractButton.insertAdjacentElement("afterend", link);
     else nav.appendChild(link);
     return true;
+  };
+
+  const installCenter7DeliveryQuality = () => {
+    if (document.body?.dataset.cc11DeliveryPage !== "true") return;
+    if (document.querySelector('script[data-center7-delivery-quality]')) return;
+    const script = document.createElement("script");
+    script.src = "./center7-delivery-quality.js?v=CONTROL-CENTER-19-CENTER7";
+    script.defer = true;
+    script.dataset.center7DeliveryQuality = "true";
+    document.head.appendChild(script);
   };
 
   const installDeliveryCompatibility = () => {
@@ -258,11 +268,13 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
   installFavicon();
   installDeliveryCompatibility();
+  installCenter7DeliveryQuality();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       installLinks();
       installDeliveryCompatibility();
+      installCenter7DeliveryQuality();
       installProductMasterDeepLink();
       installCenter4ProductFeatures();
       installCenter5IndustryTemplates();
@@ -270,6 +282,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   } else {
     installLinks();
     installDeliveryCompatibility();
+    installCenter7DeliveryQuality();
     installProductMasterDeepLink();
     installCenter4ProductFeatures();
     installCenter5IndustryTemplates();
