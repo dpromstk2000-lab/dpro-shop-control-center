@@ -1,10 +1,11 @@
 (() => {
   "use strict";
 
-  if (window.__DPRO_CENTER10_RUNTIME_R1__) return;
+  if (window.__DPRO_CENTER10_RUNTIME__ || window.__DPRO_CENTER10_RUNTIME_R1__) return;
+  window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-22-CENTER10-R2-LARGE-20260809";
+  const BUILD = "CONTROL-CENTER-22-CENTER10-R3-LINK-CHECK-20260809";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -115,6 +116,38 @@
     return "";
   }
 
+
+  function contractById(contractId) {
+    return (state.overview?.contracts||[]).find(
+      (c)=>String(c.contract_id||"")===String(contractId||"")
+    )||null;
+  }
+
+  function contractReadiness(contract) {
+    const c=contract||{};
+    const contractStatus=String(c.contract_status||"");
+    const contractUsable=!!c.contract_id && !["ended","cancelled"].includes(contractStatus);
+    const projectLinked=!!c.project_id;
+    const systemLinked=!!c.system_instance_id;
+    const featureChangeAllowed=contractUsable && projectLinked;
+    return {
+      contractUsable,
+      projectLinked,
+      systemLinked,
+      featureChangeAllowed,
+      fullLinked:contractUsable&&projectLinked&&systemLinked,
+    };
+  }
+
+  function readinessTone(ok,warning=false) {
+    if(ok) return "green";
+    return warning?"amber":"red";
+  }
+
+  function readinessPill(ok,yes,no,warning=false) {
+    return pill(ok?yes:no,readinessTone(ok,warning));
+  }
+
   function installStyle() {
     if($("center10Style")) return;
     const style=document.createElement("style");
@@ -140,6 +173,25 @@
       .c10-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:11px}.c10-history-task{display:grid;grid-template-columns:130px 150px minmax(0,1fr) 130px;gap:8px;align-items:center;padding:11px;border:1px solid #e3eae7;border-radius:9px;margin-top:7px;font-size:12px}
       .c10-modal{position:fixed;inset:0;z-index:3000;background:rgba(3,31,24,.55);display:grid;place-items:center;padding:20px}.c10-modal.hidden{display:none}.c10-modal-card{width:min(760px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.25)}.c10-modal-head{display:flex;justify-content:space-between;gap:12px}.c10-modal-head h2{margin:0;font-size:28px}.c10-close{border:0;background:#eef3f0;border-radius:9px;width:36px;height:36px;cursor:pointer}
 
+      .c10-link-health{margin:12px 0;padding:16px;border:1px solid #cfe0d9;border-radius:14px;background:#fff}
+      .c10-link-health-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
+      .c10-link-health-head strong{font-size:16px}.c10-link-health-head span{font-size:12px;color:#6b7974}
+      .c10-link-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+      .c10-link-cell{padding:12px;border:1px solid #e0e8e4;border-radius:11px;background:#f9fbfa}
+      .c10-link-cell b{display:block;font-size:21px;color:#0b5f49}.c10-link-cell span{display:block;margin-top:4px;font-size:11px;color:#6b7974;line-height:1.5}
+      .c10-link-warn{margin-top:10px;padding:11px 12px;border-radius:10px;background:#fff7df;color:#7d5a00;font-size:12px;line-height:1.65}
+      .c10-readiness{padding:14px;border:1px solid #cfdfd8;border-radius:12px;background:#f8fbfa}
+      .c10-readiness-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+      .c10-readiness-title strong{font-size:15px}.c10-readiness-title span{font-size:11px;color:#6b7974}
+      .c10-readiness-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+      .c10-readiness-item{padding:10px;border:1px solid #e0e8e4;border-radius:10px;background:#fff}
+      .c10-readiness-item small{display:block;font-size:11px;color:#6b7974;margin-bottom:6px}
+      .c10-readiness-item b{display:block;font-size:13px;line-height:1.5}
+      .c10-readiness-note{margin-top:10px;font-size:12px;line-height:1.65;color:#53635d}
+      .c10-readiness-note.warn{padding:10px 11px;border-radius:9px;background:#fff5d9;color:#805c00}
+      .c10-readiness-note.ok{padding:10px 11px;border-radius:9px;background:#eaf8f2;color:#076a4d}
+      #c10Create:disabled{opacity:.58;cursor:not-allowed;box-shadow:none}
+
       #panel-contract-change .btn,
       #c10NewModal .btn{font-size:14px;min-height:48px;padding:0 18px;font-weight:900}
       #panel-contract-change .eyebrow,
@@ -147,8 +199,8 @@
       #c10NewModal .c10-modal-card{width:min(940px,96vw);padding:28px}
       #c10NewModal .c10-close{width:44px;height:44px;font-size:18px}
       .tab[data-tab="contract-change"]{font-size:14px;font-weight:900;padding-left:18px;padding-right:18px}
-      @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
-      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task{grid-template-columns:1fr}.c10-hero{display:block}}
+      @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-link-grid,.c10-readiness-grid{grid-template-columns:repeat(2,1fr)}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
+      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task{grid-template-columns:1fr}.c10-hero{display:block}}
     `;
     document.head.appendChild(style);
   }
@@ -178,6 +230,8 @@
       <div class="c10-safety">
         解約でもGitHub・Cloudflare・Supabase・LINE・ドメイン等の外部資産は自動削除しません。契約上の引き継ぎ範囲と所有者を確認してから、必要な外部操作を別途行います。
       </div>
+
+      <div id="c10LinkHealth" class="c10-link-health">契約連動状態を確認しています…</div>
 
       <div id="c10Summary" class="c10-summary"></div>
 
@@ -305,6 +359,7 @@
 
       state.overview=data||{summary:{},requests:[],contracts:[]};
       renderSummary();
+      renderLinkHealth();
       renderList();
     } catch(error) {
       console.error(BUILD,error);
@@ -326,6 +381,35 @@
     $("c10Summary").innerHTML=rows.map(([v,l,t])=>
       `<article class="c10-metric ${t}"><b>${esc(v)}</b><span>${esc(l)}</span></article>`
     ).join("");
+  }
+
+  function renderLinkHealth() {
+    const host=$("c10LinkHealth");
+    if(!host) return;
+    const contracts=state.overview?.contracts||[];
+    const usable=contracts.filter((c)=>contractReadiness(c).contractUsable);
+    const projectLinked=usable.filter((c)=>contractReadiness(c).projectLinked).length;
+    const systemLinked=usable.filter((c)=>contractReadiness(c).systemLinked).length;
+    const featureReady=usable.filter((c)=>contractReadiness(c).featureChangeAllowed).length;
+    const issues=usable.filter((c)=>!contractReadiness(c).fullLinked);
+
+    host.innerHTML=`
+      <div class="c10-link-health-head">
+        <strong>契約連動セルフチェック</strong>
+        <span>契約 → 制作案件 → システム台帳 → Feature変更可否を自動判定</span>
+      </div>
+      <div class="c10-link-grid">
+        <div class="c10-link-cell"><b>${usable.length}</b><span>変更対象にできる契約</span></div>
+        <div class="c10-link-cell"><b>${projectLinked}</b><span>制作案件まで紐付け済み</span></div>
+        <div class="c10-link-cell"><b>${systemLinked}</b><span>システム台帳まで紐付け済み</span></div>
+        <div class="c10-link-cell"><b>${featureReady}</b><span>Feature変更の下書き作成可</span></div>
+      </div>
+      ${issues.length?`
+        <div class="c10-link-warn">
+          連動確認が必要な契約 ${issues.length}件。契約変更登録画面で、どこまで紐付いているか契約ごとに表示します。
+        </div>
+      `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
+    `;
   }
 
   function matchesFilter(x) {
@@ -397,7 +481,6 @@
       return;
     }
 
-    // 二重起動・旧キャッシュ・連打の影響を残さない。
     document.querySelectorAll('#c10NewModal,[data-c10-new-modal="true"]').forEach((el)=>el.remove());
 
     const modal=document.createElement("div");
@@ -419,13 +502,15 @@
             <div class="c10-field full">
               <label>変更対象の契約</label>
               <select id="c10NewContract">
-                ${contracts.map((c)=>`
-                  <option value="${esc(c.contract_id)}" data-project="${esc(c.project_id||"")}">
-                    ${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}
-                  </option>
-                `).join("")}
+                ${contracts.map((c)=>{
+                  const r=contractReadiness(c);
+                  const link=r.projectLinked?"制作案件あり":"制作案件未紐付";
+                  return `<option value="${esc(c.contract_id)}">${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}［${esc(link)}］</option>`;
+                }).join("")}
               </select>
             </div>
+
+            <div id="c10ContractReadiness" class="c10-readiness full"></div>
 
             <div class="c10-field">
               <label>変更種別</label>
@@ -473,34 +558,96 @@
       if(event.target===modal) close();
     });
 
+    const contractEl=modal.querySelector("#c10NewContract");
     const typeEl=modal.querySelector("#c10NewType");
     const effectiveEl=modal.querySelector("#c10NewEffective");
-    typeEl?.addEventListener("change",()=>{
+
+    const refreshForm=()=>{
       const t=typeEl.value;
       const required=["feature_change","service_change","fee_change","pause","resume","cancellation"].includes(t);
       effectiveEl.disabled=!required;
       if(!required) effectiveEl.value="";
       else if(!effectiveEl.value) effectiveEl.value=todayIso();
-    });
+      renderNewContractReadiness(modal);
+    };
 
-    modal.querySelector("#c10Create")?.addEventListener("click",createChange,{once:true});
+    contractEl?.addEventListener("change",refreshForm);
+    typeEl?.addEventListener("change",refreshForm);
+    modal.querySelector("#c10Create")?.addEventListener("click",createChange);
+    refreshForm();
+  }
+
+  function renderNewContractReadiness(modal=document) {
+    const contractEl=modal.querySelector?.("#c10NewContract")||$("c10NewContract");
+    const typeEl=modal.querySelector?.("#c10NewType")||$("c10NewType");
+    const host=modal.querySelector?.("#c10ContractReadiness")||$("c10ContractReadiness");
+    const button=modal.querySelector?.("#c10Create")||$("c10Create");
+    if(!contractEl||!typeEl||!host||!button) return;
+
+    const c=contractById(contractEl.value);
+    const r=contractReadiness(c);
+    const type=typeEl.value;
+    const featureBlocked=type==="feature_change"&&!r.featureChangeAllowed;
+    const contractBlocked=!r.contractUsable;
+    const blocked=featureBlocked||contractBlocked;
+
+    let note="";
+    if(contractBlocked){
+      note="この契約は終了済みのため、新しい変更案件を登録できません。";
+    } else if(type==="feature_change"&&!r.projectLinked){
+      note="Feature変更には制作案件の紐付けが必要です。先に「制作中・契約者」でこの契約の制作案件を登録・紐付けしてください。";
+    } else if(type==="feature_change"&&r.projectLinked&&!r.systemLinked){
+      note="Feature変更の下書きは作成できます。ただしシステム台帳が未紐付けなので、本番反映前に紐付け確認が必要です。";
+    } else if(type==="feature_change"){
+      note="Feature変更の下書きを作成できます。完了確定までは既存Featureへ反映しません。";
+    } else {
+      note="この変更種別は登録できます。契約内容への反映は変更案件を完了するまで行いません。";
+    }
+
+    host.innerHTML=`
+      <div class="c10-readiness-title">
+        <strong>この契約の連動状態</strong>
+        <span>${esc(c?.contract_code||"—")}</span>
+      </div>
+      <div class="c10-readiness-grid">
+        <div class="c10-readiness-item"><small>契約台帳</small><b>${readinessPill(r.contractUsable,"登録済","要確認")}</b></div>
+        <div class="c10-readiness-item"><small>制作案件</small><b>${readinessPill(r.projectLinked,"紐付済","未紐付",true)}</b></div>
+        <div class="c10-readiness-item"><small>システム台帳</small><b>${readinessPill(r.systemLinked,"紐付済","未紐付",true)}</b></div>
+        <div class="c10-readiness-item"><small>Feature変更</small><b>${readinessPill(r.featureChangeAllowed,"下書き可","利用不可",true)}</b></div>
+      </div>
+      <div class="c10-readiness-note ${blocked?"warn":"ok"}">${esc(note)}</div>
+    `;
+
+    button.disabled=blocked;
+    button.textContent=featureBlocked?"制作案件の紐付けが必要":contractBlocked?"この契約は変更不可":"下書きを作成";
   }
 
   async function createChange() {
     const contractSelect=$("c10NewContract");
-    const opt=contractSelect.selectedOptions[0];
-    const contractId=contractSelect.value;
-    const projectId=opt?.dataset.project||null;
-    const changeType=$("c10NewType").value;
-    const title=$("c10NewTitle").value.trim();
+    const contractId=contractSelect?.value||"";
+    const contract=contractById(contractId);
+    const readiness=contractReadiness(contract);
+    const projectId=contract?.project_id||null;
+    const changeType=$("c10NewType")?.value||"";
+    const title=$("c10NewTitle")?.value.trim()||"";
+
+    if(!contractId||!contract){
+      alert("変更対象の契約を確認してください。");
+      return;
+    }
 
     if(!title){
       alert("件名を入力してください。");
       return;
     }
 
-    if(changeType==="feature_change"&&!projectId){
-      alert("この契約には制作案件が紐付いていないため、Feature変更はまだ登録できません。先に制作案件を契約へ紐付けてください。");
+    if(!readiness.contractUsable){
+      alert("この契約は終了済みのため、新しい変更案件を登録できません。");
+      return;
+    }
+
+    if(changeType==="feature_change"&&!readiness.featureChangeAllowed){
+      renderNewContractReadiness($("c10NewModal")||document);
       return;
     }
 
@@ -531,10 +678,8 @@
     } catch(error) {
       alert(error.message||"契約変更を登録できませんでした。");
     } finally {
-      if($("c10Create")){
-        $("c10Create").disabled=false;
-        $("c10Create").textContent="下書きを作成";
-      }
+      const modal=$("c10NewModal");
+      if(modal) renderNewContractReadiness(modal);
     }
   }
 
