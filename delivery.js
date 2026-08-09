@@ -2,6 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
+  const CENTER3_BUILD = "CONTROL-CENTER-11-CENTER3-R1-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -107,6 +108,16 @@
       ? { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }
       : { year:"numeric", month:"2-digit", day:"2-digit" }
     ).format(date);
+  }
+
+  function formatDateInput(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
   function statusTone(status) {
@@ -561,6 +572,25 @@
 
       <section class="detail-section">
         <div class="detail-section-head">
+          <div><h3>制作案件の状態</h3><p class="lead">準備中から本番稼働まで、ここで進行状態を管理します。</p></div>
+        </div>
+        <div class="form-grid" style="margin-top:11px">
+          <label>
+            <span>現在の状態</span>
+            <select id="projectStatusInput" ${canWrite() ? "" : "disabled"}>
+              ${Object.entries(projectStatusLabels).map(([value,label]) => `<option value="${value}" ${d.project.status === value ? "selected" : ""}>${label}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            <span>納品予定日</span>
+            <input id="projectDeliveryDateInput" type="date" value="${escapeHtml(formatDateInput(d.project.target_delivery_date))}" ${canWrite() ? "" : "disabled"}>
+          </label>
+          ${canWrite() ? '<button id="saveProjectMeta" class="btn primary full" type="button">制作状況を保存</button>' : ""}
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-head">
           <div><h3>使用機能 / Feature Flag</h3><p class="lead">契約内容に合わせてON/OFFすると、条件付きチェックが自動調整されます。</p></div>
           ${canWrite() ? '<button id="refreshProjectRules" class="btn secondary" type="button">標準チェックを再生成</button>' : ""}
         </div>
@@ -582,6 +612,54 @@
   }
 
   function bindDetailActions() {
+    $("saveProjectMeta")?.addEventListener("click", async () => {
+      if (!canWrite()) return toast("編集権限がありません。", true);
+
+      const projectId = state.currentProject.project.id;
+      const currentOverview = state.currentProject.overview;
+      const status = $("projectStatusInput").value;
+      const targetDeliveryDate = $("projectDeliveryDateInput").value || null;
+
+      if (["approved","live"].includes(status) && !currentOverview.ready_for_delivery) {
+        toast("必須STEP・DPRO標準が完了するまで、納品承認・本番稼働には変更できません。", true);
+        return;
+      }
+
+      const button = $("saveProjectMeta");
+      button.disabled = true;
+      button.textContent = "保存中…";
+
+      try {
+        const payload = {
+          status,
+          target_delivery_date: targetDeliveryDate,
+          updated_by: state.staff.id,
+        };
+
+        if (status === "approved" && !state.currentProject.project.approved_at) {
+          payload.approved_at = new Date().toISOString();
+        }
+        if (status === "live" && !state.currentProject.project.delivered_at) {
+          payload.delivered_at = new Date().toISOString();
+        }
+
+        const { error } = await state.supabase
+          .from("cc_delivery_projects")
+          .update(payload)
+          .eq("id", projectId);
+        if (error) throw error;
+
+        await loadBaseData();
+        await openProject(projectId);
+        toast("制作案件の状態を更新しました。");
+      } catch (error) {
+        toast(error.message || "制作案件を更新できませんでした。", true);
+      } finally {
+        button.disabled = false;
+        button.textContent = "制作状況を保存";
+      }
+    });
+
     $$("[data-feature]", $("detailContent")).forEach((input) => {
       input.addEventListener("change", async () => {
         const projectId = state.currentProject.project.id;
@@ -616,7 +694,7 @@
     $$("[data-save-step]", $("detailContent")).forEach((button) => {
       button.onclick = async () => {
         const id = button.dataset.saveStep;
-        const select = $(`[data-step-status="${id}"]`);
+        const select = document.querySelector(`[data-step-status="${id}"]`);
         const status = select.value;
         button.disabled = true;
         button.textContent = "保存中…";
@@ -646,7 +724,7 @@
     $$("[data-save-check]", $("detailContent")).forEach((button) => {
       button.onclick = async () => {
         const id = button.dataset.saveCheck;
-        const select = $(`[data-check-status="${id}"]`);
+        const select = document.querySelector(`[data-check-status="${id}"]`);
         const status = select.value;
         button.disabled = true;
         button.textContent = "保存中…";
