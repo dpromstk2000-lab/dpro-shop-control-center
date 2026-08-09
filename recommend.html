@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>業務タイプ推奨｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="recommend.css?v=CENTER6-20260809">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=CENTER6-20260809"></script>
+  <script defer src="recommend.js?v=CENTER6-20260809"></script>
+</head>
+<body>
+  <div id="loading" class="screen"><div class="spinner"></div><strong>DPRO 業務タイプ推奨</strong><p>製品台帳と推奨設定を確認しています…</p></div>
+  <div id="auth" class="screen hidden"><div class="state-card"><h1>CONTROL CENTERへログインしてください</h1><a href="index.html" class="btn primary">CONTROL CENTERへ</a></div></div>
+  <div id="error" class="screen hidden"><div class="state-card"><h1>業務タイプ推奨を開けません</h1><p id="errorText"></p><button id="retry" class="btn primary">再確認</button></div></div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="delivery.html#profiles"><i>製</i>製品別標準</a>
+        <a class="active" href="recommend.html"><i>推</i>業務タイプ推奨</a>
+        <a href="index.html#view-products"><i>台</i>製品・連動標準</a>
+        <a href="monitor.html"><i>監</i>自社サイト監視</a>
+      </nav>
+      <div class="sidebar-note"><strong>CENTER-6</strong><span>推奨 → 初回確認 → 標準化</span><small>店舗差は契約案件で調整</small></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><strong>業務タイプ推奨</strong><small>初回契約の設定漏れを防ぎ、製品標準を育てる</small></div>
+        <div class="staff"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div>
+      </header>
+
+      <section class="content">
+        <div class="hero">
+          <p class="eyebrow">BUSINESS TYPE RECOMMENDATION</p>
+          <h1>全部を先に決めない。<br>契約時に、必要な基本だけ自動提案。</h1>
+          <p>製品標準が未設定の製品は5つの業務タイプから推奨機能を自動適用します。店舗ごとに調整し、問題なければ正式な製品標準として保存します。</p>
+          <div class="actions"><a class="btn secondary" href="delivery.html">制作・納品へ戻る</a><button id="refresh" class="btn primary">最新情報に更新</button></div>
+        </div>
+
+        <div id="metrics" class="metrics"></div>
+
+        <section class="flow">
+          <article><b>1</b><strong>業務タイプ推奨</strong><span>未設定製品へ基本候補</span></article>
+          <i>→</i>
+          <article><b>2</b><strong>初回契約で調整</strong><span>店舗差だけON/OFF</span></article>
+          <i>→</i>
+          <article><b>3</b><strong>製品標準として確定</strong><span>2店舗目から自動</span></article>
+        </section>
+
+        <section class="template-section">
+          <div class="section-head"><div><h2>5つの業務タイプ</h2><p>これは製品標準ではなく「初回契約時の推奨」です。</p></div></div>
+          <div id="templateGrid" class="template-grid"></div>
+        </section>
+
+        <section class="products-section">
+          <div class="section-head"><div><h2>製品ごとの推奨</h2><p>製品標準がある場合は正式標準が優先されます。</p></div><span id="resultCount"></span></div>
+          <div class="toolbar">
+            <input id="search" type="search" placeholder="製品名・システムコードで検索">
+            <select id="templateFilter"><option value="all">すべての業務タイプ</option></select>
+            <select id="standardFilter">
+              <option value="all">すべての製品</option>
+              <option value="unconfigured">製品標準 未設定のみ</option>
+              <option value="configured">製品標準 設定済みのみ</option>
+            </select>
+          </div>
+          <div id="productGrid" class="product-grid"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <button id="closeModal" class="close" type="button">×</button>
+      <p class="eyebrow">RECOMMENDATION SETTING</p>
+      <h2 id="modalTitle"></h2>
+      <p id="modalSub" class="muted"></p>
+      <div id="modalStandard"></div>
+      <div class="notice"><strong>ここでは製品標準を確定しません。</strong><span>初回契約で使う「おすすめの土台」だけを決めます。</span></div>
+      <label class="field"><span>推奨する業務タイプ</span><select id="modalTemplate"></select></label>
+      <div id="modalFeatures" class="feature-grid"></div>
+      <label class="field"><span>変更メモ（任意）</span><input id="modalNote" maxlength="160" placeholder="例：受付後の写真確認が中心のため案件・進捗型"></label>
+      <div id="modalMessage" class="message"></div>
+      <button id="saveRecommendation" class="btn primary full">この推奨タイプを保存</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+</body>
+</html>
