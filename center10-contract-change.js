@@ -5,7 +5,7 @@
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-22-CENTER10-R3-LINK-CHECK-20260809";
+  const BUILD = "CONTROL-CENTER-23-CENTER10-R4-SAFE-LINK-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -19,6 +19,12 @@
     selectedId:"",
     search:"",
     filter:"open",
+    linkAudit:{
+      loaded:false,
+      error:"",
+      projects:[],
+      systems:[],
+    },
   };
 
   const TYPE_LABELS = {
@@ -148,6 +154,193 @@
     return pill(ok?yes:no,readinessTone(ok,warning));
   }
 
+  function normId(value) {
+    return String(value||"").trim();
+  }
+
+  function normCode(value) {
+    return String(value||"").trim().toUpperCase();
+  }
+
+  function activeProject(project) {
+    return !!project && !["cancelled"].includes(String(project.status||""));
+  }
+
+  function activeSystem(system) {
+    return !!system && !["ended","cancelled"].includes(String(system.status||""));
+  }
+
+  function projectPriority(status) {
+    const order={
+      live:1,
+      approved:2,
+      ready_for_review:3,
+      in_progress:4,
+      waiting_client:5,
+      preparing:6,
+      paused:7,
+      cancelled:99,
+    };
+    return order[String(status||"")]||50;
+  }
+
+  function sortProjects(rows) {
+    return [...rows].sort((a,b)=>{
+      const p=projectPriority(a.status)-projectPriority(b.status);
+      if(p!==0) return p;
+      return String(b.updated_at||"").localeCompare(String(a.updated_at||""));
+    });
+  }
+
+  function auditForContract(contract) {
+    const c=contract||{};
+    const projects=(state.linkAudit?.projects||[]).filter(activeProject);
+    const systems=(state.linkAudit?.systems||[]).filter(activeSystem);
+    const contractId=normId(c.contract_id);
+    const clientId=normId(c.client_id);
+
+    const exactProjects=sortProjects(
+      projects.filter((p)=>normId(p.contract_id)===contractId)
+    );
+    const exactProject=exactProjects[0]||null;
+
+    const unlinkedSameClient=sortProjects(
+      projects.filter((p)=>
+        normId(p.client_id)===clientId &&
+        !normId(p.contract_id)
+      )
+    );
+
+    const sameClientSystems=systems.filter((s)=>normId(s.client_id)===clientId);
+
+    let candidateProject=null;
+    let projectMode="none";
+
+    if(exactProject){
+      candidateProject=exactProject;
+      projectMode="linked";
+    }else if(unlinkedSameClient.length===1){
+      candidateProject=unlinkedSameClient[0];
+      projectMode="unique";
+    }else if(unlinkedSameClient.length>1){
+      projectMode="multiple";
+    }
+
+    let linkedSystem=null;
+    let candidateSystem=null;
+    let systemMode="none";
+
+    if(candidateProject?.system_instance_id){
+      linkedSystem=systems.find(
+        (s)=>normId(s.id)===normId(candidateProject.system_instance_id)
+      )||null;
+      if(linkedSystem) systemMode="linked";
+    }
+
+    if(!linkedSystem && candidateProject){
+      const code=normCode(
+        candidateProject.effective_system_code ||
+        candidateProject.product_system_code ||
+        candidateProject.system_code
+      );
+
+      const byCode=code
+        ? sameClientSystems.filter((s)=>normCode(s.system_code)===code)
+        : [];
+
+      if(byCode.length===1){
+        candidateSystem=byCode[0];
+        systemMode="unique_code";
+      }else if(byCode.length>1){
+        systemMode="multiple";
+      }else if(sameClientSystems.length===1){
+        candidateSystem=sameClientSystems[0];
+        systemMode="unique_client";
+      }else if(sameClientSystems.length>1){
+        systemMode="multiple";
+      }
+    }
+
+    const readiness=contractReadiness(c);
+    const canLinkProject=
+      readiness.contractUsable &&
+      !readiness.projectLinked &&
+      projectMode==="unique" &&
+      !!candidateProject;
+
+    const canLinkSystem=
+      readiness.contractUsable &&
+      readiness.projectLinked &&
+      !readiness.systemLinked &&
+      !!candidateProject &&
+      !!candidateSystem &&
+      ["unique_code","unique_client"].includes(systemMode);
+
+    return {
+      contract:c,
+      readiness,
+      exactProject,
+      candidateProject,
+      unlinkedSameClient,
+      linkedSystem,
+      candidateSystem,
+      sameClientSystems,
+      projectMode,
+      systemMode,
+      canLinkProject,
+      canLinkSystem,
+    };
+  }
+
+  function projectLabel(project) {
+    if(!project) return "—";
+    return [
+      project.project_code||"",
+      project.project_name||project.client_name||"",
+      project.effective_system_name||project.system_name||project.product_system_code||""
+    ].filter(Boolean).join("｜");
+  }
+
+  function systemLabel(system) {
+    if(!system) return "—";
+    return [
+      system.system_name||system.system_code||"",
+      system.facility_code||"",
+      system.environment||""
+    ].filter(Boolean).join("｜");
+  }
+
+  function auditMessage(audit) {
+    const a=audit||{};
+    if(!a.readiness?.contractUsable){
+      return {tone:"bad",text:"終了・取消済みのため連動対象外です。"};
+    }
+    if(a.readiness?.fullLinked){
+      return {tone:"ok",text:"契約・制作案件・本番システムまで連動済みです。"};
+    }
+    if(a.readiness?.projectLinked && !a.readiness?.systemLinked){
+      if(a.canLinkSystem){
+        return {tone:"warn",text:"制作案件は連動済みです。本番システム候補が1件だけ見つかりました。確認後に紐付けできます。"};
+      }
+      if(a.systemMode==="multiple"){
+        return {tone:"warn",text:"制作案件は連動済みですが、本番システム候補が複数あります。自動では決めません。"};
+      }
+      return {tone:"warn",text:"制作案件は連動済みですが、本番システム候補を一意に確認できません。"};
+    }
+    if(a.canLinkProject){
+      return {
+        tone:"warn",
+        text:a.candidateSystem
+          ?"同じ顧客の未紐付け制作案件が1件だけ見つかり、本番システム候補も確認できました。"
+          :"同じ顧客の未紐付け制作案件が1件だけ見つかりました。契約だけ安全に紐付けできます。"
+      };
+    }
+    if(a.projectMode==="multiple"){
+      return {tone:"warn",text:`同じ顧客の未紐付け制作案件が${a.unlinkedSameClient.length}件あります。誤紐付け防止のため自動候補にはしません。`};
+    }
+    return {tone:"warn",text:"同じ顧客の未紐付け制作案件が見つかりません。先に制作案件の登録が必要です。"};
+  }
+
   function installStyle() {
     if($("center10Style")) return;
     const style=document.createElement("style");
@@ -199,8 +392,20 @@
       #c10NewModal .c10-modal-card{width:min(940px,96vw);padding:28px}
       #c10NewModal .c10-close{width:44px;height:44px;font-size:18px}
       .tab[data-tab="contract-change"]{font-size:14px;font-weight:900;padding-left:18px;padding-right:18px}
-      @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-link-grid,.c10-readiness-grid{grid-template-columns:repeat(2,1fr)}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
-      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task{grid-template-columns:1fr}.c10-hero{display:block}}
+      .c10-audit-list{display:grid;gap:8px;margin-top:12px}
+      .c10-audit-row{display:grid;grid-template-columns:minmax(240px,1.1fr) minmax(240px,1fr) minmax(210px,.9fr) auto;gap:9px;align-items:center;padding:12px;border:1px solid #e0e8e4;border-radius:12px;background:#fbfcfb}
+      .c10-audit-row.ok{border-color:#b9dccd;background:#f7fcf9}
+      .c10-audit-row.warn{border-color:#ead18b;background:#fffdf7}
+      .c10-audit-row.bad{border-color:#efc3cc;background:#fff9fa}
+      .c10-audit-main strong,.c10-audit-main span,.c10-audit-sub strong,.c10-audit-sub span{display:block}
+      .c10-audit-main strong{font-size:14px}.c10-audit-main span{margin-top:4px;font-size:11px;color:#6d7b75}
+      .c10-audit-sub strong{font-size:12px}.c10-audit-sub span{margin-top:4px;font-size:11px;color:#6d7b75;line-height:1.45}
+      .c10-audit-action{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+      .c10-audit-note{margin-top:8px;font-size:12px;color:#65736d;line-height:1.65}
+      .c10-link-button{white-space:nowrap}
+      .c10-modal-link-action{margin-top:9px;display:flex;justify-content:flex-end}
+      @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-link-grid,.c10-readiness-grid{grid-template-columns:repeat(2,1fr)}.c10-audit-row{grid-template-columns:1fr 1fr}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
+      @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task,.c10-audit-row{grid-template-columns:1fr}.c10-hero{display:block}}
     `;
     document.head.appendChild(style);
   }
@@ -220,7 +425,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10</span>
+        <span class="c10-pill green">CENTER-10 R4</span>
       </div>
 
       <div class="c10-guide">
@@ -358,6 +563,7 @@
       if(error) throw error;
 
       state.overview=data||{summary:{},requests:[],contracts:[]};
+      await loadLinkAuditData(sb);
       renderSummary();
       renderLinkHealth();
       renderList();
@@ -365,6 +571,29 @@
       console.error(BUILD,error);
       $("c10List").innerHTML=`<div class="c10-empty"><strong>CENTER-10を読み込めません</strong><span>${esc(error.message||"DBを確認してください。")}</span></div>`;
     }
+  }
+
+  async function loadLinkAuditData(sb) {
+    state.linkAudit={loaded:false,error:"",projects:[],systems:[]};
+
+    const [projectsResult,systemsResult]=await Promise.all([
+      sb.from("cc_v_delivery_project_overview_v2")
+        .select("*")
+        .order("updated_at",{ascending:false}),
+      sb.from("cc_system_instances")
+        .select("id,client_id,system_code,system_name,facility_code,status,environment,created_at")
+        .order("created_at",{ascending:false}),
+    ]);
+
+    if(projectsResult.error) throw projectsResult.error;
+    if(systemsResult.error) throw systemsResult.error;
+
+    state.linkAudit={
+      loaded:true,
+      error:"",
+      projects:projectsResult.data||[],
+      systems:systemsResult.data||[],
+    };
   }
 
   function renderSummary() {
@@ -386,12 +615,51 @@
   function renderLinkHealth() {
     const host=$("c10LinkHealth");
     if(!host) return;
+
     const contracts=state.overview?.contracts||[];
     const usable=contracts.filter((c)=>contractReadiness(c).contractUsable);
     const projectLinked=usable.filter((c)=>contractReadiness(c).projectLinked).length;
     const systemLinked=usable.filter((c)=>contractReadiness(c).systemLinked).length;
     const featureReady=usable.filter((c)=>contractReadiness(c).featureChangeAllowed).length;
     const issues=usable.filter((c)=>!contractReadiness(c).fullLinked);
+    const audits=usable.map(auditForContract);
+
+    const auditRows=audits.map((a)=>{
+      const msg=auditMessage(a);
+      const project=a.exactProject||a.candidateProject;
+      const system=a.linkedSystem||a.candidateSystem;
+
+      let action="";
+      if(a.canLinkProject){
+        action=`<button class="btn primary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">候補を確認して紐付け</button>`;
+      }else if(a.canLinkSystem){
+        action=`<button class="btn secondary c10-link-button" type="button" data-c10-link-contract="${esc(a.contract.contract_id)}">本番システムを紐付け</button>`;
+      }else if(a.readiness.fullLinked){
+        action=pill("連動済","green");
+      }else if(a.projectMode==="multiple"){
+        action=pill("候補複数","amber");
+      }else{
+        action=pill("制作案件が必要","amber");
+      }
+
+      return `
+        <article class="c10-audit-row ${esc(msg.tone)}">
+          <div class="c10-audit-main">
+            <strong>${esc(a.contract.client_name)}｜${esc(a.contract.contract_name)}</strong>
+            <span>${esc(a.contract.contract_code)} / ${esc(a.contract.contract_status||"")}</span>
+          </div>
+          <div class="c10-audit-sub">
+            <strong>制作案件：${esc(project?projectLabel(project):"未確認")}</strong>
+            <span>${esc(msg.text)}</span>
+          </div>
+          <div class="c10-audit-sub">
+            <strong>本番システム：${esc(system?systemLabel(system):"未確認")}</strong>
+            <span>${a.candidateProject&&!a.exactProject?"候補として照合":"現在の連動状態"}</span>
+          </div>
+          <div class="c10-audit-action">${action}</div>
+        </article>
+      `;
+    }).join("");
 
     host.innerHTML=`
       <div class="c10-link-health-head">
@@ -406,10 +674,110 @@
       </div>
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。契約変更登録画面で、どこまで紐付いているか契約ごとに表示します。
+          連動確認が必要な契約 ${issues.length}件。R4は同じ顧客の候補が1件に一意に決まる場合だけ「紐付け候補」として表示します。複数候補は自動決定しません。
         </div>
       `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
+      <div class="c10-audit-list">${auditRows}</div>
     `;
+
+    $$("[data-c10-link-contract]",host).forEach((button)=>{
+      button.addEventListener("click",()=>linkContractCandidate(button.dataset.c10LinkContract));
+    });
+  }
+
+  async function linkContractCandidate(contractId,modal=null) {
+    const contract=contractById(contractId);
+    const audit=auditForContract(contract);
+
+    if(!contract||!audit.readiness.contractUsable){
+      alert("この契約は現在、紐付け対象にできません。");
+      return;
+    }
+
+    const project=audit.exactProject||audit.candidateProject;
+    if(!project){
+      alert("安全に紐付けできる制作案件候補を確認できませんでした。");
+      return;
+    }
+
+    if(!audit.canLinkProject&&!audit.canLinkSystem){
+      alert(
+        audit.projectMode==="multiple"
+          ?"制作案件候補が複数あるため、自動では紐付けません。"
+          :"現在の状態では安全な自動紐付け対象ではありません。"
+      );
+      return;
+    }
+
+    const system=audit.linkedSystem||audit.candidateSystem||null;
+    const mode=audit.canLinkProject?"契約と制作案件":"本番システム";
+    const confirmText=[
+      `${mode}を紐付けます。`,
+      "",
+      `契約：${contract.client_name}｜${contract.contract_name}｜${contract.contract_code}`,
+      `制作案件：${projectLabel(project)}`,
+      `本番システム：${system?systemLabel(system):"今回は未紐付け"}`,
+      "",
+      "候補が1件に一意に決まった場合だけ表示しています。",
+      "この内容で紐付けてよいですか？"
+    ].join("\n");
+
+    if(!confirm(confirmText)) return;
+
+    const buttons=$$(`[data-c10-link-contract="${CSS.escape(String(contractId))}"]`);
+    buttons.forEach((b)=>{
+      b.disabled=true;
+      b.textContent="紐付け中…";
+    });
+
+    try{
+      const sb=await client();
+
+      const productCode=
+        project.effective_system_code ||
+        project.product_system_code ||
+        project.system_code ||
+        system?.system_code ||
+        null;
+
+      const productName=
+        project.effective_system_name ||
+        project.product_name_snapshot ||
+        project.system_name ||
+        system?.system_name ||
+        null;
+
+      const {error}=await sb.rpc("cc_center4_update_project_links",{
+        p_project_id:project.id,
+        p_contract_id:contract.contract_id,
+        p_system_instance_id:system?.id||project.system_instance_id||null,
+        p_product_system_code:productCode,
+        p_product_name:productName,
+      });
+      if(error) throw error;
+
+      await loadOverview();
+
+      if(modal && document.body.contains(modal)){
+        const select=modal.querySelector("#c10NewContract");
+        if(select){
+          const updated=contractById(contractId);
+          const option=[...select.options].find((o)=>o.value===String(contractId));
+          if(option&&updated){
+            const r=contractReadiness(updated);
+            option.textContent=`${updated.client_name}｜${updated.contract_name}｜${updated.contract_code}［${r.projectLinked?"制作案件あり":"制作案件未紐付"}］`;
+          }
+        }
+        renderNewContractReadiness(modal);
+      }
+
+      alert("契約連動を更新しました。CENTER-10のセルフチェックも再計算済みです。");
+    }catch(error){
+      console.error(BUILD,error);
+      alert(error.message||"契約連動を更新できませんでした。");
+    }finally{
+      buttons.forEach((b)=>{ if(document.body.contains(b)) b.disabled=false; });
+    }
   }
 
   function matchesFilter(x) {
@@ -504,7 +872,10 @@
               <select id="c10NewContract">
                 ${contracts.map((c)=>{
                   const r=contractReadiness(c);
-                  const link=r.projectLinked?"制作案件あり":"制作案件未紐付";
+                  const a=auditForContract(c);
+                  let link=r.projectLinked?"制作案件あり":"制作案件未紐付";
+                  if(!r.projectLinked&&a.canLinkProject) link="制作案件候補1件";
+                  else if(!r.projectLinked&&a.projectMode==="multiple") link=`制作案件候補${a.unlinkedSameClient.length}件`;
                   return `<option value="${esc(c.contract_id)}">${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}［${esc(link)}］</option>`;
                 }).join("")}
               </select>
@@ -595,7 +966,12 @@
     if(contractBlocked){
       note="この契約は終了済みのため、新しい変更案件を登録できません。";
     } else if(type==="feature_change"&&!r.projectLinked){
-      note="Feature変更には制作案件の紐付けが必要です。先に「制作中・契約者」でこの契約の制作案件を登録・紐付けしてください。";
+      const a=auditForContract(c);
+      note=a.canLinkProject
+        ?"Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が1件だけ見つかったため、この画面から内容確認後に紐付けできます。"
+        :a.projectMode==="multiple"
+          ?`Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が${a.unlinkedSameClient.length}件あるため、自動では決めません。`
+          :"Feature変更には制作案件の紐付けが必要です。同じ顧客の未紐付け制作案件がないため、先に制作案件を登録してください。";
     } else if(type==="feature_change"&&r.projectLinked&&!r.systemLinked){
       note="Feature変更の下書きは作成できます。ただしシステム台帳が未紐付けなので、本番反映前に紐付け確認が必要です。";
     } else if(type==="feature_change"){
@@ -616,7 +992,17 @@
         <div class="c10-readiness-item"><small>Feature変更</small><b>${readinessPill(r.featureChangeAllowed,"下書き可","利用不可",true)}</b></div>
       </div>
       <div class="c10-readiness-note ${blocked?"warn":"ok"}">${esc(note)}</div>
+      ${featureBlocked&&auditForContract(c).canLinkProject?`
+        <div class="c10-modal-link-action">
+          <button class="btn secondary" type="button" data-c10-modal-link="${esc(c?.contract_id||"")}">制作案件候補を確認して紐付け</button>
+        </div>
+      `:""}
     `;
+
+    const linkButton=host.querySelector("[data-c10-modal-link]");
+    if(linkButton){
+      linkButton.addEventListener("click",()=>linkContractCandidate(linkButton.dataset.c10ModalLink,modal));
+    }
 
     button.disabled=blocked;
     button.textContent=featureBlocked?"制作案件の紐付けが必要":contractBlocked?"この契約は変更不可":"下書きを作成";
