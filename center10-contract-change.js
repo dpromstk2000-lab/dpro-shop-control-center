@@ -5,7 +5,7 @@
   window.__DPRO_CENTER10_RUNTIME__ = true;
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-25-CENTER10-R6-PRODUCTION-GUARD-20260810";
+  const BUILD = "CONTROL-CENTER-26-CENTER10-R7-PRODUCTION-REGISTER-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -24,6 +24,7 @@
       error:"",
       projects:[],
       systems:[],
+      workers:[],
       standardVersion:null,
     },
   };
@@ -79,6 +80,10 @@
 
   function isOwnerAdmin() {
     return state.staff?.role_key === "owner_admin";
+  }
+
+  function canRegisterProductionSystem() {
+    return ["owner_admin","technical_admin"].includes(state.staff?.role_key);
   }
 
   function fmtDate(value) {
@@ -191,6 +196,50 @@
     if(env==="staging") return "STAGING";
     if(env==="test") return "TEST";
     return "環境未確認";
+  }
+
+  function normalizeHttpUrl(value) {
+    const raw=String(value||"").trim();
+    if(!raw) return "";
+    try{
+      const url=new URL(raw);
+      if(!["https:","http:"].includes(url.protocol)) return "";
+      url.hash="";
+      return url.href.replace(/\/$/,"");
+    }catch{
+      return "";
+    }
+  }
+
+  function normalizeWorkerUrl(value) {
+    const raw=normalizeHttpUrl(value);
+    if(!raw) return "";
+    try{
+      const url=new URL(raw);
+      url.pathname=url.pathname.replace(/\/api\/health\/?$/i,"").replace(/\/$/,"");
+      url.search="";
+      url.hash="";
+      return url.href.replace(/\/$/,"");
+    }catch{
+      return "";
+    }
+  }
+
+  function healthUrlFromWorker(value) {
+    const base=normalizeWorkerUrl(value);
+    return base?`${base}/api/health`:"";
+  }
+
+  function workerNameFromUrl(value) {
+    try{
+      return new URL(normalizeWorkerUrl(value)).hostname.split(".")[0]||"DPRO Worker";
+    }catch{
+      return "DPRO Worker";
+    }
+  }
+
+  function looksNonProductionText(value) {
+    return /(^|[._\-\/])(demo|staging|stage|stg|test|testing)([._\-\/]|$)/i.test(String(value||""));
   }
 
   function projectPriority(status) {
@@ -489,6 +538,12 @@
       .c10-import-cell{padding:12px;border:1px solid #dce6e1;border-radius:10px;background:#f8fbf9}
       .c10-import-cell small,.c10-import-cell strong{display:block}.c10-import-cell small{font-size:11px;color:#6d7b75}.c10-import-cell strong{margin-top:5px;font-size:13px}
       .c10-import-warning{margin-top:12px;padding:13px 15px;border:1px solid #ead18b;border-radius:10px;background:#fff9e9;color:#765600;font-size:12px;line-height:1.7}
+      .c10-prod-fixed{padding:13px 15px;border:1px solid #b9dccd;border-radius:10px;background:#eef9f4;color:#17674f;font-size:13px;font-weight:900}
+      .c10-prod-ref{margin-top:10px;padding:12px 14px;border:1px solid #dce6e1;border-radius:10px;background:#f8fbf9;font-size:12px;line-height:1.65;color:#5f6f68}
+      .c10-prod-danger{margin-top:10px;padding:12px 14px;border:1px solid #efc3cc;border-radius:10px;background:#fff3f5;color:#9d2e3c;font-size:12px;line-height:1.65}
+      .c10-prod-check{display:flex;gap:9px;align-items:flex-start;padding:12px 14px;border:1px solid #dce6e1;border-radius:10px;background:#fff}
+      .c10-prod-check input{margin-top:3px;transform:scale(1.15)}
+      .c10-prod-check strong,.c10-prod-check span{display:block}.c10-prod-check span{margin-top:3px;font-size:11px;color:#6d7a75}
       @media(max-width:1100px){.c10-summary{grid-template-columns:repeat(4,1fr)}.c10-link-grid,.c10-readiness-grid{grid-template-columns:repeat(2,1fr)}.c10-audit-row{grid-template-columns:1fr 1fr}.c10-card{grid-template-columns:1fr 1fr 1fr}.c10-main{grid-column:1/-1}.c10-features{grid-template-columns:repeat(2,1fr)}.c10-flow{grid-template-columns:repeat(3,1fr)}}
       @media(max-width:720px){.c10-head{display:block}.c10-summary,.c10-grid,.c10-features,.c10-checklist,.c10-flow,.c10-link-grid,.c10-readiness-grid{grid-template-columns:1fr}.c10-tools,.c10-card,.c10-service-row,.c10-history-task,.c10-audit-row,.c10-import-info{grid-template-columns:1fr}.c10-hero{display:block}}
     `;
@@ -510,7 +565,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R6</span>
+        <span class="c10-pill green">CENTER-10 R7</span>
       </div>
 
       <div class="c10-guide">
@@ -659,14 +714,17 @@
   }
 
   async function loadLinkAuditData(sb) {
-    state.linkAudit={loaded:false,error:"",projects:[],systems:[],standardVersion:null};
+    state.linkAudit={loaded:false,error:"",projects:[],systems:[],workers:[],standardVersion:null};
 
-    const [projectsResult,systemsResult,standardResult]=await Promise.all([
+    const [projectsResult,systemsResult,workersResult,standardResult]=await Promise.all([
       sb.from("cc_v_delivery_project_overview_v2")
         .select("*")
         .order("updated_at",{ascending:false}),
       sb.from("cc_system_instances")
-        .select("id,client_id,system_code,system_name,facility_code,status,environment,created_at")
+        .select("id,client_id,system_code,system_name,facility_code,status,environment,health_url,system_check_url,expected_worker_version,expected_database_version,created_at")
+        .order("created_at",{ascending:false}),
+      sb.from("cc_workers")
+        .select("id,client_id,system_instance_id,worker_name,worker_url,health_url,environment,status,expected_version,created_at")
         .order("created_at",{ascending:false}),
       sb.from("cc_standard_versions")
         .select("id,standard_code,version_code,title,status,effective_date")
@@ -678,6 +736,7 @@
 
     if(projectsResult.error) throw projectsResult.error;
     if(systemsResult.error) throw systemsResult.error;
+    if(workersResult.error) throw workersResult.error;
     if(standardResult.error) throw standardResult.error;
 
     state.linkAudit={
@@ -685,6 +744,7 @@
       error:"",
       projects:projectsResult.data||[],
       systems:systemsResult.data||[],
+      workers:workersResult.data||[],
       standardVersion:standardResult.data||null,
     };
   }
@@ -736,7 +796,9 @@
       }else if(a.projectMode==="multiple"){
         action=pill("候補複数","amber");
       }else if(a.onlyNonProductionSystems){
-        action=pill("本番システム未登録","amber");
+        action=canRegisterProductionSystem()
+          ?`<button class="btn primary c10-link-button" type="button" data-c10-prod-register="${esc(a.contract.contract_id)}">PRODUCTION本番を登録</button>`
+          :pill("本番システム未登録","amber");
       }else if(a.importSystemMode==="none"){
         action=pill("DPROシステムなし","gray");
       }else{
@@ -775,7 +837,7 @@
       </div>
       ${issues.length?`
         <div class="c10-link-warn">
-          連動確認が必要な契約 ${issues.length}件。R6は実契約に対してPRODUCTION環境だけを正式候補にします。DEMO / STAGING / TEST は参考表示のみで、自動紐付け・既存導入取り込みには使用しません。
+          連動確認が必要な契約 ${issues.length}件。R7はPRODUCTION本番環境が未登録の場合、DEMO等を参考にしながら本番台帳を新規登録し、そのまま契約・制作案件へ安全に接続できます。DEMOのURL・施設コードは本番へ流用しません。
         </div>
       `:`<div class="c10-readiness-note ok">現在の対象契約は、制作案件・システム台帳まで連動しています。</div>`}
       <div class="c10-audit-list">${auditRows}</div>
@@ -787,6 +849,397 @@
     $$("[data-c10-import-contract]",host).forEach((button)=>{
       button.addEventListener("click",()=>openLegacyImportModal(button.dataset.c10ImportContract));
     });
+    $$("[data-c10-prod-register]",host).forEach((button)=>{
+      button.addEventListener("click",()=>openProductionRegisterModal(button.dataset.c10ProdRegister));
+    });
+  }
+
+  function openProductionRegisterModal(contractId) {
+    if(!canRegisterProductionSystem()){
+      alert("PRODUCTION本番システムの登録は、管理責任者または技術管理者のみ実行できます。");
+      return;
+    }
+
+    const contract=contractById(contractId);
+    const audit=auditForContract(contract);
+    if(!contract||!audit.readiness.contractUsable){
+      alert("この契約はPRODUCTION本番システム登録の対象にできません。");
+      return;
+    }
+    if(audit.productionSystems?.length){
+      alert("この顧客にはすでにPRODUCTION本番システムがあります。新規登録せず、既存システムとの紐付けを確認してください。");
+      return;
+    }
+    if(!audit.nonProductionSystems?.length){
+      alert("参照できるDEMO / STAGINGシステムがありません。DPROシステム台帳から製品を確認して登録してください。");
+      return;
+    }
+    if(!state.linkAudit?.standardVersion?.version_code){
+      alert("現在のDPRO STANDARDを確認できないため、登録を開始できません。");
+      return;
+    }
+
+    document.querySelectorAll('#c10ProductionModal,[data-c10-production-modal="true"]').forEach((el)=>el.remove());
+
+    const refs=audit.nonProductionSystems||[];
+    const first=refs[0];
+    const defaultName=String(first.system_name||first.system_code||"DPROシステム")
+      .replace(/\s*[（(]?(demo|デモ|staging|stage|test)[）)]?\s*/ig," ")
+      .trim();
+
+    const modal=document.createElement("div");
+    modal.id="c10ProductionModal";
+    modal.className="c10-modal";
+    modal.dataset.c10ProductionModal="true";
+    modal.innerHTML=`
+      <div class="c10-modal-card" role="dialog" aria-modal="true" aria-labelledby="c10ProductionTitle">
+        <div class="c10-modal-head">
+          <div>
+            <p class="eyebrow">PRODUCTION SYSTEM REGISTER</p>
+            <h2 id="c10ProductionTitle">PRODUCTION本番システムを正式登録</h2>
+          </div>
+          <button class="c10-close" type="button" data-c10-production-close aria-label="閉じる">×</button>
+        </div>
+
+        <div class="c10-import-info">
+          <div class="c10-import-cell"><small>契約</small><strong>${esc(contract.contract_name)}</strong></div>
+          <div class="c10-import-cell"><small>契約コード</small><strong>${esc(contract.contract_code)}</strong></div>
+          <div class="c10-import-cell"><small>DPRO STANDARD</small><strong>${esc(state.linkAudit.standardVersion.version_code)}</strong></div>
+        </div>
+
+        <div class="c10-prod-fixed" style="margin-top:12px">環境：PRODUCTION（固定）　／　初期状態：準備中（固定）</div>
+
+        <div class="c10-grid" style="margin-top:14px">
+          <div class="c10-field full">
+            <label>製品コードの参照元（DEMO等）</label>
+            <select id="c10ProdReference">
+              ${refs.map((s)=>`<option value="${esc(s.id)}">${esc(systemLabel(s))}</option>`).join("")}
+            </select>
+          </div>
+
+          <div class="c10-field">
+            <label>システムコード</label>
+            <input id="c10ProdSystemCode" value="${esc(first.system_code||"")}" readonly>
+          </div>
+          <div class="c10-field">
+            <label>本番システム名</label>
+            <input id="c10ProdSystemName" maxlength="160" value="${esc(defaultName)}">
+          </div>
+          <div class="c10-field">
+            <label>本番事業所コード</label>
+            <input id="c10ProdFacilityCode" maxlength="120" placeholder="例：green_fukuoka_kasuya">
+          </div>
+
+          <div class="c10-field full">
+            <label>本番Worker URL</label>
+            <input id="c10ProdWorkerUrl" type="url" placeholder="https://...workers.dev">
+          </div>
+          <div class="c10-field full">
+            <label>Health URL</label>
+            <input id="c10ProdHealthUrl" type="url" placeholder="Worker URLから自動入力">
+          </div>
+          <div class="c10-field full">
+            <label>system-check URL（任意）</label>
+            <input id="c10ProdSystemCheckUrl" type="url" placeholder="https://.../system-check.html">
+          </div>
+
+          <div class="c10-field">
+            <label>期待Worker版（任意）</label>
+            <input id="c10ProdExpectedWorker" maxlength="160">
+          </div>
+          <div class="c10-field">
+            <label>期待DB版（任意）</label>
+            <input id="c10ProdExpectedDb" maxlength="160">
+          </div>
+
+          <div class="c10-field full">
+            <label>制作履歴名</label>
+            <input id="c10ProdProjectName" maxlength="160" value="${esc(`${contract.client_name} ${defaultName} 本番導入`)}">
+          </div>
+
+          <label class="c10-prod-check full">
+            <input id="c10ProdCreateProject" type="checkbox" checked>
+            <span>
+              <strong>登録後、この契約の制作案件も作成して正式接続する</strong>
+              <span>契約・PRODUCTION本番システム・DPRO製品・DPRO STANDARDを接続します。制作案件の状態は「準備中」で始まり、自動で納品済みにはしません。</span>
+            </span>
+          </label>
+
+          <div class="c10-prod-ref full" id="c10ProdReferenceNote">
+            参照元は製品コード確認専用です。DEMO / STAGING / TEST の施設コード・Worker URL・Health URLは本番へコピーしません。
+          </div>
+          <div class="c10-prod-danger full">
+            本番用として実際に作成済みのWorker URLと、新しい本番事業所コードだけを入力してください。DEMO URL・DEMO施設コードは登録できません。
+          </div>
+
+          <div class="c10-actions full">
+            <button id="c10ProdRegisterButton" class="btn primary" type="button">PRODUCTION本番を登録・接続</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close=()=>modal.remove();
+    modal.querySelector("[data-c10-production-close]")?.addEventListener("click",close);
+    modal.addEventListener("click",(event)=>{if(event.target===modal) close();});
+
+    const refSelect=modal.querySelector("#c10ProdReference");
+    const workerInput=modal.querySelector("#c10ProdWorkerUrl");
+    const healthInput=modal.querySelector("#c10ProdHealthUrl");
+
+    refSelect?.addEventListener("change",()=>{
+      const ref=refs.find((s)=>String(s.id)===String(refSelect.value))||refs[0];
+      modal.querySelector("#c10ProdSystemCode").value=ref?.system_code||"";
+      const clean=String(ref?.system_name||ref?.system_code||"DPROシステム")
+        .replace(/\s*[（(]?(demo|デモ|staging|stage|test)[）)]?\s*/ig," ")
+        .trim();
+      modal.querySelector("#c10ProdSystemName").value=clean;
+      modal.querySelector("#c10ProdProjectName").value=`${contract.client_name} ${clean} 本番導入`;
+    });
+
+    workerInput?.addEventListener("input",()=>{
+      const generated=healthUrlFromWorker(workerInput.value);
+      if(!healthInput.dataset.manuallyEdited||!healthInput.value.trim()) healthInput.value=generated;
+    });
+    healthInput?.addEventListener("input",()=>{healthInput.dataset.manuallyEdited="true";});
+
+    modal.querySelector("#c10ProdRegisterButton")?.addEventListener("click",()=>registerProductionSystem(contractId,modal));
+  }
+
+  async function registerProductionSystem(contractId,modal) {
+    if(!canRegisterProductionSystem()){
+      alert("PRODUCTION本番システムの登録権限がありません。");
+      return;
+    }
+
+    const contract=contractById(contractId);
+    const audit=auditForContract(contract);
+    const refId=modal?.querySelector("#c10ProdReference")?.value||"";
+    const ref=(audit.nonProductionSystems||[]).find((s)=>String(s.id)===String(refId))||null;
+    const systemCode=String(modal?.querySelector("#c10ProdSystemCode")?.value||"").trim().toUpperCase();
+    const systemName=String(modal?.querySelector("#c10ProdSystemName")?.value||"").trim();
+    const facilityCode=String(modal?.querySelector("#c10ProdFacilityCode")?.value||"").trim();
+    const workerUrl=normalizeWorkerUrl(modal?.querySelector("#c10ProdWorkerUrl")?.value||"");
+    const healthUrl=normalizeHttpUrl(modal?.querySelector("#c10ProdHealthUrl")?.value||"");
+    const systemCheckUrl=normalizeHttpUrl(modal?.querySelector("#c10ProdSystemCheckUrl")?.value||"");
+    const expectedWorker=String(modal?.querySelector("#c10ProdExpectedWorker")?.value||"").trim();
+    const expectedDb=String(modal?.querySelector("#c10ProdExpectedDb")?.value||"").trim();
+    const projectName=String(modal?.querySelector("#c10ProdProjectName")?.value||"").trim();
+    const createProject=Boolean(modal?.querySelector("#c10ProdCreateProject")?.checked);
+
+    if(!contract||!audit.readiness.contractUsable){
+      alert("契約状態を確認できないため処理を中止しました。");
+      return;
+    }
+    if(audit.productionSystems?.length){
+      alert("最新情報では、すでにPRODUCTION本番システムが登録されています。二重登録防止のため中止しました。");
+      await loadOverview();
+      return;
+    }
+    if(!ref||!systemCode||systemCode!==String(ref.system_code||"").trim().toUpperCase()){
+      alert("参照元のDPRO製品コードと一致しません。");
+      return;
+    }
+    if(!systemName){
+      alert("本番システム名を入力してください。");
+      return;
+    }
+    if(!facilityCode){
+      alert("本番事業所コードを入力してください。");
+      return;
+    }
+    if(!/^[A-Za-z0-9_-]+$/.test(facilityCode)){
+      alert("本番事業所コードは半角英数字・ハイフン・アンダースコアだけで入力してください。");
+      return;
+    }
+    if(looksNonProductionText(facilityCode)){
+      alert("本番事業所コードに demo / staging / test は使用できません。新しいPRODUCTION用コードを入力してください。");
+      return;
+    }
+    if(!workerUrl){
+      alert("有効な本番Worker URLを入力してください。");
+      return;
+    }
+    if(looksNonProductionText(workerUrl)){
+      alert("Worker URLに demo / staging / test が含まれています。PRODUCTION本番Worker URLを入力してください。");
+      return;
+    }
+    if(!healthUrl){
+      alert("Health URLを確認してください。");
+      return;
+    }
+    if(systemCheckUrl && looksNonProductionText(systemCheckUrl)){
+      alert("system-check URLに demo / staging / test が含まれています。PRODUCTION用URLを確認してください。");
+      return;
+    }
+    if(createProject&&!projectName){
+      alert("制作履歴名を入力してください。");
+      return;
+    }
+    if(!state.linkAudit?.standardVersion?.version_code){
+      alert("現在のDPRO STANDARDを確認できません。");
+      return;
+    }
+
+    // クライアント側の直前二重登録チェック
+    const allSystems=state.linkAudit?.systems||[];
+    if(allSystems.some((s)=>String(s.facility_code||"").trim().toLowerCase()===facilityCode.toLowerCase())){
+      alert("同じ事業所コードがすでにシステム台帳へ登録されています。別の本番事業所コードを確認してください。");
+      return;
+    }
+    if(allSystems.some((s)=>
+      String(s.client_id||"")===String(contract.client_id||"") &&
+      isProductionSystem(s) &&
+      normCode(s.system_code)===systemCode
+    )){
+      alert("同じ顧客・同じDPRO製品のPRODUCTION本番システムがすでにあります。二重登録しません。");
+      return;
+    }
+
+    const nonProdSystemIds=new Set((audit.nonProductionSystems||[]).map((s)=>String(s.id)));
+    const nonProdWorkerUrls=(state.linkAudit?.workers||[])
+      .filter((w)=>nonProdSystemIds.has(String(w.system_instance_id)))
+      .map((w)=>normalizeWorkerUrl(w.worker_url))
+      .filter(Boolean);
+    if(nonProdWorkerUrls.includes(workerUrl)){
+      alert("入力されたWorker URLはDEMO / STAGING側で使用中です。本番専用Worker URLを入力してください。");
+      return;
+    }
+
+    const confirmText=[
+      "PRODUCTION本番システムを正式登録します。",
+      "",
+      `契約：${contract.client_name}｜${contract.contract_name}｜${contract.contract_code}`,
+      `製品コード：${systemCode}`,
+      `本番システム名：${systemName}`,
+      `本番事業所コード：${facilityCode}`,
+      `本番Worker：${workerUrl}`,
+      "環境：PRODUCTION",
+      "初期状態：準備中",
+      createProject?`制作案件：作成して契約へ接続（${projectName}）`:"制作案件：今回は作成しない",
+      "",
+      "DEMO / STAGINGのURLや施設コードは使用しません。",
+      "この内容で登録しますか？"
+    ].join("\n");
+    if(!confirm(confirmText)) return;
+
+    const button=modal?.querySelector("#c10ProdRegisterButton");
+    if(button){
+      button.disabled=true;
+      button.textContent="本番台帳を確認中…";
+    }
+
+    let systemId=null;
+    try{
+      const sb=await client();
+
+      // DB直前再検査
+      const [systemCheck,workerCheck]=await Promise.all([
+        sb.from("cc_system_instances")
+          .select("id,client_id,system_code,facility_code,environment,status")
+          .or(`facility_code.eq.${facilityCode},and(client_id.eq.${contract.client_id},system_code.eq.${systemCode},environment.eq.production)`),
+        sb.from("cc_workers")
+          .select("id,worker_url,system_instance_id")
+          .eq("worker_url",workerUrl),
+      ]);
+      if(systemCheck.error) throw systemCheck.error;
+      if(workerCheck.error) throw workerCheck.error;
+
+      if((systemCheck.data||[]).length){
+        throw new Error("二重登録防止: 同じ事業所コード、または同じ顧客・製品のPRODUCTION本番システムがDBに存在します。");
+      }
+      if((workerCheck.data||[]).length){
+        throw new Error("二重登録防止: このWorker URLはすでに台帳で使用されています。");
+      }
+
+      button.textContent="PRODUCTION本番を登録中…";
+      const systemPayload={
+        client_id:contract.client_id,
+        system_code:systemCode,
+        system_name:systemName,
+        facility_code:facilityCode,
+        environment:"production",
+        status:"preparing",
+        health_url:healthUrl,
+        system_check_url:systemCheckUrl||null,
+        expected_worker_version:expectedWorker||null,
+        expected_database_version:expectedDb||null,
+      };
+      const {data:systemData,error:systemError}=await sb
+        .from("cc_system_instances")
+        .insert(systemPayload)
+        .select("id")
+        .single();
+      if(systemError) throw systemError;
+      systemId=systemData?.id||null;
+      if(!systemId) throw new Error("PRODUCTION本番システムIDを取得できませんでした。");
+
+      button.textContent="Worker台帳を接続中…";
+      const workerPayload={
+        client_id:contract.client_id,
+        system_instance_id:systemId,
+        worker_name:workerNameFromUrl(workerUrl),
+        worker_url:workerUrl,
+        health_url:healthUrl,
+        environment:"production",
+        status:"preparing",
+        expected_version:expectedWorker||null,
+        updated_at:new Date().toISOString(),
+      };
+      const {error:workerError}=await sb.from("cc_workers").insert(workerPayload);
+      if(workerError){
+        await loadOverview();
+        throw new Error(`PRODUCTION本番システムは登録されましたが、Worker台帳の接続に失敗しました：${workerError.message}`);
+      }
+
+      if(createProject){
+        button.textContent="契約・制作案件を接続中…";
+        const {error:projectError}=await sb.rpc("cc_center4_create_delivery_project",{
+          p_client_id:contract.client_id,
+          p_contract_id:contract.contract_id,
+          p_system_instance_id:systemId,
+          p_product_system_code:systemCode,
+          p_product_name:systemName,
+          p_project_name:projectName,
+          p_target_delivery_date:null,
+          p_project_code:null,
+          p_standard_version_code:state.linkAudit.standardVersion.version_code,
+        });
+        if(projectError){
+          modal?.remove();
+          await loadOverview();
+          alert([
+            "PRODUCTION本番システムとWorker台帳までは正常に登録しました。",
+            "制作案件の自動接続だけ完了していません。",
+            "",
+            projectError.message||"",
+            "",
+            "CENTER-10を再確認すると「既存導入を取り込む」から安全に続行できます。"
+          ].filter(Boolean).join("\n"));
+          return;
+        }
+      }
+
+      modal?.remove();
+      await loadOverview();
+
+      alert([
+        "PRODUCTION本番システムを正式登録しました。",
+        createProject?"契約・制作案件・本番システムも接続済みです。":"制作案件は今回は作成していません。",
+        "",
+        "制作案件は「準備中」から開始します。",
+        "納品・本番稼働は自動確定していません。",
+        createProject?"CENTER-10でFeature変更の下書きが利用できる状態になったか確認してください。":"必要なら「既存導入を取り込む」で制作案件を接続してください。"
+      ].join("\n"));
+    }catch(error){
+      console.error(BUILD,error);
+      alert(error.message||"PRODUCTION本番システムを登録できませんでした。");
+      if(button&&document.body.contains(button)){
+        button.disabled=false;
+        button.textContent="PRODUCTION本番を登録・接続";
+      }
+    }
   }
 
   function openLegacyImportModal(contractId) {
@@ -1296,7 +1749,9 @@
       note=a.canLinkProject
         ?"Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が1件だけ見つかったため、この画面から内容確認後に紐付けできます。"
         :a.canImportExisting
-          ?"Feature変更には制作案件が必要です。既存DPROシステムを確認できたため、「既存導入取り込み」で管理履歴を作成できます。"
+          ?"Feature変更には制作案件が必要です。PRODUCTION本番システムを確認できたため、「既存導入取り込み」で管理履歴を作成できます。"
+          :a.onlyNonProductionSystems
+            ?"Feature変更にはPRODUCTION本番環境が必要です。DEMO等は参考表示だけなので、「PRODUCTION本番を登録して接続」から正式台帳を作成してください。"
           :a.projectMode==="multiple"
             ?`Feature変更には制作案件の紐付けが必要です。同じ顧客の候補が${a.unlinkedSameClient.length}件あるため、自動では決めません。`
             :"Feature変更には制作案件が必要です。既存DPROシステムが確認できない契約は、無理に制作案件へ変換しません。";
@@ -1330,6 +1785,11 @@
           <button class="btn secondary" type="button" data-c10-modal-import="${esc(c?.contract_id||"")}">既存導入をCONTROL CENTERへ取り込む</button>
         </div>
       `:""}
+      ${featureBlocked&&auditForContract(c).onlyNonProductionSystems&&canRegisterProductionSystem()?`
+        <div class="c10-modal-link-action">
+          <button class="btn primary" type="button" data-c10-modal-prod="${esc(c?.contract_id||"")}">PRODUCTION本番を登録して接続</button>
+        </div>
+      `:""}
     `;
 
     const linkButton=host.querySelector("[data-c10-modal-link]");
@@ -1339,6 +1799,10 @@
     const importButton=host.querySelector("[data-c10-modal-import]");
     if(importButton){
       importButton.addEventListener("click",()=>openLegacyImportModal(importButton.dataset.c10ModalImport));
+    }
+    const prodButton=host.querySelector("[data-c10-modal-prod]");
+    if(prodButton){
+      prodButton.addEventListener("click",()=>openProductionRegisterModal(prodButton.dataset.c10ModalProd));
     }
 
     button.disabled=blocked;
