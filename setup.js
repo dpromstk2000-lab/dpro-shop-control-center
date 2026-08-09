@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const BUILD = "CONTROL-CENTER-15-CENTER3-20260809";
+  const BUILD = "CONTROL-CENTER-15-CENTER3-R1-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -168,6 +168,7 @@
   async function loadBaseData() {
     const [
       projectsResult,
+      deliveryProjectsResult,
       templatesResult,
       templateFeaturesResult,
       featuresResult,
@@ -175,6 +176,7 @@
       standardResult,
     ] = await Promise.all([
       state.supabase.from("cc_v_contract_setup_overview").select("*").order("project_code"),
+      state.supabase.from("cc_v_delivery_project_overview_v2").select("*").order("updated_at",{ascending:false}),
       state.supabase.from("cc_industry_templates").select("*").eq("status","current").order("template_name"),
       state.supabase.from("cc_v_industry_template_features").select("*").order("sort_order"),
       state.supabase.from("cc_feature_catalog").select("*").eq("is_active",true).order("sort_order"),
@@ -182,11 +184,34 @@
       state.supabase.from("cc_standard_versions").select("version_code,title,effective_date").eq("standard_code","DPRO_STANDARD").eq("status","current").order("effective_date",{ascending:false}).limit(1).maybeSingle(),
     ]);
 
-    for (const result of [projectsResult, templatesResult, templateFeaturesResult, featuresResult, implementationsResult, standardResult]) {
+    for (const result of [projectsResult, deliveryProjectsResult, templatesResult, templateFeaturesResult, featuresResult, implementationsResult, standardResult]) {
       if (result.error) throw result.error;
     }
 
-    state.projects = projectsResult.data || [];
+    // CENTER-3-R1:
+    // 契約時は本番system_instanceがまだ無くても、制作・納品側で選択済みの
+    // product_system_code / effective_system_code を製品判定へ使う。
+    const deliveryById = new Map((deliveryProjectsResult.data || []).map((row) => [row.id, row]));
+    state.projects = (projectsResult.data || []).map((row) => {
+      const delivery = deliveryById.get(row.project_id) || {};
+      return {
+        ...row,
+        system_code:
+          row.system_code ||
+          delivery.effective_system_code ||
+          delivery.system_code ||
+          delivery.product_system_code ||
+          "",
+        system_name:
+          row.system_name ||
+          delivery.effective_system_name ||
+          delivery.system_name ||
+          delivery.product_name ||
+          delivery.effective_system_code ||
+          delivery.product_system_code ||
+          "",
+      };
+    });
     state.templates = templatesResult.data || [];
     state.templateFeatures = templateFeaturesResult.data || [];
     state.features = featuresResult.data || [];
