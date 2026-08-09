@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-17-CENTER5-20260809",
+  version: "CONTROL-CENTER-18-CENTER6-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -41,6 +41,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         content:"NEW";margin-left:auto;padding:3px 7px;border-radius:999px;
         background:#dff7ec;color:#096245;font-size:9px;font-weight:900;letter-spacing:.08em
       }
+      .cc-start-link span{background:rgba(159,227,189,.25)!important;color:#e4fff5!important}
       .cc-setup-link span{background:rgba(159,227,189,.20)!important;color:#d9fff0!important}
       .cc-contact-link span{background:rgba(53,180,137,.22)!important;color:#d9fff0!important}
       .cc-delivery-link span{background:rgba(255,198,79,.18)!important;color:#ffe8ad!important}
@@ -93,6 +94,21 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installStartLink = (nav) => {
+    if (document.body?.dataset.cc18StartPage === "true") return true;
+    if (nav.querySelector("[data-cc18-start-link]")) return true;
+    const link = document.createElement("a");
+    link.href = "start.html";
+    link.className = "nav-button cc-addon-link cc-start-link";
+    link.dataset.cc18StartLink = "true";
+    link.innerHTML = "<span>始</span>契約開始ナビ";
+    link.setAttribute("aria-label", "DPRO契約開始ナビを開く");
+    const contractButton = nav.querySelector('[data-view="contracts"]');
+    if (contractButton) contractButton.insertAdjacentElement("afterend", link);
+    else nav.appendChild(link);
+    return true;
+  };
+
   const installSetupLink = (nav) => {
     if (document.body?.dataset.cc15SetupPage === "true") return true;
     if (nav.querySelector("[data-cc15-setup-link]")) return true;
@@ -138,6 +154,38 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installProductMasterDeepLink = () => {
+    const params = new URLSearchParams(location.search);
+    const system = (params.get("system") || "").trim();
+    const tab = (params.get("product_tab") || "").trim();
+
+    if (system) {
+      localStorage.setItem("dpro_center4_feature_system", system);
+      localStorage.setItem("dpro_center5_template_system", system);
+    }
+
+    if (!tab || !document.getElementById("view-products")) return;
+
+    const selector =
+      tab === "features" ? "[data-center4-tab]" :
+      tab === "recommendations" ? "[data-center5-tab]" :
+      null;
+
+    if (!selector) return;
+
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const button = document.querySelector(selector);
+      if (button) {
+        clearInterval(timer);
+        button.click();
+        return;
+      }
+      if (tries >= 80) clearInterval(timer);
+    }, 125);
+  };
+
   const installLinks = () => {
     const nav = document.querySelector(".side-nav");
     if (!nav) return false;
@@ -147,9 +195,10 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     // deliveryを先に挿入し、その後setupを同じ位置へ挿入する。
     const delivery = installDeliveryLink(nav);
     const setup = installSetupLink(nav);
+    const start = installStartLink(nav);
     const contact = installContactLink(nav);
     const monitor = installMonitorLink(nav);
-    return delivery && setup && contact && monitor;
+    return delivery && setup && start && contact && monitor;
   };
 
   installFavicon();
@@ -161,12 +210,14 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
       installDeliveryCompatibility();
       installCenter4ProductFeatures();
       installCenter5IndustryTemplates();
+      installProductMasterDeepLink();
     }, { once: true });
   } else {
     installLinks();
     installDeliveryCompatibility();
     installCenter4ProductFeatures();
     installCenter5IndustryTemplates();
+    installProductMasterDeepLink();
   }
 
   const observer = new MutationObserver(() => {

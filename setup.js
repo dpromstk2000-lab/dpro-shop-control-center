@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const BUILD = "CONTROL-CENTER-15-CENTER3-R2-20260809";
+  const BUILD = "CONTROL-CENTER-18-CENTER6-SETUP-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -778,6 +778,15 @@
       if (!ok) return;
       await loadBaseData();
       showOnly("app");
+
+      const requestedProject = new URLSearchParams(location.search).get("project");
+      if (requestedProject) {
+        if (state.projects.some((p) => p.project_id === requestedProject)) {
+          await openProject(requestedProject);
+        } else {
+          toast("指定された契約案件が見つかりませんでした。", true);
+        }
+      }
     } catch (error) {
       console.error(BUILD, error);
       $("errorText").textContent = error.message || "CENTER-2のDB設定と接続を確認してください。";
