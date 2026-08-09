@@ -7,10 +7,10 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>制作・納品｜DPRO SHOP CONTROL CENTER</title>
-  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-12-CENTER4">
+  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-13-CENTER5">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="config.js?v=CONTROL-CENTER-12-CENTER4"></script>
-  <script defer src="delivery.js?v=CONTROL-CENTER-12-CENTER4"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-13-CENTER5"></script>
+  <script defer src="delivery.js?v=CONTROL-CENTER-13-CENTER5"></script>
 </head>
 <body data-cc11-delivery-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -59,7 +59,7 @@
         <span id="sideStandard">V1.1</span>
         <small>契約 → 制作 → 検査 → 納品</small>
       </div>
-      <div class="version">CONTROL-CENTER-11<br><span>CENTER-4</span></div>
+      <div class="version">CONTROL-CENTER-13<br><span>CENTER-5</span></div>
     </aside>
 
     <main class="main">
@@ -92,6 +92,7 @@
 
         <div class="tabs" role="tablist">
           <button class="tab active" type="button" data-tab="projects">制作中・契約者</button>
+          <button class="tab" type="button" data-tab="profiles">製品別標準</button>
           <button class="tab" type="button" data-tab="standard">DPRO STANDARD</button>
           <button class="tab" type="button" data-tab="rollout">横展開</button>
         </div>
@@ -111,6 +112,28 @@
             <span id="projectResultCount" class="result-count"></span>
           </div>
           <div id="projectGrid" class="project-grid"></div>
+        </section>
+
+        <section id="panel-profiles" class="tab-panel hidden">
+          <div class="section-head">
+            <div>
+              <h2>製品別標準</h2>
+              <p>契約前にDPRO製品ごとの基本Feature Flagを整備します。LINE・ホームページは契約状況から自動判定するため、ここでは設定しません。</p>
+            </div>
+            <span class="pill green">PRODUCT STANDARD</span>
+          </div>
+          <div id="profileSummary" class="profile-summary"></div>
+          <div class="toolbar profile-toolbar">
+            <input id="profileSearch" type="search" placeholder="製品名・システムコードで検索">
+            <select id="profileCategoryFilter"><option value="all">すべてのカテゴリ</option></select>
+            <select id="profileStatusFilter">
+              <option value="all">すべて</option>
+              <option value="configured">標準設定済み</option>
+              <option value="unconfigured">未設定</option>
+            </select>
+            <span id="profileResultCount" class="result-count"></span>
+          </div>
+          <div id="productProfileGrid" class="product-profile-grid"></div>
         </section>
 
         <section id="panel-standard" class="tab-panel hidden">
@@ -157,6 +180,39 @@
     <div class="modal-card detail-card">
       <button class="modal-close" type="button" data-close-modal>×</button>
       <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <div id="profileModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="profileEditorTitle">
+    <div class="modal-card profile-editor-card">
+      <button class="modal-close" type="button" data-profile-close>×</button>
+      <div class="modal-head">
+        <p class="eyebrow">PRODUCT STANDARD</p>
+        <h2 id="profileEditorTitle">製品標準</h2>
+        <p id="profileEditorSub"></p>
+        <div id="profileEditorStatus" class="profile-editor-status"></div>
+      </div>
+
+      <div class="profile-guidance">
+        <strong>この製品を契約したときの基本設定</strong>
+        <span>店舗ごとに違う機能は契約案件側で変更できます。LINE公式連携・ホームページ連携は契約内容から自動設定します。</span>
+      </div>
+
+      <div class="profile-tools">
+        <button id="profileCommonButton" class="btn secondary" type="button">DPRO共通基本に戻す</button>
+        <select id="profileCopySource"><option value="">他製品からコピー（任意）</option></select>
+        <button id="profileCopyButton" class="btn secondary" type="button">コピーして確認</button>
+      </div>
+
+      <div id="profileFeatureGrid" class="feature-grid profile-editor-grid"></div>
+
+      <label class="profile-note-field">
+        <span>変更メモ（任意）</span>
+        <input id="profileEditorNote" maxlength="160" placeholder="例：予約を標準ONへ変更">
+      </label>
+      <div id="profileEditorMessage" class="form-message"></div>
+
+      <button id="profileSaveButton" class="btn primary full" type="button">製品標準を保存</button>
     </div>
   </div>
 

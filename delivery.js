@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const CENTER4_BUILD = "CONTROL-CENTER-12-CENTER4-20260809";
+  const CENTER5_BUILD = "CONTROL-CENTER-13-CENTER5-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -21,6 +21,9 @@
     rolloutSummary: [],
     products: [],
     systemProfiles: [],
+    systemProfileRows: [],
+    profileRevisions: [],
+    profileEditorCode: null,
     currentTab: "projects",
     currentProject: null,
   };
@@ -233,6 +236,8 @@
       rolloutResult,
       rolloutSummaryResult,
       profileResult,
+      profileRowsResult,
+      revisionResult,
     ] = await Promise.all([
       state.supabase.from("cc_clients").select("id,client_code,display_name,status").order("display_name"),
       state.supabase.from("cc_contracts").select("id,client_id,contract_code,contract_name,status").order("created_at",{ascending:false}),
@@ -244,11 +249,14 @@
       state.supabase.from("cc_standard_rollout_targets").select("*").order("rollout_name").order("system_code"),
       state.supabase.from("cc_v_standard_rollout_summary").select("*").order("rollout_name"),
       state.supabase.from("cc_v_system_feature_profile_summary").select("*").order("system_code"),
+      state.supabase.from("cc_system_feature_defaults").select("system_code,feature_code,enabled,setting_json,profile_source,updated_at,updated_by").order("system_code").order("feature_code"),
+      state.supabase.from("cc_v_system_feature_revision_latest").select("*").order("system_code"),
     ]);
 
     for (const result of [
       clientsResult, contractsResult, systemsResult, projectResult, standardResult,
-      versionResult, featureResult, rolloutResult, rolloutSummaryResult, profileResult
+      versionResult, featureResult, rolloutResult, rolloutSummaryResult, profileResult,
+      profileRowsResult, revisionResult
     ]) {
       if (result.error) throw result.error;
     }
@@ -263,6 +271,8 @@
     state.rollout = rolloutResult.data || [];
     state.rolloutSummary = rolloutSummaryResult.data || [];
     state.systemProfiles = profileResult.data || [];
+    state.systemProfileRows = profileRowsResult.data || [];
+    state.profileRevisions = revisionResult.data || [];
     state.products = await productPromise;
 
     $("sideStandard").textContent = state.standardVersion?.version_code || "未設定";
@@ -276,6 +286,7 @@
     renderMetrics();
     renderProjects();
     renderStandard();
+    renderProductProfiles();
     renderRollout();
     switchTab(state.currentTab);
   }
@@ -385,6 +396,213 @@
     `).join("") : '<div class="empty">DPRO STANDARDを取得できませんでした。</div>';
   }
 
+
+  function productProfileRows(systemCode) {
+    return state.systemProfileRows.filter((x) => x.system_code === systemCode);
+  }
+
+  function revisionByCode(systemCode) {
+    return state.profileRevisions.find((x) => x.system_code === systemCode) || null;
+  }
+
+  function filteredProfileProducts() {
+    const q = String($("profileSearch")?.value || "").trim().toLowerCase();
+    const category = $("profileCategoryFilter")?.value || "all";
+    const status = $("profileStatusFilter")?.value || "all";
+
+    return [...state.products]
+      .sort((a,b) => Number(a.product_number || 999) - Number(b.product_number || 999))
+      .filter((p) => {
+        const profile = productProfileByCode(p.system_code);
+        if (category !== "all" && String(p.category || "") !== category) return false;
+        if (status === "configured" && !profile) return false;
+        if (status === "unconfigured" && profile) return false;
+        const hay = `${p.product_number || ""} ${p.product_name || ""} ${p.system_code || ""} ${p.category || ""}`.toLowerCase();
+        return !q || hay.includes(q);
+      });
+  }
+
+  function prepareProfileFilters() {
+    const select = $("profileCategoryFilter");
+    if (!select) return;
+    const current = select.value || "all";
+    const categories = [...new Set(state.products.map((p) => String(p.category || "").trim()).filter(Boolean))]
+      .sort((a,b) => a.localeCompare(b, "ja"));
+    select.innerHTML = '<option value="all">すべてのカテゴリ</option>' +
+      categories.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    if ([...select.options].some((o) => o.value === current)) select.value = current;
+  }
+
+  function renderProductProfiles() {
+    if (!$("productProfileGrid")) return;
+    prepareProfileFilters();
+
+    const total = state.products.length;
+    const configured = state.products.filter((p) => productProfileByCode(p.system_code)).length;
+    const unconfigured = Math.max(0, total - configured);
+    const completeRate = total ? Math.round((configured / total) * 100) : 0;
+
+    $("profileSummary").innerHTML = [
+      [total, "DPRO製品", "製品台帳"],
+      [configured, "標準設定済み", "契約時に自動適用"],
+      [unconfigured, "未設定", "これから整備"],
+      [`${completeRate}%`, "整備率", "製品標準の完成度"],
+    ].map(([v,l,n]) => `<article><b>${escapeHtml(v)}</b><span>${escapeHtml(l)}</span><small>${escapeHtml(n)}</small></article>`).join("");
+
+    const rows = filteredProfileProducts();
+    $("profileResultCount").textContent = `${rows.length}件`;
+
+    $("productProfileGrid").innerHTML = rows.length ? rows.map((p) => {
+      const profile = productProfileByCode(p.system_code);
+      const revision = revisionByCode(p.system_code);
+      return `
+        <article class="profile-card ${profile ? "configured" : ""}">
+          <div class="profile-card-head">
+            <div>
+              <span class="project-code">${escapeHtml(String(p.product_number || "").padStart(2,"0"))}｜${escapeHtml(p.system_code)}</span>
+              <h3>${escapeHtml(p.product_name)}</h3>
+              <p>${escapeHtml(p.category || "カテゴリ未設定")}</p>
+            </div>
+            ${profile
+              ? pill(`製品標準 ${profile.enabled_count}/${profile.feature_count}`, "green")
+              : pill("標準未設定", "amber")}
+          </div>
+          <div class="profile-card-meta">
+            <span>${revision ? `Revision ${revision.revision_number}` : "履歴なし"}</span>
+            <span>${revision ? `更新 ${formatDate(revision.created_at,true)}` : "共通基本から開始"}</span>
+          </div>
+          <button class="btn ${profile ? "secondary" : "primary"} full" type="button" data-edit-profile="${escapeHtml(p.system_code)}">
+            ${profile ? "製品標準を確認・編集" : "製品標準を設定"}
+          </button>
+        </article>
+      `;
+    }).join("") : '<div class="empty">条件に合うDPRO製品がありません。</div>';
+
+    $$("[data-edit-profile]").forEach((button) => {
+      button.onclick = () => openProfileEditor(button.dataset.editProfile);
+    });
+  }
+
+  function profileSettingsFromRows(systemCode) {
+    const map = new Map(productProfileRows(systemCode).map((x) => [x.feature_code, Boolean(x.enabled)]));
+    const result = {};
+    state.features
+      .filter((f) => !["line","website"].includes(f.feature_code))
+      .forEach((f) => {
+        result[f.feature_code] = map.has(f.feature_code) ? map.get(f.feature_code) : Boolean(f.default_enabled);
+      });
+    return result;
+  }
+
+  function renderProfileEditor(settings) {
+    const code = state.profileEditorCode;
+    const product = productByCode(code);
+    const profile = productProfileByCode(code);
+    const revision = revisionByCode(code);
+    if (!product) return;
+
+    $("profileEditorTitle").textContent = `${String(product.product_number || "").padStart(2,"0")}｜${product.product_name}`;
+    $("profileEditorSub").textContent = `${product.system_code}・${product.category || "カテゴリ未設定"}`;
+    $("profileEditorStatus").innerHTML = profile
+      ? `${pill(`製品標準 ${profile.enabled_count}/${profile.feature_count}`, "green")} ${revision ? pill(`Revision ${revision.revision_number}`,"blue") : ""}`
+      : pill("標準未設定","amber");
+
+    const defs = state.features.filter((f) => !["line","website"].includes(f.feature_code));
+    $("profileFeatureGrid").innerHTML = defs.map((f) => `
+      <article class="feature profile-feature">
+        <label>
+          <input type="checkbox" data-profile-feature="${escapeHtml(f.feature_code)}" ${settings[f.feature_code] ? "checked" : ""} ${canWrite() ? "" : "disabled"}>
+          <span>${escapeHtml(f.feature_name || f.feature_code)}</span>
+        </label>
+        <small>${escapeHtml(f.description || "")}</small>
+      </article>
+    `).join("");
+
+    $("profileEditorNote").value = "";
+    $("profileEditorMessage").textContent = "";
+    $("profileEditorMessage").className = "form-message";
+
+    const sourceSelect = $("profileCopySource");
+    sourceSelect.innerHTML = '<option value="">他製品からコピー（任意）</option>' +
+      [...state.products]
+        .filter((p) => p.system_code !== code && productProfileByCode(p.system_code))
+        .sort((a,b) => Number(a.product_number || 999) - Number(b.product_number || 999))
+        .map((p) => {
+          const x = productProfileByCode(p.system_code);
+          return `<option value="${escapeHtml(p.system_code)}">${escapeHtml(String(p.product_number || "").padStart(2,"0"))}｜${escapeHtml(p.product_name)}（${x.enabled_count}/${x.feature_count}）</option>`;
+        }).join("");
+  }
+
+  function openProfileEditor(systemCode) {
+    state.profileEditorCode = systemCode;
+    renderProfileEditor(profileSettingsFromRows(systemCode));
+    $("profileModal").classList.remove("hidden");
+    $("profileModal").setAttribute("aria-hidden","false");
+  }
+
+  function closeProfileEditor() {
+    $("profileModal")?.classList.add("hidden");
+    $("profileModal")?.setAttribute("aria-hidden","true");
+    state.profileEditorCode = null;
+  }
+
+  function collectProfileEditorSettings() {
+    const settings = {};
+    $$("[data-profile-feature]", $("profileFeatureGrid")).forEach((input) => {
+      settings[input.dataset.profileFeature] = Boolean(input.checked);
+    });
+    return settings;
+  }
+
+  function applyCommonProfileDefaults() {
+    const settings = {};
+    state.features
+      .filter((f) => !["line","website"].includes(f.feature_code))
+      .forEach((f) => settings[f.feature_code] = Boolean(f.default_enabled));
+    renderProfileEditor(settings);
+    $("profileEditorMessage").className = "form-message info";
+    $("profileEditorMessage").textContent = "DPRO共通基本に戻しました。内容を確認して「製品標準を保存」を押すまでDBには反映されません。";
+  }
+
+  function copyProfilePreview() {
+    const sourceCode = $("profileCopySource").value;
+    if (!sourceCode) return toast("コピー元の製品を選択してください。", true);
+    renderProfileEditor(profileSettingsFromRows(sourceCode));
+    $("profileCopySource").value = sourceCode;
+    const source = productByCode(sourceCode);
+    $("profileEditorMessage").className = "form-message info";
+    $("profileEditorMessage").textContent = `${source?.product_name || sourceCode} の標準をコピーしました。まだ未保存です。内容を確認してください。`;
+  }
+
+  async function saveProfileEditor() {
+    if (!canWrite() || !state.profileEditorCode) return toast("編集権限がありません。", true);
+
+    const button = $("profileSaveButton");
+    const settings = collectProfileEditorSettings();
+    button.disabled = true;
+    button.textContent = "製品標準を保存中…";
+
+    try {
+      const { data, error } = await state.supabase.rpc("cc_center5_save_product_feature_profile", {
+        p_system_code: state.profileEditorCode,
+        p_settings: settings,
+        p_note: $("profileEditorNote").value.trim() || null,
+      });
+      if (error) throw error;
+
+      await loadBaseData();
+      state.profileEditorCode = data?.systemCode || state.profileEditorCode;
+      renderProfileEditor(profileSettingsFromRows(state.profileEditorCode));
+      toast(`${productByCode(state.profileEditorCode)?.product_name || state.profileEditorCode} を製品標準として保存しました。Revision ${data?.revision || ""}`);
+    } catch (error) {
+      $("profileEditorMessage").className = "form-message";
+      $("profileEditorMessage").textContent = error.message || "製品標準を保存できませんでした。";
+    } finally {
+      button.disabled = false;
+      button.textContent = "製品標準を保存";
+    }
+  }
+
   function renderRollout() {
     const completed = state.rollout.filter((x) => x.status === "completed").length;
     const progress = state.rollout.filter((x) => x.status === "in_progress").length;
@@ -413,7 +631,7 @@
           `).join("")}
         </tbody>
       </table>
-    ` : '<div class="empty">横展開対象はまだ登録されていません。既存の「製品・連動標準」を基準に、CENTER-4以降で標準項目ごとの横展開を登録できます。</div>';
+    ` : '<div class="empty">横展開対象はまだ登録されていません。既存の「製品・連動標準」を基準に、CENTER-5以降で標準項目ごとの横展開を登録できます。</div>';
   }
 
   function switchTab(tab) {
@@ -1027,6 +1245,16 @@
     $$(".tab").forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
     $("projectSearch").addEventListener("input", renderProjects);
     $("projectStatusFilter").addEventListener("change", renderProjects);
+    $("profileSearch")?.addEventListener("input", renderProductProfiles);
+    $("profileCategoryFilter")?.addEventListener("change", renderProductProfiles);
+    $("profileStatusFilter")?.addEventListener("change", renderProductProfiles);
+    $("profileCommonButton")?.addEventListener("click", applyCommonProfileDefaults);
+    $("profileCopyButton")?.addEventListener("click", copyProfilePreview);
+    $("profileSaveButton")?.addEventListener("click", saveProfileEditor);
+    $("[data-profile-close]")?.addEventListener("click", closeProfileEditor);
+    $("profileModal")?.addEventListener("click", (event) => {
+      if (event.target === $("profileModal")) closeProfileEditor();
+    });
     $("refreshButton").addEventListener("click", refreshAll);
     $("newProjectButton").addEventListener("click", openNewProjectModal);
     $("formClient").addEventListener("change", () => {
@@ -1056,20 +1284,23 @@
       });
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeModals();
+      if (event.key === "Escape") {
+        closeModals();
+        closeProfileEditor();
+      }
     });
     $("menuButton").addEventListener("click", () => $("sidebar").classList.toggle("open"));
   }
 
   async function boot() {
-    setLoading("ログイン状態とCENTER-1データを確認しています…");
+    setLoading("ログイン状態と製品標準・制作データを確認しています…");
     try {
       const ok = await initializeSupabase();
       if (!ok) return;
       await loadBaseData();
       showOnly("app");
     } catch (error) {
-      $("errorText").textContent = error.message || "CENTER-1のDB設定と接続を確認してください。";
+      $("errorText").textContent = error.message || "CENTER-5のDB設定と接続を確認してください。";
       showOnly("errorScreen");
     }
   }
