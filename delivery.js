@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const CENTER3_BUILD = "CONTROL-CENTER-11-CENTER3-R1-20260809";
+  const CENTER4_BUILD = "CONTROL-CENTER-12-CENTER4-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -19,6 +19,8 @@
     features: [],
     rollout: [],
     rolloutSummary: [],
+    products: [],
+    systemProfiles: [],
     currentTab: "projects",
     currentProject: null,
   };
@@ -136,6 +138,36 @@
     return ["owner_admin","technical_admin","support"].includes(state.staff?.role_key);
   }
 
+  async function loadProductCatalogSafe() {
+    try {
+      const base = String(CONFIG.apiBaseUrl || "").replace(/\/$/, "");
+      const response = await fetch(`${base}/api/products/overview`, {
+        cache: "no-store",
+        headers: { authorization: `Bearer ${state.session?.access_token || ""}` },
+      });
+      if (!response.ok) return [];
+      const data = await response.json().catch(() => ({}));
+      return Array.isArray(data.products) ? data.products : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function productByCode(systemCode) {
+    return state.products.find((p) => p.system_code === systemCode) || null;
+  }
+
+  function productProfileByCode(systemCode) {
+    return state.systemProfiles.find((p) => p.system_code === systemCode) || null;
+  }
+
+  function productOptionHtml(selectedCode = "") {
+    const rows = [...state.products].sort((a,b) => Number(a.product_number || 999) - Number(b.product_number || 999));
+    return '<option value="">DPRO製品を選択</option>' + rows.map((p) =>
+      `<option value="${escapeHtml(p.system_code)}" ${p.system_code === selectedCode ? "selected" : ""}>${escapeHtml(String(p.product_number || "").padStart(2,"0"))}｜${escapeHtml(p.product_name)}（${escapeHtml(p.system_code)}）</option>`
+    ).join("");
+  }
+
   async function fetchPublicConfig() {
     const base = String(CONFIG.apiBaseUrl || "").replace(/\/$/, "");
     const response = await fetch(`${base}/api/public-config`, { cache: "no-store" });
@@ -188,6 +220,8 @@
   }
 
   async function loadBaseData() {
+    const productPromise = loadProductCatalogSafe();
+
     const [
       clientsResult,
       contractsResult,
@@ -198,19 +232,24 @@
       featureResult,
       rolloutResult,
       rolloutSummaryResult,
+      profileResult,
     ] = await Promise.all([
       state.supabase.from("cc_clients").select("id,client_code,display_name,status").order("display_name"),
       state.supabase.from("cc_contracts").select("id,client_id,contract_code,contract_name,status").order("created_at",{ascending:false}),
       state.supabase.from("cc_system_instances").select("id,client_id,system_code,system_name,status,facility_code").order("created_at",{ascending:false}),
-      state.supabase.from("cc_v_delivery_project_overview").select("*").order("updated_at",{ascending:false}),
+      state.supabase.from("cc_v_delivery_project_overview_v2").select("*").order("updated_at",{ascending:false}),
       state.supabase.from("cc_v_standard_current_items").select("*").order("sort_order"),
       state.supabase.from("cc_standard_versions").select("id,standard_code,version_code,title,status,effective_date").eq("status","current").order("effective_date",{ascending:false}).limit(1).maybeSingle(),
       state.supabase.from("cc_feature_catalog").select("*").eq("is_active",true).order("sort_order"),
       state.supabase.from("cc_standard_rollout_targets").select("*").order("rollout_name").order("system_code"),
       state.supabase.from("cc_v_standard_rollout_summary").select("*").order("rollout_name"),
+      state.supabase.from("cc_v_system_feature_profile_summary").select("*").order("system_code"),
     ]);
 
-    for (const result of [clientsResult, contractsResult, systemsResult, projectResult, standardResult, versionResult, featureResult, rolloutResult, rolloutSummaryResult]) {
+    for (const result of [
+      clientsResult, contractsResult, systemsResult, projectResult, standardResult,
+      versionResult, featureResult, rolloutResult, rolloutSummaryResult, profileResult
+    ]) {
       if (result.error) throw result.error;
     }
 
@@ -223,6 +262,8 @@
     state.features = featureResult.data || [];
     state.rollout = rolloutResult.data || [];
     state.rolloutSummary = rolloutSummaryResult.data || [];
+    state.systemProfiles = profileResult.data || [];
+    state.products = await productPromise;
 
     $("sideStandard").textContent = state.standardVersion?.version_code || "未設定";
     $("standardVersionPill").textContent = state.standardVersion?.version_code || "未設定";
@@ -266,7 +307,7 @@
     const status = $("projectStatusFilter")?.value || "all";
     return state.projects.filter((p) => {
       if (status !== "all" && p.status !== status) return false;
-      const hay = `${p.project_code} ${p.project_name} ${p.client_name} ${p.client_code} ${p.system_name || ""} ${p.system_code || ""}`.toLowerCase();
+      const hay = `${p.project_code} ${p.project_name} ${p.client_name} ${p.client_code} ${p.effective_system_name || p.system_name || ""} ${p.effective_system_code || p.system_code || ""}`.toLowerCase();
       return !q || hay.includes(q);
     });
   }
@@ -291,7 +332,7 @@
             <div>
               <span class="project-code">${escapeHtml(p.project_code)}</span>
               <h2>${escapeHtml(p.client_name)}</h2>
-              <p>${escapeHtml(p.project_name)}${p.system_name ? `・${escapeHtml(p.system_name)}` : ""}</p>
+              <p>${escapeHtml(p.project_name)}${p.effective_system_name ? `・${escapeHtml(p.effective_system_name)}` : ""}</p>
             </div>
             ${pill(projectStatusLabels[p.status] || p.status, statusTone(p.status))}
           </div>
@@ -372,7 +413,7 @@
           `).join("")}
         </tbody>
       </table>
-    ` : '<div class="empty">横展開対象はまだ登録されていません。既存の「製品・連動標準」を基準に、CENTER-3以降で標準項目ごとの横展開を登録できます。</div>';
+    ` : '<div class="empty">横展開対象はまだ登録されていません。既存の「製品・連動標準」を基準に、CENTER-4以降で標準項目ごとの横展開を登録できます。</div>';
   }
 
   function switchTab(tab) {
@@ -386,23 +427,99 @@
     const selectableClients = state.clients.filter((x) => x.status !== "ended");
     $("formClient").innerHTML = '<option value="">契約者を選択</option>' +
       selectableClients.map((x) => `<option value="${x.id}">${escapeHtml(x.display_name)}（${escapeHtml(x.client_code)}）</option>`).join("");
+
+    $("formProduct").innerHTML = productOptionHtml();
     updateContractAndSystemOptions();
+  }
+
+  function preferredSingle(rows, preferredStatuses = []) {
+    const preferred = rows.filter((x) => preferredStatuses.includes(x.status));
+    if (preferred.length === 1) return preferred[0];
+    if (rows.length === 1) return rows[0];
+    return null;
+  }
+
+  function syncProductFromSystem() {
+    const systemId = $("formSystem").value;
+    if (!systemId) return;
+    const system = state.systems.find((x) => x.id === systemId);
+    if (!system?.system_code) return;
+    const product = productByCode(system.system_code);
+    if (product) $("formProduct").value = product.system_code;
+  }
+
+  function syncSystemFromProduct() {
+    const clientId = $("formClient").value;
+    const productCode = $("formProduct").value;
+    if (!clientId || !productCode) return;
+    const matches = state.systems.filter((x) => x.client_id === clientId && x.system_code === productCode && x.status !== "ended");
+    if (matches.length === 1) $("formSystem").value = matches[0].id;
+  }
+
+  function suggestProjectName() {
+    const input = $("formProjectName");
+    if (!input || input.dataset.userEdited === "true") return;
+
+    const client = state.clients.find((x) => x.id === $("formClient").value);
+    const product = productByCode($("formProduct").value);
+    if (client && product) {
+      input.value = `${client.display_name} ${product.product_name} 本番導入`;
+    } else if (client) {
+      input.value = `${client.display_name} DPRO本番導入`;
+    } else {
+      input.value = "";
+    }
+  }
+
+  function updateProjectFormHint() {
+    const clientId = $("formClient").value;
+    const message = $("projectFormMessage");
+    if (!clientId) {
+      message.textContent = "";
+      message.className = "form-message full";
+      return;
+    }
+
+    const contracts = state.contracts.filter((x) => x.client_id === clientId && x.status !== "ended");
+    const systems = state.systems.filter((x) => x.client_id === clientId && x.status !== "ended");
+    const notes = [];
+
+    if (!contracts.length) notes.push("契約情報は未登録です。制作開始後でも紐付けできます。");
+    if (!systems.length) notes.push("本番システムはまだ未登録です。DPRO製品を先に選んで制作開始できます。");
+    if (!$("formProduct").value) notes.push("DPRO製品を選択してください。");
+
+    message.textContent = notes.join(" ");
+    message.className = notes.length ? "form-message full info" : "form-message full success";
+    if (!notes.length) message.textContent = "契約・製品・本番システムを自動確認しました。";
   }
 
   function updateContractAndSystemOptions() {
     const clientId = $("formClient").value;
-    const contracts = state.contracts.filter((x) => x.client_id === clientId);
-    const systems = state.systems.filter((x) => x.client_id === clientId);
+    const contracts = state.contracts.filter((x) => x.client_id === clientId && x.status !== "ended");
+    const systems = state.systems.filter((x) => x.client_id === clientId && x.status !== "ended");
 
-    $("formContract").innerHTML = '<option value="">未指定</option>' +
+    $("formContract").innerHTML = '<option value="">未登録 / 後で紐付け</option>' +
       contracts.map((x) => `<option value="${x.id}">${escapeHtml(x.contract_name)}（${escapeHtml(x.contract_code)}）</option>`).join("");
 
-    $("formSystem").innerHTML = '<option value="">未指定</option>' +
+    $("formSystem").innerHTML = '<option value="">未登録 / 制作中に後で紐付け</option>' +
       systems.map((x) => `<option value="${x.id}">${escapeHtml(x.system_name)}（${escapeHtml(x.system_code)}）</option>`).join("");
+
+    const singleContract = preferredSingle(contracts, ["active"]);
+    const singleSystem = preferredSingle(systems, ["active","preparing"]);
+
+    if (singleContract) $("formContract").value = singleContract.id;
+    if (singleSystem) {
+      $("formSystem").value = singleSystem.id;
+      syncProductFromSystem();
+    }
+
+    suggestProjectName();
+    updateProjectFormHint();
   }
 
   function openNewProjectModal() {
     $("projectForm").reset();
+    $("formProjectName").dataset.userEdited = "false";
     $("projectFormMessage").textContent = "";
     prepareProjectForm();
     $("projectModal").classList.remove("hidden");
@@ -420,43 +537,42 @@
     const clientId = $("formClient").value;
     const contractId = $("formContract").value || null;
     const systemId = $("formSystem").value || null;
+    const productCode = $("formProduct").value || "";
+    const product = productByCode(productCode);
     const projectName = $("formProjectName").value.trim();
     const deliveryDate = $("formDeliveryDate").value || null;
 
-    if (!clientId || !projectName) {
-      $("projectFormMessage").textContent = "契約者と制作名を入力してください。";
+    if (!clientId || !productCode || !projectName) {
+      $("projectFormMessage").className = "form-message full";
+      $("projectFormMessage").textContent = "契約者・DPRO製品・制作名を確認してください。";
       return;
     }
 
     const submit = $("projectForm").querySelector('button[type="submit"]');
     submit.disabled = true;
-    submit.textContent = "作成中…";
+    submit.textContent = "契約内容と製品標準を確認中…";
     $("projectFormMessage").textContent = "";
 
     try {
-      const { data: projectId, error } = await state.supabase.rpc("cc_center1_create_delivery_project", {
+      const { data: projectId, error } = await state.supabase.rpc("cc_center4_create_delivery_project", {
         p_client_id: clientId,
         p_contract_id: contractId,
         p_system_instance_id: systemId,
+        p_product_system_code: productCode,
+        p_product_name: product?.product_name || productCode,
         p_project_name: projectName,
+        p_target_delivery_date: deliveryDate,
         p_project_code: null,
         p_standard_version_code: state.standardVersion?.version_code || "V1.1",
       });
       if (error) throw error;
 
-      if (deliveryDate && projectId) {
-        const { error: updateError } = await state.supabase
-          .from("cc_delivery_projects")
-          .update({ target_delivery_date: deliveryDate, updated_by: state.staff.id })
-          .eq("id", projectId);
-        if (updateError) throw updateError;
-      }
-
       closeModals();
       await loadBaseData();
-      toast("制作プロジェクトを作成しました。");
+      toast("契約・製品標準を反映して制作プロジェクトを作成しました。");
       if (projectId) await openProject(projectId);
     } catch (error) {
+      $("projectFormMessage").className = "form-message full";
       $("projectFormMessage").textContent = error.message || "制作プロジェクトを作成できませんでした。";
     } finally {
       submit.disabled = false;
@@ -510,6 +626,17 @@
     const itemMap = standardItemMap();
     const open = Number(p.blocking_steps_open || 0) + Number(p.blocking_checks_open || 0);
     const progress = projectProgress(p);
+    const clientContracts = state.contracts.filter((x) => x.client_id === p.client_id && x.status !== "ended");
+    const clientSystems = state.systems.filter((x) => x.client_id === p.client_id && x.status !== "ended");
+    const effectiveCode = p.effective_system_code || d.project.product_system_code || "";
+    const profile = productProfileByCode(effectiveCode);
+    const product = productByCode(effectiveCode);
+
+    const detailContractOptions = '<option value="">未登録 / 後で紐付け</option>' +
+      clientContracts.map((x) => `<option value="${x.id}" ${d.project.contract_id === x.id ? "selected" : ""}>${escapeHtml(x.contract_name)}（${escapeHtml(x.contract_code)}）</option>`).join("");
+
+    const detailSystemOptions = '<option value="">未登録 / 後で紐付け</option>' +
+      clientSystems.map((x) => `<option value="${x.id}" ${d.project.system_instance_id === x.id ? "selected" : ""}>${escapeHtml(x.system_name)}（${escapeHtml(x.system_code)}）</option>`).join("");
 
     const featureHtml = d.projectFeatures
       .sort((a,b) => (featureMap.get(a.feature_code)?.sort_order || 999) - (featureMap.get(b.feature_code)?.sort_order || 999))
@@ -555,7 +682,7 @@
       <header class="detail-title">
         <span class="project-code">${escapeHtml(p.project_code)}</span>
         <h2 id="detailTitle">${escapeHtml(p.client_name)}｜${escapeHtml(p.project_name)}</h2>
-        <p>${escapeHtml(p.system_name || "システム未指定")}・DPRO STANDARD ${escapeHtml(p.standard_version || "")}・更新 ${formatDate(p.updated_at,true)}</p>
+        <p>${escapeHtml(p.effective_system_name || "製品未指定")}・DPRO STANDARD ${escapeHtml(p.standard_version || "")}・更新 ${formatDate(p.updated_at,true)}</p>
       </header>
 
       <div class="detail-metrics">
@@ -591,8 +718,31 @@
 
       <section class="detail-section">
         <div class="detail-section-head">
-          <div><h3>使用機能 / Feature Flag</h3><p class="lead">契約内容に合わせてON/OFFすると、条件付きチェックが自動調整されます。</p></div>
-          ${canWrite() ? '<button id="refreshProjectRules" class="btn secondary" type="button">標準チェックを再生成</button>' : ""}
+          <div><h3>契約・製品・本番環境</h3><p class="lead">契約直後は製品だけ先に選び、本番システムは完成後に紐付けできます。</p></div>
+          ${profile ? pill(`製品標準 ${profile.enabled_count}/${profile.feature_count}`,"green") : pill("製品標準 未登録","amber")}
+        </div>
+        <div class="form-grid linkage-grid" style="margin-top:11px">
+          <label><span>契約</span><select id="detailContractInput" ${canWrite() ? "" : "disabled"}>${detailContractOptions}</select></label>
+          <label><span>DPRO製品</span><select id="detailProductInput" ${canWrite() ? "" : "disabled"}>${productOptionHtml(effectiveCode)}</select></label>
+          <label><span>本番システム</span><select id="detailSystemInput" ${canWrite() ? "" : "disabled"}>${detailSystemOptions}</select></label>
+          <div class="profile-note">
+            <strong>${escapeHtml(product?.product_name || p.effective_system_name || "製品未指定")}</strong>
+            <span>${profile ? `この製品のFeature標準は登録済みです。更新 ${formatDate(profile.updated_at,true)}` : "この製品のFeature標準はまだありません。今回の設定を保存すると次回から自動適用できます。"}</span>
+          </div>
+          ${canWrite() ? '<button id="saveProjectLinks" class="btn primary full" type="button">契約・製品・本番環境を保存</button>' : ""}
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <div class="detail-section-head">
+          <div><h3>使用機能 / Feature Flag</h3><p class="lead">共通標準＋契約中のLINE/HP＋製品標準から初期設定します。必要な場合だけ調整してください。</p></div>
+          ${canWrite() ? `
+            <div class="button-row">
+              <button id="applySmartDefaults" class="btn secondary" type="button">自動設定を再確認</button>
+              ${effectiveCode ? '<button id="saveSystemProfile" class="btn secondary" type="button">この設定を製品標準として保存</button>' : ""}
+              <button id="refreshProjectRules" class="btn secondary" type="button">標準チェックを再生成</button>
+            </div>
+          ` : ""}
         </div>
         <div class="feature-grid">${featureHtml || '<div class="empty">Feature Flagがありません。</div>'}</div>
       </section>
@@ -612,6 +762,93 @@
   }
 
   function bindDetailActions() {
+    $("detailSystemInput")?.addEventListener("change", () => {
+      const system = state.systems.find((x) => x.id === $("detailSystemInput").value);
+      if (system?.system_code && productByCode(system.system_code)) {
+        $("detailProductInput").value = system.system_code;
+      }
+    });
+
+    $("detailProductInput")?.addEventListener("change", () => {
+      const productCode = $("detailProductInput").value;
+      const matches = state.systems.filter((x) => x.client_id === state.currentProject.overview.client_id && x.system_code === productCode && x.status !== "ended");
+      if (matches.length === 1) $("detailSystemInput").value = matches[0].id;
+    });
+
+    $("saveProjectLinks")?.addEventListener("click", async () => {
+      const projectId = state.currentProject.project.id;
+      const productCode = $("detailProductInput").value || "";
+      const product = productByCode(productCode);
+      const button = $("saveProjectLinks");
+      button.disabled = true;
+      button.textContent = "自動設定を確認中…";
+      try {
+        const { error } = await state.supabase.rpc("cc_center4_update_project_links", {
+          p_project_id: projectId,
+          p_contract_id: $("detailContractInput").value || null,
+          p_system_instance_id: $("detailSystemInput").value || null,
+          p_product_system_code: productCode || null,
+          p_product_name: product?.product_name || null,
+        });
+        if (error) throw error;
+        await loadBaseData();
+        await openProject(projectId);
+        toast("契約・製品・本番環境を保存し、Feature Flagを自動確認しました。");
+      } catch (error) {
+        toast(error.message || "契約・製品情報を保存できませんでした。", true);
+      } finally {
+        button.disabled = false;
+        button.textContent = "契約・製品・本番環境を保存";
+      }
+    });
+
+    $("applySmartDefaults")?.addEventListener("click", async () => {
+      const projectId = state.currentProject.project.id;
+      const button = $("applySmartDefaults");
+      button.disabled = true;
+      button.textContent = "確認中…";
+      try {
+        const { data, error } = await state.supabase.rpc("cc_center4_apply_smart_defaults", {
+          p_project_id: projectId,
+          p_overwrite: false,
+        });
+        if (error) throw error;
+        await loadBaseData();
+        await openProject(projectId);
+        const parts = [];
+        if (data?.lineDetected) parts.push("LINE");
+        if (data?.websiteDetected) parts.push("HP");
+        if (Number(data?.profileCount || 0) > 0) parts.push(`製品標準${data.profileCount}項目`);
+        toast(parts.length ? `${parts.join("・")}を自動確認しました。` : "共通標準を再確認しました。");
+      } catch (error) {
+        toast(error.message || "自動設定を確認できませんでした。", true);
+      } finally {
+        button.disabled = false;
+        button.textContent = "自動設定を再確認";
+      }
+    });
+
+    $("saveSystemProfile")?.addEventListener("click", async () => {
+      const projectId = state.currentProject.project.id;
+      const button = $("saveSystemProfile");
+      button.disabled = true;
+      button.textContent = "製品標準を保存中…";
+      try {
+        const { data, error } = await state.supabase.rpc("cc_center4_save_system_feature_profile", {
+          p_project_id: projectId,
+        });
+        if (error) throw error;
+        await loadBaseData();
+        await openProject(projectId);
+        toast(`${data?.systemCode || "DPRO製品"}のFeature標準を保存しました。次回契約から自動適用します。`);
+      } catch (error) {
+        toast(error.message || "製品標準を保存できませんでした。", true);
+      } finally {
+        button.disabled = false;
+        button.textContent = "この設定を製品標準として保存";
+      }
+    });
+
     $("saveProjectMeta")?.addEventListener("click", async () => {
       if (!canWrite()) return toast("編集権限がありません。", true);
 
@@ -792,7 +1029,24 @@
     $("projectStatusFilter").addEventListener("change", renderProjects);
     $("refreshButton").addEventListener("click", refreshAll);
     $("newProjectButton").addEventListener("click", openNewProjectModal);
-    $("formClient").addEventListener("change", updateContractAndSystemOptions);
+    $("formClient").addEventListener("change", () => {
+      $("formProjectName").dataset.userEdited = "false";
+      updateContractAndSystemOptions();
+    });
+    $("formContract").addEventListener("change", updateProjectFormHint);
+    $("formSystem").addEventListener("change", () => {
+      syncProductFromSystem();
+      suggestProjectName();
+      updateProjectFormHint();
+    });
+    $("formProduct").addEventListener("change", () => {
+      syncSystemFromProduct();
+      suggestProjectName();
+      updateProjectFormHint();
+    });
+    $("formProjectName").addEventListener("input", () => {
+      $("formProjectName").dataset.userEdited = "true";
+    });
     $("projectForm").addEventListener("submit", createProject);
     $("retryButton").addEventListener("click", boot);
     $$("[data-close-modal]").forEach((button) => button.addEventListener("click", closeModals));

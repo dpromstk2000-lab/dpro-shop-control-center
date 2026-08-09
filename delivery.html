@@ -7,10 +7,10 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>制作・納品｜DPRO SHOP CONTROL CENTER</title>
-  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-11-CENTER3-R1">
+  <link rel="stylesheet" href="delivery.css?v=CONTROL-CENTER-12-CENTER4">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="config.js?v=CONTROL-CENTER-11-CENTER3-R1"></script>
-  <script defer src="delivery.js?v=CONTROL-CENTER-11-CENTER3-R1"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-12-CENTER4"></script>
+  <script defer src="delivery.js?v=CONTROL-CENTER-12-CENTER4"></script>
 </head>
 <body data-cc11-delivery-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -59,7 +59,7 @@
         <span id="sideStandard">V1.1</span>
         <small>契約 → 制作 → 検査 → 納品</small>
       </div>
-      <div class="version">CONTROL-CENTER-11<br><span>CENTER-3 R1</span></div>
+      <div class="version">CONTROL-CENTER-11<br><span>CENTER-4</span></div>
     </aside>
 
     <main class="main">
@@ -138,14 +138,15 @@
       <div class="modal-head">
         <p class="eyebrow">NEW DELIVERY PROJECT</p>
         <h2 id="projectModalTitle">新しい制作を登録</h2>
-        <p>契約者を選ぶと、その店舗専用の制作STEPとDPRO標準チェックを自動生成します。</p>
+        <p>契約者とDPRO製品を選ぶと、契約情報・製品標準を確認して必要な制作STEPとDPRO標準チェックを自動生成します。</p>
       </div>
       <form id="projectForm" class="form-grid">
         <label><span>契約者</span><select id="formClient" required></select></label>
-        <label><span>契約</span><select id="formContract"><option value="">未指定</option></select></label>
-        <label><span>DPROシステム</span><select id="formSystem"><option value="">未指定</option></select></label>
-        <label><span>制作名</span><input id="formProjectName" required maxlength="120" placeholder="例：〇〇美容室 HAIR 本番導入"></label>
+        <label><span>契約</span><select id="formContract"><option value="">未登録 / 後で紐付け</option></select></label>
+        <label class="full"><span>DPRO製品</span><select id="formProduct" required><option value="">DPRO製品を選択</option></select></label>
+        <label><span>本番システム</span><select id="formSystem"><option value="">未登録 / 制作中に後で紐付け</option></select></label>
         <label><span>納品予定日</span><input id="formDeliveryDate" type="date"></label>
+        <label class="full"><span>制作名</span><input id="formProjectName" required maxlength="120" placeholder="契約者・製品から自動入力"></label>
         <div id="projectFormMessage" class="form-message full"></div>
         <button class="btn primary full" type="submit">制作プロジェクトを作成</button>
       </form>
