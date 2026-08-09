@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>契約セットアップ｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="setup.css?v=CONTROL-CENTER-15-CENTER3">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-15-CENTER3"></script>
+  <script defer src="setup.js?v=CONTROL-CENTER-15-CENTER3"></script>
+</head>
+<body data-cc15-setup-page="true">
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>DPRO 契約セットアップ</strong>
+    <p id="loadingText">ログイン状態とDPRO STANDARD V1.2を確認しています…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>契約セットアップはDPROスタッフ専用です。二段階認証済みのCONTROL CENTERから利用します。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>契約セットアップを開けません</h1>
+      <p id="errorText">CENTER-2のDBと接続を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="index.html">CONTROL CENTERへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html">
+        <span>D</span>
+        <div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div>
+      </a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="index.html#view-clients"><i>顧</i>全顧客</a>
+        <a href="index.html#view-contracts"><i>契</i>契約・サービス</a>
+        <a class="active" href="setup.html"><i>設</i>契約セットアップ</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="index.html#view-products"><i>製</i>製品・連動標準</a>
+        <a href="index.html#view-line"><i>LINE</i>LINE公式運用</a>
+        <a href="monitor.html"><i>監</i>自社サイト監視</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>DPRO STANDARD</strong>
+        <span id="sideStandard">V1.2</span>
+        <small>契約内容 → Feature → 制作タスク</small>
+      </div>
+      <div class="version">CONTROL-CENTER-15<br><span>CENTER-3</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div>
+          <strong>契約セットアップ</strong>
+          <small>業種おすすめ・利用機能・実装状況を確定</small>
+        </div>
+        <div class="staff-chip">
+          <span id="staffInitial">D</span>
+          <div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">CONTRACT SETUP MASTER</p>
+            <h1>契約したら、<br>ここから始める。</h1>
+            <p>業種おすすめを基準に、店舗ごとの利用機能をON/OFF。必要な共通部品・追加実装・制作タスクまで自動で整理します。</p>
+          </div>
+          <div class="head-actions">
+            <button id="refreshButton" class="btn secondary" type="button">最新情報に更新</button>
+            <a class="btn primary" href="delivery.html">＋ 新しい制作を登録</a>
+          </div>
+        </div>
+
+        <div class="policy-note">
+          <strong>全部のシステムを今すぐ改修しない</strong>
+          <span>契約が入った時に、必要なFeatureだけを最高の状態へ仕上げます。実装済み・標準部品・契約時追加実装を区別して管理します。</span>
+        </div>
+
+        <div id="metricGrid" class="metric-grid"></div>
+
+        <div class="toolbar">
+          <input id="projectSearch" type="search" placeholder="店舗名・システム名・制作コードで検索">
+          <select id="setupStatusFilter">
+            <option value="all">すべての状態</option>
+            <option value="draft">未設定</option>
+            <option value="recommended">おすすめ適用済み</option>
+            <option value="confirmed">契約内容確定</option>
+            <option value="locked">確定・ロック</option>
+          </select>
+          <select id="readyFilter">
+            <option value="all">すべて</option>
+            <option value="ready">セットアップ完了</option>
+            <option value="work">制作・確認あり</option>
+          </select>
+          <span id="resultCount" class="result-count"></span>
+        </div>
+
+        <div id="projectGrid" class="project-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="detailModal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-card detail-card">
+      <button class="modal-close" type="button" data-close-modal>×</button>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+</body>
+</html>

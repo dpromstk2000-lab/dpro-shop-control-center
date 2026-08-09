@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-11-FRONTEND-20260809-CENTER2",
+  version: "CONTROL-CENTER-15-CENTER3-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -41,6 +41,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         content:"NEW";margin-left:auto;padding:3px 7px;border-radius:999px;
         background:#dff7ec;color:#096245;font-size:9px;font-weight:900;letter-spacing:.08em
       }
+      .cc-setup-link span{background:rgba(159,227,189,.20)!important;color:#d9fff0!important}
       .cc-contact-link span{background:rgba(53,180,137,.22)!important;color:#d9fff0!important}
       .cc-delivery-link span{background:rgba(255,198,79,.18)!important;color:#ffe8ad!important}
     `;
@@ -92,22 +93,56 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installSetupLink = (nav) => {
+    if (document.body?.dataset.cc15SetupPage === "true") return true;
+    if (nav.querySelector("[data-cc15-setup-link]")) return true;
+    const link = document.createElement("a");
+    link.href = "setup.html";
+    link.className = "nav-button cc-addon-link cc-setup-link";
+    link.dataset.cc15SetupLink = "true";
+    link.innerHTML = "<span>設</span>契約セットアップ";
+    link.setAttribute("aria-label", "DPRO契約セットアップを開く");
+    const contractButton = nav.querySelector('[data-view="contracts"]');
+    if (contractButton) contractButton.insertAdjacentElement("afterend", link);
+    else nav.appendChild(link);
+    return true;
+  };
+
+  const installDeliveryCompatibility = () => {
+    if (document.body?.dataset.cc11DeliveryPage !== "true") return;
+    if (document.querySelector('script[data-center3-compat]')) return;
+    const script = document.createElement("script");
+    script.src = "./center3-integration.js?v=CONTROL-CENTER-15-CENTER3";
+    script.defer = true;
+    script.dataset.center3Compat = "true";
+    document.head.appendChild(script);
+  };
+
   const installLinks = () => {
     const nav = document.querySelector(".side-nav");
     if (!nav) return false;
     ensureStyle();
+
+    // 「契約・サービス → 契約セットアップ → 制作・納品」の順になるよう
+    // deliveryを先に挿入し、その後setupを同じ位置へ挿入する。
     const delivery = installDeliveryLink(nav);
+    const setup = installSetupLink(nav);
     const contact = installContactLink(nav);
     const monitor = installMonitorLink(nav);
-    return delivery && contact && monitor;
+    return delivery && setup && contact && monitor;
   };
 
   installFavicon();
+  installDeliveryCompatibility();
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", installLinks, { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      installLinks();
+      installDeliveryCompatibility();
+    }, { once: true });
   } else {
     installLinks();
+    installDeliveryCompatibility();
   }
 
   const observer = new MutationObserver(() => {
