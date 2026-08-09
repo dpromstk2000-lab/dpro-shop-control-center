@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const CENTER5_BUILD = "CONTROL-CENTER-13-CENTER5-20260809";
+  const CENTER5_BUILD = "CONTROL-CENTER-13-CENTER5-R1-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -1251,9 +1251,10 @@
     $("profileCommonButton")?.addEventListener("click", applyCommonProfileDefaults);
     $("profileCopyButton")?.addEventListener("click", copyProfilePreview);
     $("profileSaveButton")?.addEventListener("click", saveProfileEditor);
-    $("[data-profile-close]")?.addEventListener("click", closeProfileEditor);
+    document.querySelector("[data-profile-close]")?.addEventListener("click", closeProfileEditor);
     $("profileModal")?.addEventListener("click", (event) => {
       if (event.target === $("profileModal")) closeProfileEditor();
+      if (event.target.closest?.("[data-profile-close]")) closeProfileEditor();
     });
     $("refreshButton").addEventListener("click", refreshAll);
     $("newProjectButton").addEventListener("click", openNewProjectModal);
