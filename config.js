@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-18-CENTER6-R1-20260809",
+  version: "CONTROL-CENTER-18-CENTER6-R2-20260809",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -159,6 +159,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     const system = (params.get("system") || "").trim();
     const tab = (params.get("product_tab") || "").trim();
 
+    // CENTER-4/5スクリプトが起動する前に対象製品を保存する。
     if (system) {
       localStorage.setItem("dpro_center4_feature_system", system);
       localStorage.setItem("dpro_center5_template_system", system);
@@ -171,27 +172,62 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
       tab === "recommendations" ? "[data-center5-tab]" :
       null;
 
-    if (!tabSelector) return;
+    const panelSelector =
+      tab === "features" ? "#product-panel-features" :
+      tab === "recommendations" ? "#product-panel-recommendations" :
+      null;
+
+    if (!tabSelector || !panelSelector) return;
 
     let tries = 0;
-    let productsOpened = false;
+    let stableTicks = 0;
+
     const timer = setInterval(() => {
       tries += 1;
 
       const appShell = document.getElementById("appShell");
       const productsNav = document.querySelector('.nav-button[data-view="products"]');
+      const productsView = document.getElementById("view-products");
+      const tabButton = document.querySelector(tabSelector);
+      const targetPanel = document.querySelector(panelSelector);
 
-      if (!productsOpened && appShell && !appShell.classList.contains("hidden") && productsNav) {
-        productsNav.click();
-        productsOpened = true;
+      const appReady = Boolean(
+        appShell &&
+        !appShell.classList.contains("hidden") &&
+        productsNav
+      );
+
+      if (!appReady) {
+        stableTicks = 0;
+        if (tries >= 240) clearInterval(timer);
+        return;
       }
 
-      const tabButton = document.querySelector(tabSelector);
-      const productsView = document.getElementById("view-products");
+      // app.jsの初期化最後でdashboardへ戻されることがあるため、
+      // 製品画面が外れていれば何度でも通常navクリックで戻す。
       const productsVisible = productsView && !productsView.classList.contains("hidden");
+      if (!productsVisible) {
+        productsNav.click();
+        stableTicks = 0;
+        return;
+      }
 
-      if (productsOpened && productsVisible && tabButton) {
+      // CENTER-4/5タブ生成後、対象タブを開く。
+      if (!tabButton || !targetPanel) {
+        stableTicks = 0;
+        return;
+      }
+
+      const panelVisible = !targetPanel.classList.contains("hidden");
+      if (!panelVisible) {
         tabButton.click();
+        stableTicks = 0;
+        return;
+      }
+
+      // 本体の遅延処理に上書きされないことを約1秒確認してから完了。
+      stableTicks += 1;
+      if (stableTicks >= 8) {
         clearInterval(timer);
 
         const clean = new URL(location.href);
@@ -201,7 +237,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         return;
       }
 
-      if (tries >= 160) clearInterval(timer);
+      if (tries >= 240) clearInterval(timer);
     }, 125);
   };
 
@@ -227,16 +263,16 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     document.addEventListener("DOMContentLoaded", () => {
       installLinks();
       installDeliveryCompatibility();
+      installProductMasterDeepLink();
       installCenter4ProductFeatures();
       installCenter5IndustryTemplates();
-      installProductMasterDeepLink();
     }, { once: true });
   } else {
     installLinks();
     installDeliveryCompatibility();
+    installProductMasterDeepLink();
     installCenter4ProductFeatures();
     installCenter5IndustryTemplates();
-    installProductMasterDeepLink();
   }
 
   const observer = new MutationObserver(() => {
