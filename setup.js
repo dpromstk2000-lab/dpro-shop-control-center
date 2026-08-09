@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
-  const BUILD = "CONTROL-CENTER-15-CENTER3-R1-20260809";
+  const BUILD = "CONTROL-CENTER-15-CENTER3-R2-20260809";
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
@@ -61,6 +61,14 @@
     system: "業種専用",
     general: "共通",
   };
+
+  function installR2Style() {
+    if (document.getElementById("center3-r2-style")) return;
+    const style = document.createElement("style");
+    style.id = "center3-r2-style";
+    style.textContent = ".ready-banner .btn{margin-left:12px;min-height:36px;vertical-align:middle}@media(max-width:560px){.ready-banner .btn{margin:10px 0 0;width:100%}}";
+    document.head.appendChild(style);
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -448,6 +456,10 @@
     const ready = Boolean(o.setup_ready);
     const openTasks = Number(o.feature_tasks_open || 0);
     const issues = Number(o.dependency_issues || 0);
+    const currentStandard = state.standardVersion?.version_code || "";
+    const projectStandard = o.standard_version || "";
+    const standardOutdated = Boolean(currentStandard && projectStandard && currentStandard !== projectStandard);
+    const effectiveReady = ready && !standardOutdated;
 
     $("detailContent").innerHTML = `
       <header class="detail-title">
@@ -460,8 +472,17 @@
         <div class="detail-metric"><b>${Number(o.enabled_features || 0)}</b><span>ON機能</span></div>
         <div class="detail-metric"><b>${openTasks}</b><span>制作タスク</span></div>
         <div class="detail-metric"><b>${issues}</b><span>依存問題</span></div>
-        <div class="detail-metric"><b>${ready ? "OK" : "—"}</b><span>セットアップ</span></div>
+        <div class="detail-metric"><b>${effectiveReady ? "OK" : "—"}</b><span>セットアップ</span></div>
       </div>
+
+      ${standardOutdated ? `
+        <div class="ready-banner warning">
+          この案件は DPRO STANDARD ${escapeHtml(projectStandard)} です。現行は ${escapeHtml(currentStandard)} です。
+          <button id="upgradeStandardButton" class="btn primary" type="button" ${canWrite() ? "" : "disabled"}>
+            ${escapeHtml(currentStandard)}へ更新
+          </button>
+        </div>
+      ` : `<div class="ready-banner">DPRO STANDARD ${escapeHtml(currentStandard || projectStandard)}・現行版です。</div>`}
 
       <section class="detail-section">
         <div class="section-head"><div><h3>1. 業種・製品おすすめ</h3><p>おすすめを基準にして、店舗ごとに不要機能をOFF、必要機能をONにします。</p></div>${pill(setupLabels[d.setup?.setup_status || o.setup_status || "draft"] || "未設定")}</div>
@@ -492,16 +513,18 @@
         ${d.tasks.length && canWrite() ? `<div class="feature-actions"><button id="saveTasksButton" class="btn secondary" type="button">制作タスク状態を保存</button></div>` : ""}
       </section>
 
-      <div class="ready-banner ${ready ? "" : "warning"}">
-        ${ready
+      <div class="ready-banner ${effectiveReady ? "" : "warning"}">
+        ${effectiveReady
           ? "契約セットアップ完了。制作・納品工程へ進めます。"
-          : `現在はセットアップ未完了です。制作タスク ${openTasks}件 / 依存問題 ${issues}件`}
+          : standardOutdated
+            ? `現行DPRO STANDARD ${escapeHtml(currentStandard)}へ更新してから契約セットアップを確定してください。`
+            : `現在はセットアップ未完了です。制作タスク ${openTasks}件 / 依存問題 ${issues}件`}
       </div>
 
       <div class="detail-actions">
         <button id="refreshRulesButton" class="btn secondary" type="button">依存・制作タスクを再計算</button>
         <a class="btn secondary" href="delivery.html">制作・納品を開く</a>
-        <button id="confirmSetupButton" class="btn primary" type="button" ${canWrite()?"":"disabled"}>契約セットアップを確定</button>
+        <button id="confirmSetupButton" class="btn primary" type="button" ${(canWrite() && !standardOutdated) ? "" : "disabled"}>契約セットアップを確定</button>
       </div>
     `;
 
@@ -627,6 +650,11 @@
 
   async function confirmSetup() {
     if (!canWrite()) return;
+    const projectStandard = state.current?.overview?.standard_version || "";
+    const currentStandard = state.standardVersion?.version_code || "";
+    if (projectStandard && currentStandard && projectStandard !== currentStandard) {
+      return toast(`DPRO STANDARD ${currentStandard}へ更新してから確定してください。`, true);
+    }
     const button = $("confirmSetupButton");
     button.disabled = true;
     button.textContent = "確定中…";
@@ -645,7 +673,36 @@
     }
   }
 
+  async function upgradeStandard() {
+    if (!canWrite()) return toast("編集権限がありません。", true);
+    const currentStandard = state.standardVersion?.version_code || "V1.2";
+    const button = $("upgradeStandardButton");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "標準を更新中…";
+    }
+
+    try {
+      const { data, error } = await state.supabase.rpc("cc_center3_upgrade_project_standard", {
+        p_project_id: state.current.project.id,
+        p_target_version_code: currentStandard,
+      });
+      if (error) throw error;
+
+      await loadBaseData();
+      await openProject(state.current.project.id);
+      toast(`DPRO STANDARDを${currentStandard}へ更新しました。既存の完了チェックは引き継いでいます。`);
+    } catch (error) {
+      toast(error.message || "DPRO STANDARDを更新できませんでした。", true);
+      if (button) {
+        button.disabled = false;
+        button.textContent = `${currentStandard}へ更新`;
+      }
+    }
+  }
+
   function bindDetailEvents() {
+    $("upgradeStandardButton")?.addEventListener("click", upgradeStandard);
     $("applyTemplateButton")?.addEventListener("click", applyTemplate);
     $("saveFeaturesButton")?.addEventListener("click", saveFeatures);
     $("saveTasksButton")?.addEventListener("click", saveTasks);
@@ -728,6 +785,7 @@
     }
   }
 
+  installR2Style();
   bindStaticEvents();
   boot();
 })();
