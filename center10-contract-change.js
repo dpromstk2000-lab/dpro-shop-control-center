@@ -1,7 +1,10 @@
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-22-CENTER10-20260809";
+  if (window.__DPRO_CENTER10_RUNTIME_R1__) return;
+  window.__DPRO_CENTER10_RUNTIME_R1__ = true;
+
+  const BUILD = "CONTROL-CENTER-22-CENTER10-R1-20260809";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -208,7 +211,11 @@
       state.filter=$("c10Filter").value;
       renderList();
     });
-    $("c10New")?.addEventListener("click",openNewModal);
+    const newButton=$("c10New");
+    if(newButton && newButton.dataset.center10NewBound!=="true"){
+      newButton.dataset.center10NewBound="true";
+      newButton.addEventListener("click",openNewModal);
+    }
   }
 
   function installPanel() {
@@ -382,85 +389,93 @@
       return;
     }
 
-    let modal=$("c10NewModal");
-    if(!modal){
-      modal=document.createElement("div");
-      modal.id="c10NewModal";
-      modal.className="c10-modal";
-      modal.innerHTML=`
-        <div class="c10-modal-card">
-          <div class="c10-modal-head">
-            <div>
-              <p class="eyebrow">CONTRACT CHANGE</p>
-              <h2>契約変更を登録</h2>
-            </div>
-            <button id="c10ModalClose" class="c10-close" type="button">×</button>
+    // 二重起動・旧キャッシュ・連打の影響を残さない。
+    document.querySelectorAll('#c10NewModal,[data-c10-new-modal="true"]').forEach((el)=>el.remove());
+
+    const modal=document.createElement("div");
+    modal.id="c10NewModal";
+    modal.className="c10-modal";
+    modal.dataset.c10NewModal="true";
+    modal.innerHTML=`
+      <div class="c10-modal-card" role="dialog" aria-modal="true" aria-labelledby="c10NewModalTitle">
+        <div class="c10-modal-head">
+          <div>
+            <p class="eyebrow">CONTRACT CHANGE</p>
+            <h2 id="c10NewModalTitle">契約変更を登録</h2>
           </div>
-          <div id="c10NewForm"></div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      $("c10ModalClose").onclick=()=>modal.remove();
-    }
-
-    $("c10NewForm").innerHTML=`
-      <div class="c10-grid" style="margin-top:14px">
-        <div class="c10-field full">
-          <label>変更対象の契約</label>
-          <select id="c10NewContract">
-            ${contracts.map((c)=>`
-              <option value="${esc(c.contract_id)}" data-project="${esc(c.project_id||"")}">
-                ${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}
-              </option>
-            `).join("")}
-          </select>
+          <button class="c10-close" type="button" data-c10-modal-close aria-label="閉じる">×</button>
         </div>
 
-        <div class="c10-field">
-          <label>変更種別</label>
-          <select id="c10NewType">
-            ${Object.entries(TYPE_LABELS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}
-          </select>
-        </div>
+        <div data-c10-new-form>
+          <div class="c10-grid" style="margin-top:14px">
+            <div class="c10-field full">
+              <label>変更対象の契約</label>
+              <select id="c10NewContract">
+                ${contracts.map((c)=>`
+                  <option value="${esc(c.contract_id)}" data-project="${esc(c.project_id||"")}">
+                    ${esc(c.client_name)}｜${esc(c.contract_name)}｜${esc(c.contract_code)}
+                  </option>
+                `).join("")}
+              </select>
+            </div>
 
-        <div class="c10-field">
-          <label>適用希望日</label>
-          <input id="c10NewEffective" type="date" value="${todayIso()}">
-        </div>
+            <div class="c10-field">
+              <label>変更種別</label>
+              <select id="c10NewType">
+                ${Object.entries(TYPE_LABELS).map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("")}
+              </select>
+            </div>
 
-        <div class="c10-field">
-          <label>オーナー承認</label>
-          <select id="c10NewApproval">
-            <option value="true">必要</option>
-            <option value="false">不要</option>
-          </select>
-        </div>
+            <div class="c10-field">
+              <label>適用希望日</label>
+              <input id="c10NewEffective" type="date" value="${todayIso()}">
+            </div>
 
-        <div class="c10-field full">
-          <label>件名</label>
-          <input id="c10NewTitle" maxlength="120" placeholder="例：写真共有機能を追加">
-        </div>
+            <div class="c10-field">
+              <label>オーナー承認</label>
+              <select id="c10NewApproval">
+                <option value="true">必要</option>
+                <option value="false">不要</option>
+              </select>
+            </div>
 
-        <div class="c10-field full">
-          <label>依頼内容</label>
-          <textarea id="c10NewSummary" placeholder="オーナーからの依頼内容・変更理由"></textarea>
-        </div>
+            <div class="c10-field full">
+              <label>件名</label>
+              <input id="c10NewTitle" maxlength="120" placeholder="例：写真共有機能を追加">
+            </div>
 
-        <div class="c10-actions full">
-          <button id="c10Create" class="btn primary" type="button">下書きを作成</button>
+            <div class="c10-field full">
+              <label>依頼内容</label>
+              <textarea id="c10NewSummary" placeholder="オーナーからの依頼内容・変更理由"></textarea>
+            </div>
+
+            <div class="c10-actions full">
+              <button id="c10Create" class="btn primary" type="button">下書きを作成</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
 
-    $("c10NewType").addEventListener("change",()=>{
-      const t=$("c10NewType").value;
-      const required=["feature_change","service_change","fee_change","pause","resume","cancellation"].includes(t);
-      $("c10NewEffective").disabled=!required;
-      if(!required) $("c10NewEffective").value="";
-      else if(!$("c10NewEffective").value) $("c10NewEffective").value=todayIso();
+    document.body.appendChild(modal);
+
+    const close=()=>modal.remove();
+    modal.querySelector("[data-c10-modal-close]")?.addEventListener("click",close);
+    modal.addEventListener("click",(event)=>{
+      if(event.target===modal) close();
     });
 
-    $("c10Create").onclick=createChange;
+    const typeEl=modal.querySelector("#c10NewType");
+    const effectiveEl=modal.querySelector("#c10NewEffective");
+    typeEl?.addEventListener("change",()=>{
+      const t=typeEl.value;
+      const required=["feature_change","service_change","fee_change","pause","resume","cancellation"].includes(t);
+      effectiveEl.disabled=!required;
+      if(!required) effectiveEl.value="";
+      else if(!effectiveEl.value) effectiveEl.value=todayIso();
+    });
+
+    modal.querySelector("#c10Create")?.addEventListener("click",createChange,{once:true});
   }
 
   async function createChange() {
