@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-32-CENTER10-R7-R4-R1-CLIENT-VISIBILITY-20260810",
+  version: "CONTROL-CENTER-33-CENTER10-R7-R5-CONTRACT-SCOPE-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -340,6 +340,38 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     script.src = `./center10-main-scope-r4.js?v=${encodeURIComponent(BUILD)}`;
     script.defer = true;
     script.dataset.center10MainScopeR4 = "true";
+    document.head.appendChild(script);
+    return true;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", install, { once: true });
+  } else {
+    install();
+  }
+
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (install() || tries >= 80) clearInterval(timer);
+  }, 125);
+})();
+
+
+/* CENTER-10-R7-R5: Contract / service production scope */
+(() => {
+  "use strict";
+
+  const BUILD = "CONTROL-CENTER-33-CENTER10-R7-R5-CONTRACT-SCOPE-20260810";
+
+  function install() {
+    if (!document.getElementById("view-contracts")) return false;
+    if (document.querySelector('script[data-center10-contract-scope-r5="true"]')) return true;
+
+    const script = document.createElement("script");
+    script.src = `./center10-contract-scope-r5.js?v=${encodeURIComponent(BUILD)}`;
+    script.defer = true;
+    script.dataset.center10ContractScopeR5 = "true";
     document.head.appendChild(script);
     return true;
   }
