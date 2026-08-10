@@ -1,0 +1,244 @@
+/* ================================================================
+   DPRO SHOP CONTROL CENTER
+   CENTER-10-UI-1-R1 / Readability layer
+   UI-only: no DB / no logic / no workflow changes
+   ================================================================ */
+
+body[data-cc11-delivery-page="true"]{
+  font-size:16px;
+  --ui-readable-muted:#52645d;
+}
+
+/* Visible build marker without fighting R10's runtime version observer. */
+body[data-cc11-delivery-page="true"] .sidebar .version{
+  font-size:0!important;
+  line-height:1.6!important;
+  color:#9bcbbb!important;
+}
+body[data-cc11-delivery-page="true"] .sidebar .version *{font-size:0!important}
+body[data-cc11-delivery-page="true"] .sidebar .version::before{
+  content:"CONTROL-CENTER-44\A CENTER-10-UI-1-R1";
+  white-space:pre;
+  font-size:10px!important;
+  line-height:1.6!important;
+}
+
+/* Sidebar / header */
+body[data-cc11-delivery-page="true"] .brand strong{font-size:15px!important}
+body[data-cc11-delivery-page="true"] .brand small{font-size:11px!important;line-height:1.45!important}
+body[data-cc11-delivery-page="true"] .sidebar nav a{
+  min-height:51px!important;
+  font-size:14px!important;
+  line-height:1.45!important;
+}
+body[data-cc11-delivery-page="true"] .sidebar nav i{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .sidebar-note strong{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .sidebar-note small{font-size:11px!important;line-height:1.55!important}
+body[data-cc11-delivery-page="true"] .topbar>div:first-of-type strong{font-size:16px!important}
+body[data-cc11-delivery-page="true"] .topbar>div:first-of-type small{font-size:13px!important;line-height:1.5!important}
+body[data-cc11-delivery-page="true"] .staff-chip strong{font-size:14px!important}
+body[data-cc11-delivery-page="true"] .staff-chip small{font-size:12px!important}
+
+/* Main hero */
+body[data-cc11-delivery-page="true"] .content{
+  width:min(calc(100% - 48px),1320px)!important;
+  padding-top:30px!important;
+}
+body[data-cc11-delivery-page="true"] .eyebrow{font-size:12px!important;line-height:1.5!important}
+body[data-cc11-delivery-page="true"] .page-head>div>p:last-child{
+  font-size:16px!important;
+  line-height:1.85!important;
+  color:var(--ui-readable-muted)!important;
+}
+
+/* Buttons / fields */
+body[data-cc11-delivery-page="true"] .btn{
+  min-height:48px!important;
+  padding-left:18px!important;
+  padding-right:18px!important;
+  font-size:14px!important;
+  line-height:1.35!important;
+}
+body[data-cc11-delivery-page="true"] input,
+body[data-cc11-delivery-page="true"] select,
+body[data-cc11-delivery-page="true"] textarea{
+  font-size:15px!important;
+  line-height:1.5!important;
+}
+body[data-cc11-delivery-page="true"] input::placeholder,
+body[data-cc11-delivery-page="true"] textarea::placeholder{
+  color:#6a7a74!important;
+  opacity:1!important;
+}
+body[data-cc11-delivery-page="true"] .toolbar input,
+body[data-cc11-delivery-page="true"] .toolbar select,
+body[data-cc11-delivery-page="true"] .form-grid input,
+body[data-cc11-delivery-page="true"] .form-grid select{
+  min-height:50px!important;
+  padding-left:14px!important;
+  padding-right:14px!important;
+}
+body[data-cc11-delivery-page="true"] .result-count{font-size:13px!important}
+
+/* Summary metrics */
+body[data-cc11-delivery-page="true"] .metric{
+  min-height:120px!important;
+  padding:18px!important;
+}
+body[data-cc11-delivery-page="true"] .metric b{font-size:30px!important}
+body[data-cc11-delivery-page="true"] .metric span{font-size:14px!important;line-height:1.45!important}
+body[data-cc11-delivery-page="true"] .metric small{
+  font-size:12px!important;
+  line-height:1.55!important;
+  color:var(--ui-readable-muted)!important;
+}
+
+/* Tabs */
+body[data-cc11-delivery-page="true"] .tabs{
+  padding:9px!important;
+  gap:8px!important;
+}
+body[data-cc11-delivery-page="true"] .tab{
+  min-height:48px!important;
+  padding:10px 16px!important;
+  font-size:14px!important;
+  line-height:1.35!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel{margin-top:21px!important}
+
+/* Core delivery cards */
+body[data-cc11-delivery-page="true"] .project-code{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .project-head h2{font-size:22px!important;line-height:1.35!important}
+body[data-cc11-delivery-page="true"] .project-head p{font-size:14px!important;line-height:1.6!important;color:var(--ui-readable-muted)!important}
+body[data-cc11-delivery-page="true"] .pill{min-height:30px!important;font-size:12px!important}
+body[data-cc11-delivery-page="true"] .progress-row{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .progress-row strong{font-size:14px!important}
+body[data-cc11-delivery-page="true"] .project-stats span{font-size:12px!important;line-height:1.5!important}
+body[data-cc11-delivery-page="true"] .empty{font-size:15px!important;line-height:1.85!important}
+
+/* Section headings / standards / tables */
+body[data-cc11-delivery-page="true"] .section-head h2{font-size:26px!important}
+body[data-cc11-delivery-page="true"] .section-head p{font-size:14px!important;line-height:1.75!important;color:var(--ui-readable-muted)!important}
+body[data-cc11-delivery-page="true"] .standard-category h3{font-size:18px!important}
+body[data-cc11-delivery-page="true"] .standard-item strong{font-size:14px!important}
+body[data-cc11-delivery-page="true"] .standard-item p{font-size:13px!important;line-height:1.7!important;color:var(--ui-readable-muted)!important}
+body[data-cc11-delivery-page="true"] th,
+body[data-cc11-delivery-page="true"] td{font-size:13px!important;line-height:1.65!important}
+body[data-cc11-delivery-page="true"] th{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .rollout-summary span{font-size:12px!important}
+
+/* Modal / form readability */
+body[data-cc11-delivery-page="true"] .modal-head>p:last-child,
+body[data-cc11-delivery-page="true"] .detail-title p,
+body[data-cc11-delivery-page="true"] .detail-section p.lead{
+  font-size:14px!important;
+  line-height:1.75!important;
+  color:var(--ui-readable-muted)!important;
+}
+body[data-cc11-delivery-page="true"] .form-grid label span{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .form-message{font-size:13px!important;line-height:1.6!important}
+body[data-cc11-delivery-page="true"] .detail-metric span{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .feature label{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .feature small{font-size:12px!important;line-height:1.55!important}
+body[data-cc11-delivery-page="true"] .step-row strong,
+body[data-cc11-delivery-page="true"] .check-row strong{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .step-row small,
+body[data-cc11-delivery-page="true"] .check-row small{font-size:12px!important;line-height:1.55!important}
+
+/* Generic readability floor for dynamically injected CENTER-7/8/9/10 panels. */
+body[data-cc11-delivery-page="true"] .tab-panel p,
+body[data-cc11-delivery-page="true"] .tab-panel small{
+  font-size:max(13px,1em)!important;
+  line-height:1.7!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel label{
+  font-size:max(13px,1em)!important;
+  line-height:1.55!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-guide"],
+  [class*="-safety"],
+  [class*="-warn"],
+  [class*="-next"],
+  [class*="-empty"],
+  [class*="-runtime"],
+  [class*="-blockers"],
+  [class*="-ready"]
+){
+  font-size:14px!important;
+  line-height:1.75!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-head"] p,
+  [class*="-sub"]
+){
+  font-size:14px!important;
+  line-height:1.7!important;
+  color:var(--ui-readable-muted)!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-metric"] span,
+  [class*="-stage"] strong,
+  [class*="-stage"] span,
+  [class*="-step"] strong,
+  [class*="-step"] span,
+  [class*="-gate"] strong,
+  [class*="-gate"] span,
+  [class*="-card"] strong,
+  [class*="-card"] span
+){
+  font-size:13px!important;
+  line-height:1.55!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-metric"] small,
+  [class*="-stage"] small,
+  [class*="-step"] small,
+  [class*="-gate"] small,
+  [class*="-card"] small
+){
+  font-size:12px!important;
+  line-height:1.6!important;
+}
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-toolbar"] input,
+  [class*="-toolbar"] select,
+  [class*="-selector"] select
+){
+  min-height:50px!important;
+  font-size:15px!important;
+}
+
+/* CENTER-8 specific form controls */
+body[data-cc11-delivery-page="true"] .c8-field label{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .c8-field input,
+body[data-cc11-delivery-page="true"] .c8-field textarea{font-size:15px!important;min-height:46px!important}
+body[data-cc11-delivery-page="true"] .c8-checkline strong{font-size:13px!important}
+body[data-cc11-delivery-page="true"] .c8-checkline small{font-size:12px!important}
+body[data-cc11-delivery-page="true"] .c8-pill{font-size:11px!important;padding:6px 9px!important}
+
+/* More breathing room in generated cards. */
+body[data-cc11-delivery-page="true"] .tab-panel :is(
+  [class*="-metric"],
+  [class*="-stage"],
+  [class*="-step"],
+  [class*="-gate"],
+  [class*="-card"]
+){
+  padding-top:max(12px,1em)!important;
+  padding-bottom:max(12px,1em)!important;
+}
+
+/* Responsive: bigger text remains readable without forcing horizontal scroll. */
+@media(max-width:1100px){
+  body[data-cc11-delivery-page="true"] .content{width:min(calc(100% - 34px),1320px)!important}
+  body[data-cc11-delivery-page="true"] .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media(max-width:720px){
+  body[data-cc11-delivery-page="true"]{font-size:15px}
+  body[data-cc11-delivery-page="true"] .content{width:min(calc(100% - 24px),1320px)!important}
+  body[data-cc11-delivery-page="true"] .tab{font-size:13px!important;padding:9px 12px!important}
+  body[data-cc11-delivery-page="true"] .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  body[data-cc11-delivery-page="true"] .metric{min-height:112px!important;padding:15px!important}
+  body[data-cc11-delivery-page="true"] .btn{min-height:47px!important}
+}
