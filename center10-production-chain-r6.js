@@ -1,69 +1,88 @@
 (() => {
   "use strict";
 
-  if (window.__DPRO_CENTER10_PRODUCTION_CHAIN_R6__) return;
+  if (window.__DPRO_CENTER10_PRODUCTION_CHAIN_R6_R1__) return;
+  window.__DPRO_CENTER10_PRODUCTION_CHAIN_R6_R1__ = true;
   window.__DPRO_CENTER10_PRODUCTION_CHAIN_R6__ = true;
 
-  const BUILD = "CONTROL-CENTER-36-CENTER10-R7-R6-PRODUCTION-CHAIN-20260810";
+  const BUILD = "CONTROL-CENTER-37-CENTER10-R7-R6-R1-SELECTION-SYNC-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
   const state = {
-    supabase:null,
-    session:null,
-    projectId:"",
-    chain:null,
-    loading:false,
-    loadSeq:0,
+    supabase: null,
+    session: null,
+    projectId: "",
+    chain: null,
+    loadSeq: 0,
+    selectorObserver: null,
+    boardObserver: null,
   };
 
   function esc(value) {
     return String(value ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function bool(value) {
+    return value === true;
+  }
+
+  function syncVisibleVersion() {
+    const version = document.querySelector(".sidebar .version");
+    if (!version) return;
+    version.innerHTML = 'CONTROL-CENTER-37<br><span>CENTER-10-R7-R6-R1</span>';
   }
 
   async function fetchPublicConfig() {
-    const base=String(CONFIG.apiBaseUrl||"").replace(/\/$/,"");
-    const response=await fetch(`${base}/api/public-config`,{cache:"no-store"});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok) throw new Error(data.message||data.error||`HTTP ${response.status}`);
+    const base = String(CONFIG.apiBaseUrl || "").replace(/\/$/, "");
+    const response = await fetch(`${base}/api/public-config`, { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || data.error || `HTTP ${response.status}`);
+    }
     return data;
   }
 
-  async function client() {
-    if(state.supabase) return state.supabase;
-    if(!window.supabase?.createClient) throw new Error("Supabase clientを確認できません。");
+  async function getSupabase() {
+    if (state.supabase) return state.supabase;
+    if (!window.supabase?.createClient) {
+      throw new Error("Supabase clientを確認できません。");
+    }
 
-    const pub=await fetchPublicConfig();
-    state.supabase=window.supabase.createClient(
+    const pub = await fetchPublicConfig();
+    state.supabase = window.supabase.createClient(
       pub.supabaseUrl,
-      pub.supabasePublishableKey||pub.supabaseAnonKey,
+      pub.supabasePublishableKey || pub.supabaseAnonKey,
       {
-        auth:{
-          persistSession:true,
-          autoRefreshToken:false,
-          detectSessionInUrl:false,
-          storageKey:pub.sessionStorageKey||"dpro-control-center-auth-v1",
-        }
+        auth: {
+          persistSession: true,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: pub.sessionStorageKey || "dpro-control-center-auth-v1",
+        },
       }
     );
 
-    const {data,error}=await state.supabase.auth.getSession();
-    if(error) throw error;
-    state.session=data?.session||null;
-    if(!state.session?.user) throw new Error("CONTROL CENTERへログインしてください。");
+    const { data, error } = await state.supabase.auth.getSession();
+    if (error) throw error;
+    state.session = data?.session || null;
+    if (!state.session?.user) {
+      throw new Error("CONTROL CENTERへログインしてください。");
+    }
     return state.supabase;
   }
 
   function installStyle() {
-    if($("c10R6Style")) return;
-    const style=document.createElement("style");
-    style.id="c10R6Style";
-    style.textContent=`
+    if ($("c10R6Style")) return;
+
+    const style = document.createElement("style");
+    style.id = "c10R6Style";
+    style.textContent = `
       .c10-r6-chain{
         margin-top:10px;padding:14px;border:1px solid #c9ddd4;border-radius:14px;
         background:#f7fbf9
@@ -77,7 +96,9 @@
         flex:0 0 auto;padding:5px 9px;border-radius:999px;background:#e5f5ed;
         color:#076549;font-size:10px;font-weight:900
       }
-      .c10-r6-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+      .c10-r6-grid{
+        display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px
+      }
       .c10-r6-step{
         padding:11px;border:1px solid #dbe6e1;border-radius:11px;background:#fff;min-height:86px
       }
@@ -101,90 +122,126 @@
         margin-top:10px;padding:11px 13px;border:1px solid #ead08a;border-radius:10px;
         background:#fff9e8;color:#805d00;font-size:12px;line-height:1.65
       }
-      @media(max-width:1100px){.c10-r6-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-      @media(max-width:720px){.c10-r6-grid{grid-template-columns:1fr}}
+      #c8Activate[data-c10-r6-locked="true"]{
+        opacity:.55;pointer-events:none
+      }
+      @media(max-width:1100px){
+        .c10-r6-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+      }
+      @media(max-width:720px){
+        .c10-r6-grid{grid-template-columns:1fr}
+      }
     `;
     document.head.appendChild(style);
   }
 
   function ensurePanel() {
-    const goLive=$("panel-go-live");
-    if(!goLive) return null;
+    const goLive = $("panel-go-live");
+    if (!goLive) return null;
 
-    let host=$("c10R6ProductionChain");
-    if(host) return host;
+    let host = $("c10R6ProductionChain");
+    if (host) {
+      const badge = host.querySelector(".c10-r6-badge");
+      if (badge) badge.textContent = "CENTER-10 R7-R6-R1";
+      return host;
+    }
 
-    host=document.createElement("section");
-    host.id="c10R6ProductionChain";
-    host.className="c10-r6-chain";
-    host.innerHTML=`
+    host = document.createElement("section");
+    host.id = "c10R6ProductionChain";
+    host.className = "c10-r6-chain";
+    host.innerHTML = `
       <div class="c10-r6-head">
         <div>
           <strong>契約 → 制作 → 本番システム 最終連動</strong>
           <p>本番稼働直前に、正式実契約とPRODUCTION本番の接続をDB側でも再確認します。</p>
         </div>
-        <span class="c10-r6-badge">CENTER-10 R7-R6</span>
+        <span class="c10-r6-badge">CENTER-10 R7-R6-R1</span>
       </div>
-      <div id="c10R6Body"><div class="c10-r6-db-warn">契約案件を選択すると最終連動を確認します。</div></div>
+      <div id="c10R6Body">
+        <div class="c10-r6-db-warn">契約案件を確認しています…</div>
+      </div>
     `;
 
-    const safety=goLive.querySelector(".c8-safety");
-    if(safety) safety.insertAdjacentElement("afterend",host);
+    const safety = goLive.querySelector(".c8-safety");
+    if (safety) safety.insertAdjacentElement("afterend", host);
     else goLive.prepend(host);
 
     return host;
   }
 
-  function bool(value){ return value===true; }
-
-  function step(name,ok,good,bad,note) {
+  function step(name, ok, good, bad, note) {
     return `
-      <article class="c10-r6-step ${ok?"ok":"bad"}">
+      <article class="c10-r6-step ${ok ? "ok" : "bad"}">
         <strong>${esc(name)}</strong>
-        <span>${ok?"✓ "+esc(good):"! "+esc(bad)}</span>
+        <span>${ok ? "✓ " + esc(good) : "! " + esc(bad)}</span>
         <small>${esc(note)}</small>
       </article>
     `;
   }
 
+  function applyActivationGuard() {
+    const button = $("c8Activate");
+    if (!button) return;
+
+    const locked = !state.chain || state.chain.ready_for_go_live !== true;
+    if (locked) {
+      button.dataset.c10R6Locked = "true";
+      button.title = "CENTER-10-R7-R6-R1 最終連動が未完了です。";
+    } else {
+      delete button.dataset.c10R6Locked;
+      if (button.title === "CENTER-10-R7-R6-R1 最終連動が未完了です。") {
+        button.title = "";
+      }
+    }
+  }
+
   function render() {
     ensurePanel();
-    const body=$("c10R6Body");
-    if(!body) return;
+    syncVisibleVersion();
 
-    if(!state.projectId){
-      body.innerHTML='<div class="c10-r6-db-warn">契約案件を選択してください。</div>';
-      forceActivationGuard();
+    const body = $("c10R6Body");
+    if (!body) return;
+
+    if (!state.projectId) {
+      body.innerHTML = '<div class="c10-r6-db-warn">契約案件を確認しています…</div>';
+      applyActivationGuard();
       return;
     }
 
-    if(!state.chain){
-      body.innerHTML='<div class="c10-r6-db-warn">最終連動を確認しています…</div>';
-      forceActivationGuard();
+    if (!state.chain) {
+      body.innerHTML = '<div class="c10-r6-db-warn">最終連動を確認しています…</div>';
+      applyActivationGuard();
       return;
     }
 
-    const links=state.chain.links||{};
-    const c8=state.chain.center8_gate||{};
-    const ready=bool(state.chain.ready_for_go_live);
-    const blockers=Array.isArray(links.blockers)?links.blockers:[];
+    const links = state.chain.links || {};
+    const c8 = state.chain.center8_gate || {};
+    const blockers = Array.isArray(links.blockers) ? links.blockers : [];
 
-    const contractOk=
-      bool(links.contract_found)&&
-      bool(links.contract_active)&&
-      bool(links.contract_started)&&
+    const clientOk = bool(links.client_found) && bool(links.client_real);
+    const contractOk =
+      bool(links.contract_found) &&
+      bool(links.contract_active) &&
+      bool(links.contract_started) &&
       bool(links.contract_client_match);
 
-    const systemOk=
-      bool(links.system_found)&&
-      bool(links.system_production)&&
+    const projectOk =
+      bool(links.contract_client_match) &&
       bool(links.system_client_match);
 
-    body.innerHTML=`
+    const systemOk =
+      bool(links.system_found) &&
+      bool(links.system_production) &&
+      bool(links.system_client_match);
+
+    const center8Ok = bool(c8.activation_gate_ready);
+    const ready = bool(state.chain.ready_for_go_live);
+
+    body.innerHTML = `
       <div class="c10-r6-grid">
         ${step(
           "実顧客",
-          bool(links.client_found)&&bool(links.client_real),
+          clientOk,
           "本番対象",
           "DEMO / TEST",
           "検査用顧客は本番経路へ入りません。"
@@ -198,7 +255,7 @@
         )}
         ${step(
           "制作案件",
-          bool(links.contract_client_match)&&bool(links.system_client_match),
+          projectOk,
           "接続一致",
           "接続不一致",
           "契約・制作・システムの顧客IDを照合します。"
@@ -212,7 +269,7 @@
         )}
         ${step(
           "CENTER-8",
-          bool(c8.activation_gate_ready),
+          center8Ok,
           "品質ゲートOK",
           "未完了あり",
           "CENTER-7・STANDARD・セットアップ・Healthを再確認します。"
@@ -222,112 +279,194 @@
         ready
           ? '<div class="c10-r6-ready">✅ 最終連動OK：DB側の本番経路条件を満たしています。CENTER-8の最終入力完了後に本番稼働できます。</div>'
           : `<div class="c10-r6-blockers"><strong>本番経路はロックされています。</strong>${
-              blockers.length?`<br>${blockers.map((x)=>`・${esc(x)}`).join("<br>")}`:
-              "<br>・CENTER-8の品質・STANDARD・セットアップ等に未完了があります。"
+              blockers.length
+                ? `<br>${blockers.map((x) => `・${esc(x)}`).join("<br>")}`
+                : "<br>・CENTER-8の品質・STANDARD・セットアップ等に未完了があります。"
             }</div>`
       }
     `;
 
-    forceActivationGuard();
-  }
-
-  function forceActivationGuard() {
-    const button=$("c8Activate");
-    if(!button) return;
-
-    // R6は「禁止方向」だけ上書きする。readyでもCENTER-8自身の入力未完了なら有効化しない。
-    if(!state.chain || !state.chain.ready_for_go_live){
-      button.disabled=true;
-      button.dataset.c10R6Locked="true";
-      button.title="CENTER-10-R7-R6 最終連動が未完了です。";
-    } else {
-      button.dataset.c10R6Locked="false";
-      button.title="";
-    }
+    applyActivationGuard();
   }
 
   async function loadChain(projectId) {
-    const seq=++state.loadSeq;
-    state.projectId=projectId||"";
-    state.chain=null;
+    const normalized = String(projectId || "").trim();
+    const seq = ++state.loadSeq;
+
+    state.projectId = normalized;
+    state.chain = null;
     render();
 
-    if(!state.projectId) return;
+    if (!normalized) return;
 
-    try{
-      state.loading=true;
-      const sb=await client();
-      const {data,error}=await sb.rpc("cc_center10_r6_get_production_chain",{
-        p_project_id:state.projectId
+    try {
+      const sb = await getSupabase();
+      const { data, error } = await sb.rpc("cc_center10_r6_get_production_chain", {
+        p_project_id: normalized,
       });
-      if(seq!==state.loadSeq) return;
-      if(error) throw error;
-      state.chain=data||{};
+
+      if (seq !== state.loadSeq) return;
+      if (error) throw error;
+
+      state.chain = data || {};
       render();
-    }catch(error){
-      if(seq!==state.loadSeq) return;
-      console.error(BUILD,error);
+    } catch (error) {
+      if (seq !== state.loadSeq) return;
+
+      console.error(BUILD, error);
       ensurePanel();
-      const body=$("c10R6Body");
-      if(body){
-        const missing=/cc_center10_r6_get_production_chain|PGRST|function/i.test(String(error.message||""));
-        body.innerHTML=`
+
+      const body = $("c10R6Body");
+      if (body) {
+        const missing =
+          /cc_center10_r6_get_production_chain|PGRST|function/i.test(
+            String(error?.message || "")
+          );
+
+        body.innerHTML = `
           <div class="c10-r6-db-warn">
-            <strong>${missing?"R6のDB SQLを先に実行してください。":"最終連動を確認できません。"}</strong><br>
-            ${esc(error.message||"DB接続を確認してください。")}
+            <strong>${missing ? "R6のDB SQLを確認してください。" : "最終連動を確認できません。"}</strong><br>
+            ${esc(error?.message || "DB接続を確認してください。")}
           </div>
         `;
       }
-      forceActivationGuard();
-    }finally{
-      state.loading=false;
+      applyActivationGuard();
     }
   }
 
-  function bindSelector() {
-    const select=$("c8ProjectSelect");
-    if(!select || select.dataset.c10R6Bound==="true") return false;
+  function syncProjectSelection() {
+    const select = $("c8ProjectSelect");
+    if (!select) return false;
 
-    select.dataset.c10R6Bound="true";
-    select.addEventListener("change",()=>{
-      setTimeout(()=>loadChain(select.value||""),50);
-    });
+    const value = String(select.value || "").trim();
 
-    loadChain(select.value||"");
+    if (value !== String(state.projectId || "")) {
+      loadChain(value);
+      return true;
+    }
+
+    if (value && !state.chain) {
+      loadChain(value);
+      return true;
+    }
+
     return true;
   }
 
-  function installObservers() {
-    const board=$("c8Board");
-    if(board && board.dataset.c10R6Observed!=="true"){
-      board.dataset.c10R6Observed="true";
-      new MutationObserver(()=>{
-        setTimeout(forceActivationGuard,0);
-      }).observe(board,{childList:true,subtree:true});
+  function bindSelector() {
+    const select = $("c8ProjectSelect");
+    if (!select) return false;
+
+    if (select.dataset.c10R6R1Bound !== "true") {
+      select.dataset.c10R6R1Bound = "true";
+
+      select.addEventListener("change", () => {
+        setTimeout(syncProjectSelection, 20);
+      });
+
+      state.selectorObserver = new MutationObserver(() => {
+        setTimeout(syncProjectSelection, 20);
+      });
+      state.selectorObserver.observe(select, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["value"],
+      });
     }
+
+    syncProjectSelection();
+    return true;
   }
 
-  async function bootstrap() {
+  function observeCenter8Board() {
+    const board = $("c8Board");
+    if (!board || state.boardObserver) return;
+
+    state.boardObserver = new MutationObserver(() => {
+      setTimeout(() => {
+        syncProjectSelection();
+        applyActivationGuard();
+        syncVisibleVersion();
+      }, 20);
+    });
+
+    state.boardObserver.observe(board, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  function installClickGuard() {
+    if (document.documentElement.dataset.c10R6R1ClickGuard === "true") return;
+    document.documentElement.dataset.c10R6R1ClickGuard = "true";
+
+    document.addEventListener(
+      "click",
+      (event) => {
+        const button = event.target?.closest?.("#c8Activate");
+        if (!button) return;
+
+        if (!state.chain || state.chain.ready_for_go_live !== true) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          applyActivationGuard();
+        }
+      },
+      true
+    );
+  }
+
+  function bootstrap() {
     installStyle();
+    installClickGuard();
+    syncVisibleVersion();
 
-    let tries=0;
-    const timer=setInterval(()=>{
-      tries+=1;
+    let tries = 0;
+    let stableProjectTicks = 0;
+    let lastProjectValue = "";
+
+    const timer = setInterval(() => {
+      tries += 1;
+
       ensurePanel();
-      const bound=bindSelector();
-      installObservers();
-      forceActivationGuard();
+      bindSelector();
+      observeCenter8Board();
+      syncVisibleVersion();
+      applyActivationGuard();
 
-      if(bound && $("panel-go-live")){
-        clearInterval(timer);
-      } else if(tries>=160){
+      const select = $("c8ProjectSelect");
+      const currentValue = String(select?.value || "").trim();
+
+      if (currentValue && currentValue === lastProjectValue) {
+        stableProjectTicks += 1;
+      } else {
+        stableProjectTicks = 0;
+        lastProjectValue = currentValue;
+      }
+
+      if (currentValue && currentValue !== state.projectId) {
+        syncProjectSelection();
+      }
+
+      // CENTER-8が非同期でoption/valueを入れるため、十分な時間追従する。
+      // 値が安定してR6読込済みになった後もしばらく維持。
+      if (
+        tries >= 240 ||
+        (
+          stableProjectTicks >= 24 &&
+          currentValue &&
+          state.projectId === currentValue &&
+          state.chain
+        )
+      ) {
         clearInterval(timer);
       }
-    },125);
+    }, 125);
   }
 
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",bootstrap,{once:true});
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
   } else {
     bootstrap();
   }
