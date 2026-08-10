@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-34-CENTER10-R7-R5-R1-UI-CLEANUP-20260810",
+  version: "CONTROL-CENTER-35-CENTER10-R7-R5-R2-COMPACT-EMPTY-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -362,7 +362,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-34-CENTER10-R7-R5-R1-UI-CLEANUP-20260810";
+  const BUILD = "CONTROL-CENTER-35-CENTER10-R7-R5-R2-COMPACT-EMPTY-20260810";
 
   function install() {
     if (!document.getElementById("view-contracts")) return false;

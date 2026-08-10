@@ -4,8 +4,9 @@
   if (window.__DPRO_CENTER10_CONTRACT_SCOPE_R5__) return;
   window.__DPRO_CENTER10_CONTRACT_SCOPE_R5__ = true;
   window.__DPRO_CENTER10_CONTRACT_SCOPE_R5_R1__ = true;
+  window.__DPRO_CENTER10_CONTRACT_SCOPE_R5_R2__ = true;
 
-  const BUILD = "CONTROL-CENTER-34-CENTER10-R7-R5-R1-UI-CLEANUP-20260810";
+  const BUILD = "CONTROL-CENTER-35-CENTER10-R7-R5-R2-COMPACT-EMPTY-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -281,11 +282,12 @@
         background:#fff;color:#086147;font-weight:900;cursor:pointer
       }
       #view-contracts .c10-r5-empty{
-        min-height:118px;height:auto;align-self:start;
+        min-height:0;height:auto;max-height:none;align-self:start;
         display:flex;align-items:center;justify-content:center;
-        padding:26px;border:1px dashed #cad8d2;border-radius:14px;background:#fff;
+        padding:20px 22px;border:1px dashed #cad8d2;border-radius:14px;background:#fff;
         text-align:center;color:#697a73;font-size:14px;line-height:1.8
       }
+      #view-contracts .c10-r5-empty.hidden{display:none !important}
       #view-contracts > .empty-state,
       #view-contracts #contractsScopeNoteR4,
       #view-contracts .c10-r4-contract-note{
@@ -347,6 +349,7 @@
 
         <div id="c10R5ContractResult" class="c10-r5-result"></div>
         <div id="c10R5ContractList" class="c10-r5-list"></div>
+        <div id="c10R5ContractEmpty" class="c10-r5-empty hidden"></div>
       </div>
     `;
 
@@ -469,26 +472,32 @@
   function renderList() {
     const list = $("c10R5ContractList");
     const result = $("c10R5ContractResult");
-    if (!list || !result || !state.loaded) return;
+    const empty = $("c10R5ContractEmpty");
+    if (!list || !result || !empty || !state.loaded) return;
 
     const rows = filteredContracts();
     result.textContent = `${rows.length}件`;
 
     if (!rows.length) {
       const demoCount = demoContracts().length;
-      list.innerHTML = `
-        <div class="c10-r5-empty" style="grid-column:1/-1">
-          ${
-            state.scope === "production"
-              ? `現在、表示条件に一致する正式な実契約はありません。<br>DEMO / テスト契約 ${demoCount}件は「DEMO / テストのみ」で確認できます。`
-              : state.scope === "demo"
-                ? "現在、表示条件に一致するDEMO / テスト契約はありません。"
-                : "表示条件に一致する契約はありません。"
-          }
-        </div>
-      `;
+
+      list.innerHTML = "";
+      list.style.display = "none";
+
+      empty.classList.remove("hidden");
+      empty.innerHTML =
+        state.scope === "production"
+          ? `現在、表示条件に一致する正式な実契約はありません。<br>DEMO / テスト契約 ${demoCount}件は「DEMO / テストのみ」で確認できます。`
+          : state.scope === "demo"
+            ? "現在、表示条件に一致するDEMO / テスト契約はありません。"
+            : "表示条件に一致する契約はありません。";
+
       return;
     }
+
+    empty.classList.add("hidden");
+    empty.innerHTML = "";
+    list.style.display = "grid";
 
     list.innerHTML = rows.map((contract) => {
       const demo = isDemoContract(contract);
@@ -590,12 +599,14 @@
     }
 
     const list = $("c10R5ContractList");
+    const empty = $("c10R5ContractEmpty");
     if (list) {
-      list.innerHTML = `
-        <div class="c10-r5-empty" style="grid-column:1/-1">
-          契約情報を読み込めませんでした。接続確認後に再読み込みしてください。
-        </div>
-      `;
+      list.innerHTML = "";
+      list.style.display = "none";
+    }
+    if (empty) {
+      empty.classList.remove("hidden");
+      empty.textContent = "契約情報を読み込めませんでした。接続確認後に再読み込みしてください。";
     }
   }
 
