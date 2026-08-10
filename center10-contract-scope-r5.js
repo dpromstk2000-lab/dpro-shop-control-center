@@ -3,8 +3,9 @@
 
   if (window.__DPRO_CENTER10_CONTRACT_SCOPE_R5__) return;
   window.__DPRO_CENTER10_CONTRACT_SCOPE_R5__ = true;
+  window.__DPRO_CENTER10_CONTRACT_SCOPE_R5_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-33-CENTER10-R7-R5-CONTRACT-SCOPE-20260810";
+  const BUILD = "CONTROL-CENTER-34-CENTER10-R7-R5-R1-UI-CLEANUP-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -200,10 +201,10 @@
     const style = document.createElement("style");
     style.id = "c10R5ContractStyles";
     style.textContent = `
-      #view-contracts .c10-r5-wrap{display:grid;gap:16px}
+      #view-contracts .c10-r5-wrap{display:grid;gap:14px;align-content:start}
       #view-contracts .c10-r5-note{
         padding:13px 15px;border:1px solid #d7e3eb;border-radius:12px;
-        background:#f4f8fb;color:#506977;font-size:12px;line-height:1.75
+        background:#f4f8fb;color:#506977;font-size:13px;line-height:1.75
       }
       #view-contracts .c10-r5-note strong{color:#174b3c}
       #view-contracts .c10-r5-metrics{
@@ -221,8 +222,8 @@
       #view-contracts .c10-r5-metric b{
         display:block;color:#075b43;font-size:28px;line-height:1;margin-bottom:9px
       }
-      #view-contracts .c10-r5-metric span{display:block;font-weight:900;font-size:12px}
-      #view-contracts .c10-r5-metric small{display:block;margin-top:5px;color:#77847e;font-size:10px}
+      #view-contracts .c10-r5-metric span{display:block;font-weight:900;font-size:13px}
+      #view-contracts .c10-r5-metric small{display:block;margin-top:5px;color:#77847e;font-size:11px}
       #view-contracts .c10-r5-toolbar{
         display:grid;grid-template-columns:minmax(260px,1fr) 180px 180px;gap:10px
       }
@@ -235,7 +236,8 @@
         text-align:right;color:#687972;font-size:12px;font-weight:800
       }
       #view-contracts .c10-r5-list{
-        display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px
+        display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+        min-height:0;align-content:start;align-items:start
       }
       #view-contracts .c10-r5-card{
         border:1px solid #d8e2dd;border-radius:16px;background:#fff;padding:18px;
@@ -246,15 +248,15 @@
         display:flex;align-items:flex-start;justify-content:space-between;gap:14px
       }
       #view-contracts .c10-r5-code{
-        color:#2e6a59;font-size:10px;font-weight:900;letter-spacing:.08em
+        color:#2e6a59;font-size:11px;font-weight:900;letter-spacing:.08em
       }
       #view-contracts .c10-r5-card h3{
         margin:5px 0 3px;font-size:19px;line-height:1.35;color:#102d25
       }
-      #view-contracts .c10-r5-client{color:#60746c;font-size:12px}
+      #view-contracts .c10-r5-client{color:#60746c;font-size:13px}
       #view-contracts .c10-r5-pill{
         flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
-        min-height:30px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:900
+        min-height:32px;padding:0 11px;border-radius:999px;font-size:11px;font-weight:900
       }
       #view-contracts .c10-r5-pill.green{background:#e6f6ed;color:#08704e}
       #view-contracts .c10-r5-pill.blue{background:#eaf3ff;color:#246393}
@@ -267,11 +269,11 @@
       #view-contracts .c10-r5-detail{
         padding:11px;border-radius:11px;background:#f6f9f7
       }
-      #view-contracts .c10-r5-detail small{display:block;color:#82908a;font-size:9px;margin-bottom:4px}
-      #view-contracts .c10-r5-detail strong{display:block;font-size:12px;color:#25483e}
+      #view-contracts .c10-r5-detail small{display:block;color:#82908a;font-size:10px;margin-bottom:4px}
+      #view-contracts .c10-r5-detail strong{display:block;font-size:13px;color:#25483e}
       #view-contracts .c10-r5-demo-warning{
         padding:11px 12px;border-radius:10px;background:#f0f4f7;color:#526a78;
-        font-size:11px;line-height:1.65
+        font-size:12px;line-height:1.65
       }
       #view-contracts .c10-r5-actions{display:flex;gap:8px;justify-content:flex-end}
       #view-contracts .c10-r5-btn{
@@ -279,8 +281,15 @@
         background:#fff;color:#086147;font-weight:900;cursor:pointer
       }
       #view-contracts .c10-r5-empty{
-        padding:36px;border:1px dashed #cad8d2;border-radius:14px;background:#fff;
-        text-align:center;color:#697a73;line-height:1.8
+        min-height:118px;height:auto;align-self:start;
+        display:flex;align-items:center;justify-content:center;
+        padding:26px;border:1px dashed #cad8d2;border-radius:14px;background:#fff;
+        text-align:center;color:#697a73;font-size:14px;line-height:1.8
+      }
+      #view-contracts > .empty-state,
+      #view-contracts #contractsScopeNoteR4,
+      #view-contracts .c10-r4-contract-note{
+        display:none !important
       }
       @media(max-width:900px){
         #view-contracts .c10-r5-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -291,9 +300,19 @@
     document.head.appendChild(style);
   }
 
+  function cleanupLegacyContractArtifacts() {
+    const view = $("view-contracts");
+    if (!view) return;
+
+    $$(":scope > .empty-state", view).forEach((node) => node.remove());
+    $$("#contractsScopeNoteR4, .c10-r4-contract-note", view).forEach((node) => node.remove());
+  }
+
   function renderShell() {
     const view = $("view-contracts");
-    if (!view || view.dataset.c10R5Ready === "true") return;
+    if (!view) return;
+    cleanupLegacyContractArtifacts();
+    if (view.dataset.c10R5Ready === "true") return;
 
     view.dataset.c10R5Ready = "true";
     view.innerHTML = `
@@ -343,6 +362,8 @@
       state.status = event.target.value || "all";
       renderList();
     });
+
+    cleanupLegacyContractArtifacts();
   }
 
   function renderMetrics() {
@@ -544,10 +565,18 @@
   }
 
   async function bootstrap() {
-    if (!$("view-contracts")) return;
+    const contractView = $("view-contracts");
+    if (!contractView) return;
 
     injectStyles();
     renderShell();
+    cleanupLegacyContractArtifacts();
+
+    const cleanupObserver = new MutationObserver(() => {
+      cleanupLegacyContractArtifacts();
+    });
+    cleanupObserver.observe(contractView,{childList:true,subtree:false});
+    setTimeout(() => cleanupObserver.disconnect(),15000);
 
     for (let attempt=0; attempt<24; attempt+=1) {
       try {
