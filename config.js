@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-22-CENTER10-20260809",
+  version: "CONTROL-CENTER-31-CENTER10-R7-R4-MAIN-SCOPE-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -319,4 +319,40 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   setTimeout(() => observer.disconnect(), 12000);
+})();
+
+
+/* CENTER-10-R7-R4: Main dashboard/client DEMO scope guard */
+(() => {
+  "use strict";
+
+  const BUILD = "CONTROL-CENTER-31-CENTER10-R7-R4-MAIN-SCOPE-20260810";
+
+  function install() {
+    if (!document.getElementById("view-dashboard") || !document.getElementById("view-clients")) {
+      return false;
+    }
+    if (document.querySelector('script[data-center10-main-scope-r4="true"]')) {
+      return true;
+    }
+
+    const script = document.createElement("script");
+    script.src = `./center10-main-scope-r4.js?v=${encodeURIComponent(BUILD)}`;
+    script.defer = true;
+    script.dataset.center10MainScopeR4 = "true";
+    document.head.appendChild(script);
+    return true;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", install, { once: true });
+  } else {
+    install();
+  }
+
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (install() || tries >= 80) clearInterval(timer);
+  }, 125);
 })();
