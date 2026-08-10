@@ -3,8 +3,9 @@
 
   if (window.__DPRO_CENTER10_MAIN_SCOPE_R4__) return;
   window.__DPRO_CENTER10_MAIN_SCOPE_R4__ = true;
+  window.__DPRO_CENTER10_MAIN_SCOPE_R4_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-31-CENTER10-R7-R4-MAIN-SCOPE-20260810";
+  const BUILD = "CONTROL-CENTER-32-CENTER10-R7-R4-R1-CLIENT-VISIBILITY-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -243,6 +244,9 @@
       }
       .client-card[data-c10-r4-scope="demo"]{
         border-color:#d7e0e8;background:#f9fbfc
+      }
+      .client-card[hidden]{
+        display:none !important
       }
       .c10-r4-scope-empty{
         padding:28px;border:1px dashed #cddbd5;border-radius:14px;background:#fff;
@@ -514,6 +518,8 @@
           (scope === "production" && !demo);
 
         card.hidden = !show;
+        card.style.display = show ? "" : "none";
+        card.setAttribute("aria-hidden", show ? "false" : "true");
         if (show) visible += 1;
 
         if (demo) markDemoCard(card);

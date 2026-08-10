@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-31-CENTER10-R7-R4-MAIN-SCOPE-20260810",
+  version: "CONTROL-CENTER-32-CENTER10-R7-R4-R1-CLIENT-VISIBILITY-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -326,7 +326,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-31-CENTER10-R7-R4-MAIN-SCOPE-20260810";
+  const BUILD = "CONTROL-CENTER-32-CENTER10-R7-R4-R1-CLIENT-VISIBILITY-20260810";
 
   function install() {
     if (!document.getElementById("view-dashboard") || !document.getElementById("view-clients")) {
