@@ -38,6 +38,7 @@
   }
 
   function syncVersion() {
+    if(window.__DPRO_CENTER10_CONTRACT_START_R8__) return;
     const version=document.querySelector(".sidebar .version");
     if(version){
       version.innerHTML='CONTROL-CENTER-39<br><span>CENTER-10-R7-R7-R1</span>';
