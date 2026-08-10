@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-35-CENTER10-R7-R5-R2-COMPACT-EMPTY-20260810",
+  version: "CONTROL-CENTER-36-CENTER10-R7-R6-PRODUCTION-CHAIN-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -387,4 +387,36 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     tries += 1;
     if (install() || tries >= 80) clearInterval(timer);
   }, 125);
+})();
+
+
+/* CENTER-10-R7-R6: Production chain final gate UI */
+(() => {
+  "use strict";
+
+  const BUILD = "CONTROL-CENTER-36-CENTER10-R7-R6-PRODUCTION-CHAIN-20260810";
+
+  function install() {
+    if (document.body?.dataset.cc11DeliveryPage !== "true") return false;
+    if (document.querySelector('script[data-center10-production-chain-r6="true"]')) return true;
+
+    const script = document.createElement("script");
+    script.src = `./center10-production-chain-r6.js?v=${encodeURIComponent(BUILD)}`;
+    script.defer = true;
+    script.dataset.center10ProductionChainR6 = "true";
+    document.head.appendChild(script);
+    return true;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", install, { once:true });
+  } else {
+    install();
+  }
+
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (install() || tries >= 120) clearInterval(timer);
+  },125);
 })();
