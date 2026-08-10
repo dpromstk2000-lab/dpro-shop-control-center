@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-43-CENTER10-R7-R10-R1-FINAL-AUDIT-20260810",
+  version: "CONTROL-CENTER-45-CENTER10-UI-1-R2-GLOBAL-READABILITY-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -10,6 +10,18 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
 (() => {
   "use strict";
+
+  const installGlobalReadability = () => {
+    const href = "./center10-ui-readable.css?v=CONTROL-CENTER-45-CENTER10-UI-1-R2";
+    let link = document.querySelector('link[data-center10-ui-readable="true"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.dataset.center10UiReadable = "true";
+      document.head.appendChild(link);
+    }
+    if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+  };
 
   const installFavicon = () => {
     if (document.querySelector('link[data-dpro-favicon="control-center"]')) return;
@@ -189,7 +201,6 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     const system = (params.get("system") || "").trim();
     const tab = (params.get("product_tab") || "").trim();
 
-    // CENTER-4/5スクリプトが起動する前に対象製品を保存する。
     if (system) {
       localStorage.setItem("dpro_center4_feature_system", system);
       localStorage.setItem("dpro_center5_template_system", system);
@@ -233,8 +244,6 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         return;
       }
 
-      // app.jsの初期化最後でdashboardへ戻されることがあるため、
-      // 製品画面が外れていれば何度でも通常navクリックで戻す。
       const productsVisible = productsView && !productsView.classList.contains("hidden");
       if (!productsVisible) {
         productsNav.click();
@@ -242,7 +251,6 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         return;
       }
 
-      // CENTER-4/5タブ生成後、対象タブを開く。
       if (!tabButton || !targetPanel) {
         stableTicks = 0;
         return;
@@ -255,7 +263,6 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
         return;
       }
 
-      // 本体の遅延処理に上書きされないことを約1秒確認してから完了。
       stableTicks += 1;
       if (stableTicks >= 8) {
         clearInterval(timer);
@@ -276,8 +283,6 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     if (!nav) return false;
     ensureStyle();
 
-    // 「契約・サービス → 契約セットアップ → 制作・納品」の順になるよう
-    // deliveryを先に挿入し、その後setupを同じ位置へ挿入する。
     const delivery = installDeliveryLink(nav);
     const setup = installSetupLink(nav);
     const start = installStartLink(nav);
@@ -286,6 +291,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return delivery && setup && start && contact && monitor;
   };
 
+  installGlobalReadability();
   installFavicon();
   installDeliveryCompatibility();
   installCenter7DeliveryQuality();
@@ -294,6 +300,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
+      installGlobalReadability();
       installLinks();
       installDeliveryCompatibility();
       installCenter7DeliveryQuality();
@@ -304,6 +311,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
       installCenter5IndustryTemplates();
     }, { once: true });
   } else {
+    installGlobalReadability();
     installLinks();
     installDeliveryCompatibility();
     installCenter7DeliveryQuality();
@@ -315,6 +323,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   }
 
   const observer = new MutationObserver(() => {
+    installGlobalReadability();
     if (installLinks()) observer.disconnect();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
