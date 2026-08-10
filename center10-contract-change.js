@@ -6,8 +6,9 @@
   window.__DPRO_CENTER10_RUNTIME_R1__ = true;
   window.__DPRO_CENTER10_RUNTIME_R2__ = true;
   window.__DPRO_CENTER10_RUNTIME_R3__ = true;
+  window.__DPRO_CENTER10_RUNTIME_R3_R1__ = true;
 
-  const BUILD = "CONTROL-CENTER-29-CENTER10-R7-R3-DELIVERY-SCOPE-20260810";
+  const BUILD = "CONTROL-CENTER-30-CENTER10-R7-R3-R1-SCOPE-FILTER-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -712,7 +713,7 @@
           <h2>契約変更・追加実装・解約</h2>
           <p>契約後の変更を、依頼 → 承認 → 実装 → 確認 → 完了まで履歴として残します。</p>
         </div>
-        <span class="c10-pill green">CENTER-10 R7-R3</span>
+        <span class="c10-pill green">CENTER-10 R7-R3-R1</span>
       </div>
 
       <div class="c10-guide">

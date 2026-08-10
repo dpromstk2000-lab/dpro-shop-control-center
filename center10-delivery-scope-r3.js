@@ -4,7 +4,7 @@
   if (window.__DPRO_CENTER10_DELIVERY_SCOPE_R3__) return;
   window.__DPRO_CENTER10_DELIVERY_SCOPE_R3__ = true;
 
-  const BUILD = "CONTROL-CENTER-29-CENTER10-R7-R3-DELIVERY-SCOPE-20260810";
+  const BUILD = "CONTROL-CENTER-30-CENTER10-R7-R3-R1-SCOPE-FILTER-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -147,7 +147,7 @@
   }
 
   function injectStyles() {
-    if ($("#c10R3ScopeStyles")) return;
+    if ($("c10R3ScopeStyles")) return;
     const style = document.createElement("style");
     style.id = "c10R3ScopeStyles";
     style.textContent = `
@@ -224,9 +224,8 @@
   }
 
   function ensureScopeFilter() {
-    const toolbar = $("#panel-projects .toolbar");
     const status = $("projectStatusFilter");
-    if (!toolbar || !status) return;
+    if (!status) return;
 
     let select = $("projectScopeFilter");
     if (!select) {
