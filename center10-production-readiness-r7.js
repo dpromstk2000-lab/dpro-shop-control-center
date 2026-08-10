@@ -4,7 +4,7 @@
   if (window.__DPRO_CENTER10_READINESS_R7__) return;
   window.__DPRO_CENTER10_READINESS_R7__ = true;
 
-  const BUILD = "CONTROL-CENTER-38-CENTER10-R7-R7-PRODUCTION-READINESS-20260810";
+  const BUILD = "CONTROL-CENTER-39-CENTER10-R7-R7-R1-TAB-FIX-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -40,7 +40,7 @@
   function syncVersion() {
     const version=document.querySelector(".sidebar .version");
     if(version){
-      version.innerHTML='CONTROL-CENTER-38<br><span>CENTER-10-R7-R7</span>';
+      version.innerHTML='CONTROL-CENTER-39<br><span>CENTER-10-R7-R7-R1</span>';
     }
   }
 
@@ -141,9 +141,17 @@
     document.head.appendChild(style);
   }
 
+  function findGoLiveTab() {
+    return document.querySelector('.tabs .tab[data-tab="go-live"]') ||
+      document.querySelector('.tabs button[data-tab="go-live"]') ||
+      Array.from(document.querySelectorAll('.tabs .tab, .tabs button'))
+        .find((el) => (el.textContent || '').trim() === '本番稼働') ||
+      null;
+  }
+
   function installPanel() {
     const tabs=document.querySelector(".tabs");
-    const goLiveTab=document.querySelector("[data-center8-go-live]");
+    const goLiveTab=findGoLiveTab();
     const goLivePanel=$("panel-go-live");
 
     if(!tabs || !goLiveTab || !goLivePanel) return false;
@@ -378,7 +386,7 @@
       button.addEventListener("click",()=>{
         const id=button.dataset.r7GoLive||"";
         if(id) localStorage.setItem("dpro_center8_go_live_project",id);
-        document.querySelector("[data-center8-go-live]")?.click();
+        findGoLiveTab()?.click();
       });
     });
   }

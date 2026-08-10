@@ -1,5 +1,5 @@
 window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
-  version: "CONTROL-CENTER-38-CENTER10-R7-R7-PRODUCTION-READINESS-20260810",
+  version: "CONTROL-CENTER-39-CENTER10-R7-R7-R1-TAB-FIX-20260810",
   apiBaseUrl: "https://dpro-shop-control-center-api.dpromstk2000.workers.dev",
   monitorApiBaseUrl: "https://dpro-shop-site-monitor-api.dpromstk2000.workers.dev",
   contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev",
@@ -394,7 +394,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-37-CENTER10-R7-R6-R1-SELECTION-SYNC-20260810";
+  const BUILD = "CONTROL-CENTER-39-CENTER10-R7-R7-R1-R6-COMPAT-20260810";
 
   function install() {
     if (document.body?.dataset.cc11DeliveryPage !== "true") return false;

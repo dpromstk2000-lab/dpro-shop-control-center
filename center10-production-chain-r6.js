@@ -33,6 +33,7 @@
   }
 
   function syncVisibleVersion() {
+    if (window.__DPRO_CENTER10_READINESS_R7__) return;
     const version = document.querySelector(".sidebar .version");
     if (!version) return;
     version.innerHTML = 'CONTROL-CENTER-37<br><span>CENTER-10-R7-R6-R1</span>';
