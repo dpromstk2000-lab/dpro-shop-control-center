@@ -4,7 +4,7 @@
   if (window.__DPRO_CENTER10_FINAL_AUDIT_R10__) return;
   window.__DPRO_CENTER10_FINAL_AUDIT_R10__ = true;
 
-  const BUILD = "CONTROL-CENTER-42-CENTER10-R7-R10-FINAL-AUDIT-20260810";
+  const BUILD = "CONTROL-CENTER-43-CENTER10-R7-R10-R1-FINAL-AUDIT-20260810";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
@@ -30,7 +30,7 @@
   function syncVersion() {
     const version = document.querySelector(".sidebar .version");
     if (!version) return false;
-    const wanted = 'CONTROL-CENTER-42<br><span>CENTER-10-R7-R10</span>';
+    const wanted = 'CONTROL-CENTER-43<br><span>CENTER-10-R7-R10-R1</span>';
     if (version.innerHTML !== wanted) version.innerHTML = wanted;
 
     if (!state.versionObserver) {
@@ -103,7 +103,7 @@
   }
 
   function installPanel() {
-    const r9Tab = document.querySelector('[data-center10-contract-delivery-r9="true"]');
+    const r9Tab = document.querySelector('.tabs .tab[data-center10-contract-delivery-r9="true"]');
     const r9Panel = $("panel-contract-delivery");
     if (!r9Tab || !r9Panel) return false;
     if ($("panel-final-audit")) return true;
@@ -113,7 +113,7 @@
     button.type = "button";
     button.dataset.tab = "final-audit";
     button.dataset.center10FinalAuditR10 = "true";
-    button.textContent = "最終総合検査";
+    button.textContent = "最終監査";
     r9Tab.insertAdjacentElement("afterend", button);
 
     const panel = document.createElement("section");
@@ -125,7 +125,7 @@
           <h2>CENTER-10-R7 最終総合検査</h2>
           <p>ここでは新機能を追加せず、契約から本番稼働までの安全経路だけを最終確認します。</p>
         </div>
-        <span class="c10-r10-pill">CENTER-10 R7-R10</span>
+        <span class="c10-r10-pill">CENTER-10 R7-R10-R1</span>
       </div>
 
       <div class="c10-r10-guide">
@@ -158,11 +158,11 @@
     return [
       {
         name: "R8画面",
-        pass: Boolean(document.querySelector('[data-center10-contract-start-r8="true"]') && $("panel-contract-start")),
+        pass: Boolean(document.querySelector('.tabs .tab[data-center10-contract-start-r8="true"]') && $("panel-contract-start")),
       },
       {
         name: "R9画面",
-        pass: Boolean(document.querySelector('[data-center10-contract-delivery-r9="true"]') && $("panel-contract-delivery")),
+        pass: Boolean(document.querySelector('.tabs .tab[data-center10-contract-delivery-r9="true"]') && $("panel-contract-delivery")),
       },
       {
         name: "制作・納品画面",
@@ -170,7 +170,7 @@
       },
       {
         name: "R7本番準備画面",
-        pass: Boolean(document.querySelector('[data-center10-readiness-r7="true"]') && $("panel-production-readiness")),
+        pass: Boolean(document.querySelector('.tabs .tab[data-center10-readiness-r7="true"]') && $("panel-production-readiness")),
       },
       {
         name: "R6本番ロック",
@@ -178,7 +178,7 @@
       },
       {
         name: "CENTER-8画面",
-        pass: Boolean(document.querySelector('[data-center8-go-live="true"]') && $("panel-go-live")),
+        pass: Boolean(document.querySelector('.tabs .tab[data-center8-go-live="true"]') && $("panel-go-live")),
       },
       {
         name: "DEMO検査導線",
