@@ -80,7 +80,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     if (document.body?.dataset.cc10ContactPage === "true") return true;
     if (nav.querySelector("[data-cc10-contact-link]")) return true;
     const link = document.createElement("a");
-    link.href = "contact.html";
+    link.href = "contact-v1.html";
     link.className = "nav-button cc-addon-link cc-contact-link";
     link.dataset.cc10ContactLink = "true";
     link.innerHTML = "<span>話</span>顧客対応";
