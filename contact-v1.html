@@ -6,9 +6,9 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#0b5f49">
   <title>顧客対応 | DPRO CONTACT</title>
-  <link rel="stylesheet" href="contact-v1.css?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808">
-  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808"></script>
-  <script defer src="contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-FLAGS-20260808"></script>
+  <link rel="stylesheet" href="contact-v1.css?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1">
+  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1"></script>
+  <script defer src="contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1"></script>
 </head>
 <body data-dpro-contact-page="true">
   <div id="loading" class="dc-state">
@@ -64,7 +64,7 @@
 
       <div class="dc-sidebar-note">
         <strong>DPRO CONTACT V1.0</strong>
-        <span id="channelName">LINE Inbox</span>
+        <span id="channelName">LINE + WEB Inbox</span>
         <small>共通顧客対応モジュール</small>
       </div>
     </aside>
@@ -75,7 +75,7 @@
         <button id="mobileBackButton" class="dc-mobile-back dc-hidden" type="button" aria-label="会話一覧へ戻る">‹</button>
         <div class="dc-top-title">
           <strong>顧客対応</strong>
-          <small id="topbarDescription">LINE公式の問い合わせを確認・返信</small>
+          <small id="topbarDescription">LINE・WEB問い合わせを一元確認</small>
         </div>
         <div class="dc-operator">
           <span id="operatorInitial">D</span>
@@ -89,9 +89,9 @@
       <div class="dc-content">
         <section class="dc-page-head">
           <div>
-            <p class="dc-eyebrow">DPRO CONTACT / LINE</p>
+            <p class="dc-eyebrow">DPRO CONTACT / LINE + WEB</p>
             <h1 id="pageTitle">問い合わせを<br>管理画面で完結</h1>
-            <p id="pageLead">LINE公式に届いた問い合わせを確認し、そのまま返信できます。</p>
+            <p id="pageLead">LINE公式とWEBフォームに届いた問い合わせを同じ画面で確認できます。</p>
           </div>
           <button id="refreshButton" class="dc-btn dc-secondary" type="button">最新情報に更新</button>
         </section>
@@ -119,15 +119,15 @@
 
           <div id="conversationPane" class="dc-conversation-pane">
             <div id="emptyConversation" class="dc-conversation-empty">
-              <span>LINE</span>
-              <h2>会話を選択してください</h2>
+              <span>LINE<br>WEB</span>
+              <h2>問い合わせを選択してください</h2>
               <p>問い合わせを選ぶと、ここに会話履歴が表示されます。</p>
             </div>
 
             <div id="conversation" class="dc-conversation dc-hidden">
               <div class="dc-conversation-head">
                 <div>
-                  <strong id="conversationName">LINEユーザー</strong>
+                  <strong id="conversationName">問い合わせ</strong>
                   <small id="conversationMeta">—</small>
                 </div>
                 <button id="statusButton" class="dc-btn dc-small dc-secondary" type="button">対応完了にする</button>
@@ -147,7 +147,7 @@
         </section>
 
         <p id="securityNote" class="dc-security-note">
-          LINEユーザーID・表示名・会話本文はWorker側で暗号化して保存します。Secretはブラウザへ配置しません。
+          LINEユーザーID、WEB問い合わせのメールアドレス・表示名・会話本文はWorker側で暗号化して保存します。Secretはブラウザへ配置しません。
         </p>
       </div>
     </main>

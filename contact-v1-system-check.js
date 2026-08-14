@@ -1,9 +1,9 @@
 (() => {
   "use strict";
 
-  const SYSTEM_CHECK_VERSION = "DPRO-CONTACT-1-SYSTEM-CHECK-20260808";
-  const EXPECTED_WORKER = "DPRO-CONTACT-1-WORKER-20260808-R2";
-  const EXPECTED_DB = "DPRO-CONTACT-1-DB-20260808-R1";
+  const SYSTEM_CHECK_VERSION = "DPRO-CONTACT-1-SYSTEM-CHECK-20260814-WEB-R1";
+  const EXPECTED_WORKER = "DPRO-CONTACT-1-WORKER-20260814-WEB-R1";
+  const EXPECTED_DB = "DPRO-CONTACT-1-DB-20260814-WEB-R1";
   const EXPECTED_DESIGN = "DPRO-CONTACT-1.0-DESIGN-20260808";
 
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
@@ -165,7 +165,7 @@
     const definitions = [
       ["workerVersion", "Workerバージョン", data.worker?.version === EXPECTED_WORKER, EXPECTED_WORKER],
       ["databaseVersion", "DBバージョン", data.checks?.databaseVersion === true && data.database?.meta?.moduleVersion === EXPECTED_DB, EXPECTED_DB],
-      ["tableSecurity", "RLS・DB権限", data.checks?.tableSecurity === true, "5テーブル / RLS ON / browser SELECT禁止"],
+      ["tableSecurity", "RLS・DB権限", data.checks?.tableSecurity === true, "6テーブル / RLS ON / browser SELECT禁止"],
       ["anonDirectAccessBlocked", "anon直接アクセス", data.checks?.anonDirectAccessBlocked === true, "ブロック必須"],
       ["authenticatedDirectAccessBlocked", "authenticated直接アクセス", data.checks?.authenticatedDirectAccessBlocked === true, "ブロック必須"],
       ["environmentComplete", "Variables / Secrets", data.checks?.environmentComplete === true, "必要項目の存在のみ検査"],
@@ -202,7 +202,8 @@
       ["Last webhook", text(data.channel?.lastWebhookAt, "未受信")],
       ["Webhook age", data.channel?.webhookAgeMinutes == null ? "—" : `${data.channel.webhookAgeMinutes}分`],
       ["Delivery failures / 24h", String(data.delivery?.failedLast24h ?? "—")],
-      ["CORS origins", Array.isArray(data.cors?.origins) ? data.cors.origins.join(", ") : "—"],
+      ["Admin CORS origins", Array.isArray(data.cors?.origins) ? data.cors.origins.join(", ") : "—"],
+      ["WEB form CORS origins", Array.isArray(data.cors?.webOrigins) && data.cors.webOrigins.length ? data.cors.webOrigins.join(", ") : "WEB無効 / 未設定"],
       ["Operator role", text(data.operator?.roleKey, "—")],
       ["Checked at", text(data.checkedAt, "—")],
     ];

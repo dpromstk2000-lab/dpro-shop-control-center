@@ -1,16 +1,17 @@
 /**
- * DPRO CONTACT V1.0 - DPRO SHOP REGRESSION CONFIG
- * STEP CONTACT-V1-6
+ * DPRO CONTACT V1.0 - DPRO SHOP LINE + WEB CONFIG
+ * STEP DPRO CONTACT WEB / 2026-08-14
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-FLAGS-20260808",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1",
 
   enabled: true,
 
   features: {
     line: true,
     lineReply: true,
+    web: true,
     search: true,
     statusManagement: true,
     autoRefresh: true,
@@ -31,10 +32,10 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     brandName: "DPRO SHOP",
     systemName: "CONTROL CENTER / CONTACT V1",
     brandMark: "D",
-    pageTitle: "LINE顧客対応を\n共通モジュールで検証",
-    pageLead: "DPRO CONTACT V1.0 共通モジュールの回帰テスト専用画面です。",
-    topbarDescription: "DPRO CONTACT V1.0 回帰テスト",
-    channelName: "DPRO SHOP LINE公式",
+    pageTitle: "LINE・WEBの問い合わせを\n一つの顧客対応へ",
+    pageLead: "LINE公式とWEB問い合わせフォームに届いた相談を、同じ顧客対応画面で確認します。",
+    topbarDescription: "LINE・WEB問い合わせを一元確認",
+    channelName: "LINE + WEB Inbox",
     homeUrl: "index.html",
     homeLabel: "CONTROL CENTER",
     loginUrl: "index.html",

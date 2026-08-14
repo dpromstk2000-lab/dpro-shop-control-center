@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-1-FRONTEND-FLAGS-20260808";
+  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -47,6 +47,7 @@
     return {
       line: CONFIG.features?.line !== false,
       lineReply: CONFIG.features?.lineReply !== false,
+      web: CONFIG.features?.web === true,
       search: CONFIG.features?.search !== false,
       statusManagement: CONFIG.features?.statusManagement !== false,
       autoRefresh: CONFIG.features?.autoRefresh !== false,
@@ -75,12 +76,12 @@
       $("statusButton").classList.toggle("dc-hidden", !f.statusManagement);
     }
 
-    const replyDisabled = !f.line || !f.lineReply;
-    if ($("replyForm")) $("replyForm").classList.toggle("dc-hidden", replyDisabled);
+    const noReplySurface = (!f.line || !f.lineReply) && !f.web;
+    if ($("replyForm")) $("replyForm").classList.toggle("dc-hidden", noReplySurface);
 
-    if (!f.line) {
-      setText("pageLead", "LINE顧客対応は現在無効になっています。");
-      setText("topbarDescription", "LINE顧客対応は無効");
+    if (!f.line && !f.web) {
+      setText("pageLead", "顧客対応チャネルは現在無効になっています。");
+      setText("topbarDescription", "顧客対応は無効");
     }
   }
 
@@ -306,16 +307,58 @@
     setText("operatorRole", op.roleLabel);
     setText("operatorInitial", (op.displayName || "D").slice(0, 1));
 
-    if (op.readOnly || !features().lineReply) {
-      if ($("replyText")) {
-        $("replyText").disabled = true;
-        $("replyText").placeholder = op.readOnly
-          ? "閲覧専用アカウントでは返信できません"
-          : "LINE返信機能は無効になっています";
-      }
-      if ($("sendButton")) $("sendButton").disabled = true;
-      if ($("statusButton")) $("statusButton").disabled = true;
+    if ($("statusButton")) {
+      $("statusButton").disabled = Boolean(op.readOnly);
     }
+    applyComposerMode();
+  }
+
+  function threadChannelType(thread = state.selectedThread) {
+    return text(thread?.channelType, "line").toLowerCase() === "web" ? "web" : "line";
+  }
+
+  function threadChannelLabel(thread = state.selectedThread) {
+    return threadChannelType(thread) === "web" ? "WEB" : "LINE";
+  }
+
+  function threadFallbackName(thread) {
+    const key = text(thread?.userKey);
+    return threadChannelType(thread) === "web"
+      ? `WEB問い合わせ ${key}`
+      : `LINEユーザー ${key}`;
+  }
+
+  function applyComposerMode(thread = state.selectedThread) {
+    const textarea = $("replyText");
+    const button = $("sendButton");
+    const hint = $("composerHint");
+    if (!textarea || !button) return;
+
+    const op = state.operator || normalizeOperator({});
+    const channelType = threadChannelType(thread);
+
+    if (channelType === "web") {
+      textarea.disabled = true;
+      textarea.value = "";
+      textarea.placeholder = "WEB問い合わせへのメール返信は今後の拡張で対応します";
+      button.disabled = true;
+      button.textContent = "WEB返信は未対応";
+      if (hint) hint.textContent = "現在は問い合わせ内容の確認・対応状態の管理まで。メール返信機能は今後追加します。";
+      return;
+    }
+
+    const canReply = !op.readOnly && features().line && features().lineReply;
+    textarea.disabled = !canReply;
+    textarea.placeholder = op.readOnly
+      ? "閲覧専用アカウントでは返信できません"
+      : features().lineReply
+        ? "返信を入力してください"
+        : "LINE返信機能は無効になっています";
+    button.disabled = !canReply;
+    button.textContent = "LINEへ返信";
+    if (hint) hint.textContent = canReply
+      ? "送信ボタンでLINEへ送信します"
+      : "このアカウントではLINEへ返信できません";
   }
 
   async function contactApi(path, options = {}) {
@@ -376,7 +419,7 @@
         }
       }
 
-      if (!silent) setText("topbarDescription", text(branding().topbarDescription, "LINE公式の問い合わせを確認・返信"));
+      if (!silent) setText("topbarDescription", text(branding().topbarDescription, "LINE・WEB問い合わせを一元確認"));
     } finally {
       state.loading = false;
     }
@@ -395,7 +438,9 @@
     const q = features().search ? text($("threadSearch")?.value).toLowerCase() : "";
     if (!q) return state.threads;
     return state.threads.filter((t) =>
-      `${t.displayName || ""} ${t.lastMessage || ""} ${t.userKey || ""}`.toLowerCase().includes(q)
+      `${t.displayName || ""} ${t.lastMessage || ""} ${t.userKey || ""} ${t.channelType || ""} ${t.channelName || ""}`
+        .toLowerCase()
+        .includes(q)
     );
   }
 
@@ -405,7 +450,7 @@
     const rows = filteredThreads();
 
     if (!rows.length) {
-      list.innerHTML = `<div class="dc-thread-empty">現在表示できるLINE問い合わせはありません。</div>`;
+      list.innerHTML = `<div class="dc-thread-empty">現在表示できる問い合わせはありません。</div>`;
       return;
     }
 
@@ -416,13 +461,16 @@
       button.type = "button";
       button.className = `dc-thread-item${state.selectedThread?.id === thread.id ? " active" : ""}`;
 
-      const name = text(thread.displayName, `LINEユーザー ${text(thread.userKey)}`);
-      const initial = name.slice(0, 1) || "L";
+      const name = text(thread.displayName, threadFallbackName(thread));
+      const channel = threadChannelLabel(thread);
+      const channelClass = threadChannelType(thread) === "web" ? "dc-channel-web" : "dc-channel-line";
+      const initial = channel === "WEB" ? "W" : (name.slice(0, 1) || "L");
 
       button.innerHTML = `
-        <span class="dc-avatar">${esc(initial)}</span>
+        <span class="dc-avatar ${channel === "WEB" ? "dc-avatar--web" : ""}">${esc(initial)}</span>
         <span class="dc-thread-body">
           <span class="dc-thread-name">
+            <span class="dc-channel-badge ${channelClass}">${channel}</span>
             <strong>${esc(name)}</strong>
             ${num(thread.unreadCount) > 0 ? `<span class="dc-badge">${num(thread.unreadCount)}</span>` : ""}
           </span>
@@ -454,13 +502,15 @@
     $("emptyConversation")?.classList.add("dc-hidden");
     $("conversation")?.classList.remove("dc-hidden");
 
-    const name = text(thread.displayName, `LINEユーザー ${text(thread.userKey)}`);
+    const name = text(thread.displayName, threadFallbackName(thread));
+    const channel = threadChannelLabel(thread);
     setText("conversationName", name);
     setText(
       "conversationMeta",
-      `${thread.status === "closed" ? "対応完了" : "対応中"} / 最終更新 ${formatDate(thread.lastMessageAt)}`
+      `${channel} / ${thread.status === "closed" ? "対応完了" : "対応中"} / 最終更新 ${formatDate(thread.lastMessageAt)}`
     );
     setText("statusButton", thread.status === "closed" ? "対応を再開" : "対応完了にする");
+    applyComposerMode(thread);
 
     const data = await contactApi(`/api/contact/threads/${encodeURIComponent(thread.id)}/messages`);
     state.messages = Array.isArray(data.messages) ? data.messages : [];
@@ -510,7 +560,13 @@
   async function submitReply(event) {
     event.preventDefault();
     const thread = state.selectedThread;
-    if (!thread || state.operator?.readOnly || !features().line || !features().lineReply) return;
+    if (
+      !thread ||
+      threadChannelType(thread) !== "line" ||
+      state.operator?.readOnly ||
+      !features().line ||
+      !features().lineReply
+    ) return;
 
     const textValue = text($("replyText")?.value);
     if (!textValue) return;
@@ -533,10 +589,8 @@
     } catch (error) {
       if (!error?.handled) toast(`送信できませんでした：${error.message}`, true);
     } finally {
-      if (button) {
-        button.textContent = original;
-        button.disabled = Boolean(state.operator?.readOnly);
-      }
+      if (button) button.textContent = original;
+      applyComposerMode(thread);
     }
   }
 

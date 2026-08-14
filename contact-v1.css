@@ -84,3 +84,13 @@ body[data-contact-density="compact"] .dc-conversation{min-height:560px}
   body:not(.dc-mobile-conversation) .dc-conversation-pane{display:none}
   body:not(.dc-mobile-conversation) .dc-mobile-back{display:none!important}
 }
+
+/* DPRO CONTACT / LINE + WEB channel badges */
+.dc-channel-badge{flex:0 0 auto;min-width:42px;height:20px;padding:0 7px;display:inline-grid;place-items:center;border-radius:999px;font-size:8px;font-weight:900;letter-spacing:.06em;border:1px solid transparent}
+.dc-channel-line{background:#e8f7ef;color:#08774f;border-color:#bfe8d3}
+.dc-channel-web{background:#eef3ff;color:#3159a8;border-color:#cdd9f6}
+.dc-avatar--web{background:#3159a8}
+.dc-thread-name{min-width:0;flex-wrap:wrap}
+.dc-thread-name strong{min-width:0;flex:1}
+.dc-composer textarea:disabled{background:#f4f6f5;color:#7a8782;cursor:not-allowed}
+@media(max-width:760px){.dc-channel-badge{min-width:38px;padding:0 6px}}
