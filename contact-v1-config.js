@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-20260814-R2",
 
   enabled: true,
 
@@ -20,7 +20,7 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     templates: false,
     assignment: false,
     aiSuggestions: false,
-    email: false
+    email: true
   },
 
   apiBaseUrl: "https://dpro-shop-contact-v1-api.dpromstk2000.workers.dev",

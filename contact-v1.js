@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1";
+  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-20260814-R2";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -15,6 +15,7 @@
     messages: [],
     refreshTimer: null,
     loading: false,
+    pendingWebReply: null,
   };
 
   function text(value, fallback = "") {
@@ -338,12 +339,18 @@
     const channelType = threadChannelType(thread);
 
     if (channelType === "web") {
-      textarea.disabled = true;
-      textarea.value = "";
-      textarea.placeholder = "WEB問い合わせへのメール返信は今後の拡張で対応します";
-      button.disabled = true;
-      button.textContent = "WEB返信は未対応";
-      if (hint) hint.textContent = "現在は問い合わせ内容の確認・対応状態の管理まで。メール返信機能は今後追加します。";
+      const canEmailReply = !op.readOnly && features().web && features().email;
+      textarea.disabled = !canEmailReply;
+      textarea.placeholder = op.readOnly
+        ? "閲覧専用アカウントでは返信できません"
+        : canEmailReply
+          ? "メール返信を入力してください"
+          : "WEBメール返信機能は無効になっています";
+      button.disabled = !canEmailReply;
+      button.textContent = "メールで返信";
+      if (hint) hint.textContent = canEmailReply
+        ? "WEB問い合わせのお客様へDPRO SHOP名義でメール送信します"
+        : "WEBメール返信機能は現在無効です";
       return;
     }
 
@@ -486,6 +493,7 @@
 
   async function selectThread(thread) {
     state.selectedThread = thread;
+    state.pendingWebReply = null;
     renderThreads();
 
     if (window.innerWidth <= 760) {
@@ -531,6 +539,7 @@
   function clearConversation() {
     state.selectedThread = null;
     state.messages = [];
+    state.pendingWebReply = null;
     $("conversation")?.classList.add("dc-hidden");
     $("emptyConversation")?.classList.remove("dc-hidden");
     document.body.classList.remove("dc-mobile-conversation");
@@ -545,9 +554,12 @@
     for (const msg of state.messages) {
       const div = document.createElement("div");
       div.className = `dc-message ${msg.direction === "outbound" ? "outbound" : "inbound"}`;
+      const deliveryNote = msg.direction === "outbound" && msg.deliveryStatus === "failed"
+        ? " ・ 送信失敗"
+        : "";
       div.innerHTML = `
         <p>${esc(msg.body || "")}</p>
-        <small>${formatDate(msg.occurredAt, true)}${msg.direction === "outbound" ? " ・ 返信" : ""}</small>
+        <small>${formatDate(msg.occurredAt, true)}${msg.direction === "outbound" ? (threadChannelType() === "web" ? " ・ メール返信" : " ・ 返信") : ""}${deliveryNote}</small>
       `;
       list.appendChild(div);
     }
@@ -560,6 +572,12 @@
   async function submitReply(event) {
     event.preventDefault();
     const thread = state.selectedThread;
+
+    if (thread && threadChannelType(thread) === "web") {
+      await submitWebEmailReply(thread);
+      return;
+    }
+
     if (
       !thread ||
       threadChannelType(thread) !== "line" ||
@@ -588,6 +606,61 @@
       await loadAll({ keepSelection: true, silent: true });
     } catch (error) {
       if (!error?.handled) toast(`送信できませんでした：${error.message}`, true);
+    } finally {
+      if (button) button.textContent = original;
+      applyComposerMode(thread);
+    }
+  }
+
+  function newClientRequestId() {
+    if (crypto?.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  async function submitWebEmailReply(thread) {
+    if (
+      !thread ||
+      threadChannelType(thread) !== "web" ||
+      state.operator?.readOnly ||
+      !features().web ||
+      !features().email
+    ) return;
+
+    const textValue = text($("replyText")?.value);
+    if (!textValue) return;
+
+    if (!state.pendingWebReply || state.pendingWebReply.text !== textValue) {
+      state.pendingWebReply = {
+        text: textValue,
+        clientRequestId: newClientRequestId(),
+      };
+    }
+
+    const button = $("sendButton");
+    const original = button?.textContent || "メールで返信";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "送信中…";
+    }
+
+    try {
+      await contactApi(`/api/contact/threads/${encodeURIComponent(thread.id)}/email-reply`, {
+        method: "POST",
+        body: JSON.stringify({
+          text: textValue,
+          clientRequestId: state.pendingWebReply.clientRequestId,
+        }),
+      });
+      state.pendingWebReply = null;
+      if ($("replyText")) $("replyText").value = "";
+      toast("メールで返信しました。");
+      await loadAll({ keepSelection: true, silent: true });
+    } catch (error) {
+      if (!error?.handled) toast(`メール送信できませんでした：${error.message}`, true);
     } finally {
       if (button) button.textContent = original;
       applyComposerMode(thread);
