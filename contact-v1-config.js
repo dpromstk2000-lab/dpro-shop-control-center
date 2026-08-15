@@ -108,3 +108,30 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
 
   installFavicon();
 })();
+
+/* DPRO CONTACT -> CONTROL CENTER 保管資料 navigation / add-only */
+(() => {
+  "use strict";
+
+  const installArchiveLink = () => {
+    const nav = document.querySelector(".dc-nav");
+    if (!nav) return false;
+    if (nav.querySelector('a[href="artifacts.html"]')) return true;
+
+    const link = document.createElement("a");
+    link.href = "artifacts.html";
+    link.setAttribute("aria-label", "DPRO保管資料を開く");
+    link.innerHTML = "<i>保</i><span>保管資料</span>";
+
+    const contact = nav.querySelector('a[href="contact-v1.html"]');
+    if (contact) contact.insertAdjacentElement("afterend", link);
+    else nav.appendChild(link);
+    return true;
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installArchiveLink, { once: true });
+  } else {
+    installArchiveLink();
+  }
+})();

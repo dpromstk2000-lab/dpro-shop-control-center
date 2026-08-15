@@ -429,3 +429,58 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     if (install() || tries >= 120) clearInterval(timer);
   },125);
 })();
+
+
+/* CONTROL CENTER ARTIFACT ARCHIVE NAV / 2026-08-15
+ * Add-only navigation patch. Existing CONTROL CENTER functions are unchanged.
+ */
+(() => {
+  "use strict";
+
+  const installArtifactArchiveLink = () => {
+    const nav =
+      document.querySelector(".side-nav") ||
+      document.querySelector(".sidebar nav");
+    if (!nav) return false;
+
+    let link = nav.querySelector('a[href="artifacts.html"]');
+
+    if (!link) {
+      link = document.createElement("a");
+      link.href = "artifacts.html";
+      link.setAttribute("aria-label", "DPRO保管資料を開く");
+
+      if (nav.classList.contains("side-nav")) {
+        link.className = "nav-button cc-addon-link cc-artifacts-link";
+        link.innerHTML = "<span>保</span>保管資料";
+      } else {
+        link.innerHTML = "<i>保</i>保管資料";
+      }
+    }
+
+    const delivery =
+      nav.querySelector("[data-cc11-delivery-link]") ||
+      nav.querySelector('a[href="delivery.html"]');
+
+    if (delivery && delivery.nextElementSibling !== link) {
+      delivery.insertAdjacentElement("afterend", link);
+    } else if (!link.isConnected) {
+      nav.appendChild(link);
+    }
+
+    return true;
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installArtifactArchiveLink, { once: true });
+  } else {
+    installArtifactArchiveLink();
+  }
+
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    installArtifactArchiveLink();
+    if (tries >= 80) clearInterval(timer);
+  }, 125);
+})();
