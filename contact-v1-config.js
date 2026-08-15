@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R5-PROD",
 
   enabled: true,
 
@@ -16,7 +16,7 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     statusManagement: true,
     autoRefresh: true,
 
-    attachments: false,
+    attachments: true,
     templates: false,
     assignment: false,
     aiSuggestions: false,
