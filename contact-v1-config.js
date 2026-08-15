@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-20260815-R3-FAVICON",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED",
 
   enabled: true,
 
@@ -24,6 +24,11 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
   },
 
   apiBaseUrl: "https://dpro-shop-contact-v1-api.dpromstk2000.workers.dev",
+
+  attachments: {
+    maxFiles: 3,
+    maxFileBytes: 8388608
+  },
 
   layout: "standalone",
   density: "normal",

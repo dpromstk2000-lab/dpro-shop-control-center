@@ -7,8 +7,9 @@
   <meta name="theme-color" content="#0b5f49">
   <title>顧客対応 | DPRO CONTACT</title>
   <link rel="stylesheet" href="contact-v1.css?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1">
-  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-20260815-R3-FAVICON"></script>
-  <script defer src="contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-20260814-R1"></script>
+  <link rel="stylesheet" href="contact-v1-attachments.css?v=DPRO-CONTACT-ATTACHMENTS-20260815-R1">
+  <script defer src="contact-v1-config.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED"></script>
+  <script defer src="contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED"></script>
 </head>
 <body data-dpro-contact-page="true">
   <div id="loading" class="dc-state">
@@ -137,8 +138,16 @@
 
               <form id="replyForm" class="dc-composer">
                 <textarea id="replyText" rows="3" maxlength="5000" placeholder="返信を入力してください"></textarea>
+                <div id="attachmentSelection" class="dc-attachment-selection dc-hidden"></div>
                 <div class="dc-composer-foot">
-                  <small id="composerHint">送信ボタンでLINEへ送信します</small>
+                  <div class="dc-composer-tools">
+                    <small id="composerHint">送信ボタンでLINEへ送信します</small>
+                    <span id="attachmentControls" class="dc-attachment-controls">
+                      <input id="attachmentInput" type="file" multiple hidden>
+                      <button id="attachmentButton" class="dc-btn dc-secondary dc-attachment-button" type="button">📎 添付</button>
+                      <em>1ファイル8MBまで・最大3件</em>
+                    </span>
+                  </div>
                   <button id="sendButton" class="dc-btn dc-primary" type="submit">LINEへ返信</button>
                 </div>
               </form>

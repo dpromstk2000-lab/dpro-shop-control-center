@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-20260814-R2";
+  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -16,6 +16,9 @@
     refreshTimer: null,
     loading: false,
     pendingWebReply: null,
+    pendingAttachmentReply: null,
+    selectedFiles: [],
+    attachmentObjectUrls: new Map(),
   };
 
   function text(value, fallback = "") {
@@ -76,6 +79,11 @@
     if ($("statusButton")) {
       $("statusButton").classList.toggle("dc-hidden", !f.statusManagement);
     }
+
+    if ($("attachmentControls")) {
+      $("attachmentControls").classList.toggle("dc-hidden", !f.attachments);
+    }
+    if (!f.attachments) clearSelectedFiles();
 
     const noReplySurface = (!f.line || !f.lineReply) && !f.web;
     if ($("replyForm")) $("replyForm").classList.toggle("dc-hidden", noReplySurface);
@@ -161,6 +169,27 @@
     } catch {
       return fallback;
     }
+  }
+
+  async function contactApiForm(path, formData) {
+    if (!state.token) throw new Error("ログインセッションがありません。");
+    if (!apiBase()) throw new Error("DPRO CONTACT API URLが未設定です。");
+
+    const response = await fetch(`${apiBase()}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${state.token}` },
+      body: formData,
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      stopAutoRefresh();
+      state.token = "";
+      show("authRequired");
+      throw Object.assign(new Error("ログインの有効期限が切れました。"), { handled: true });
+    }
+    if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+    return data;
   }
 
   async function ensureSupabaseLibrary() {
@@ -333,6 +362,7 @@
     const textarea = $("replyText");
     const button = $("sendButton");
     const hint = $("composerHint");
+    const attachmentButton = $("attachmentButton");
     if (!textarea || !button) return;
 
     const op = state.operator || normalizeOperator({});
@@ -348,8 +378,9 @@
           : "WEBメール返信機能は無効になっています";
       button.disabled = !canEmailReply;
       button.textContent = "メールで返信";
+      if (attachmentButton) attachmentButton.disabled = !canEmailReply || !features().attachments;
       if (hint) hint.textContent = canEmailReply
-        ? "WEB問い合わせのお客様へDPRO SHOP名義でメール送信します"
+        ? (features().attachments ? "本文または添付資料をメールで送信できます" : "WEB問い合わせのお客様へDPRO SHOP名義でメール送信します")
         : "WEBメール返信機能は現在無効です";
       return;
     }
@@ -363,8 +394,9 @@
         : "LINE返信機能は無効になっています";
     button.disabled = !canReply;
     button.textContent = "LINEへ返信";
+    if (attachmentButton) attachmentButton.disabled = !canReply || !features().attachments;
     if (hint) hint.textContent = canReply
-      ? "送信ボタンでLINEへ送信します"
+      ? (features().attachments ? "本文・画像・資料リンクをLINEへ送信できます" : "送信ボタンでLINEへ送信します")
       : "このアカウントではLINEへ返信できません";
   }
 
@@ -494,6 +526,8 @@
   async function selectThread(thread) {
     state.selectedThread = thread;
     state.pendingWebReply = null;
+    state.pendingAttachmentReply = null;
+    clearSelectedFiles();
     renderThreads();
 
     if (window.innerWidth <= 760) {
@@ -540,13 +574,155 @@
     state.selectedThread = null;
     state.messages = [];
     state.pendingWebReply = null;
+    state.pendingAttachmentReply = null;
+    clearSelectedFiles();
     $("conversation")?.classList.add("dc-hidden");
     $("emptyConversation")?.classList.remove("dc-hidden");
     document.body.classList.remove("dc-mobile-conversation");
     renderThreads();
   }
 
+  function formatBytes(value) {
+    const bytes = num(value, 0);
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function attachmentKind(attachment) {
+    const contentType = text(attachment?.contentType).toLowerCase();
+    if (attachment?.image || contentType.startsWith("image/")) return "image";
+    if (contentType === "application/pdf") return "pdf";
+    if (contentType.includes("spreadsheet") || contentType.includes("excel") || contentType === "text/csv") return "spreadsheet";
+    if (contentType.startsWith("audio/")) return "audio";
+    if (contentType.startsWith("video/")) return "video";
+    return "file";
+  }
+
+  function attachmentIcon(attachment) {
+    const kind = attachmentKind(attachment);
+    return kind === "image" ? "画" : kind === "pdf" ? "PDF" : kind === "spreadsheet" ? "表" : kind === "audio" ? "音" : kind === "video" ? "動" : "添";
+  }
+
+  function attachmentAvailable(attachment) {
+    return Boolean(
+      attachment?.id &&
+      attachment?.downloadable !== false &&
+      ["stored", "sent"].includes(text(attachment?.status, "stored"))
+    );
+  }
+
+  function renderAttachmentHtml(attachment) {
+    const id = esc(attachment?.id || "");
+    const name = esc(attachment?.name || "添付ファイル");
+    const size = esc(formatBytes(attachment?.sizeBytes));
+    const contentType = esc(attachment?.contentType || "");
+    const available = attachmentAvailable(attachment);
+    const kind = attachmentKind(attachment);
+
+    if (!available) {
+      return `<div class="dc-attachment-card is-unavailable"><span class="dc-attachment-icon">${attachmentIcon(attachment)}</span><div><strong>${name}</strong><small>${size}${size ? " ・ " : ""}現在開けません</small></div></div>`;
+    }
+
+    const image = kind === "image"
+      ? `<button class="dc-attachment-image dc-attachment-image--loading" type="button" data-attachment-open="${id}" aria-label="${name}を開く"><span>画像を読み込み中…</span><img alt="${name}" loading="lazy"></button>`
+      : "";
+
+    return `${image}<div class="dc-attachment-card"><span class="dc-attachment-icon">${attachmentIcon(attachment)}</span><div><strong>${name}</strong><small>${size || contentType}</small></div><div class="dc-attachment-actions"><button type="button" data-attachment-open="${id}">開く</button><button type="button" data-attachment-download="${id}" data-attachment-name="${name}">保存</button></div></div>`;
+  }
+
+  function revokeAttachmentObjectUrls() {
+    for (const url of state.attachmentObjectUrls.values()) {
+      try { URL.revokeObjectURL(url); } catch (_) {}
+    }
+    state.attachmentObjectUrls.clear();
+  }
+
+  async function fetchAttachmentBlob(attachmentId, download = false) {
+    if (!state.token) throw new Error("ログインセッションがありません。");
+    const id = text(attachmentId);
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("添付ファイルIDが不正です。");
+
+    const response = await fetch(
+      `${apiBase()}/api/contact/attachments/${encodeURIComponent(id)}${download ? "?download=1" : ""}`,
+      {
+        headers: { authorization: `Bearer ${state.token}` },
+        cache: "no-store",
+      }
+    );
+
+    if (response.status === 401) {
+      stopAutoRefresh();
+      state.token = "";
+      show("authRequired");
+      throw Object.assign(new Error("ログインの有効期限が切れました。"), { handled: true });
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || `HTTP ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  async function hydrateAttachmentPreviews() {
+    const previewButtons = Array.from(document.querySelectorAll(".dc-attachment-image[data-attachment-open]"));
+    for (const button of previewButtons) {
+      const id = text(button.dataset.attachmentOpen);
+      const img = button.querySelector("img");
+      const label = button.querySelector("span");
+      if (!id || !img || state.attachmentObjectUrls.has(id)) continue;
+      try {
+        const blob = await fetchAttachmentBlob(id, false);
+        if (!blob.type.startsWith("image/")) continue;
+        const url = URL.createObjectURL(blob);
+        state.attachmentObjectUrls.set(id, url);
+        img.src = url;
+        button.classList.remove("dc-attachment-image--loading");
+        if (label) label.remove();
+      } catch (error) {
+        button.classList.remove("dc-attachment-image--loading");
+        button.classList.add("dc-attachment-image--error");
+        if (label) label.textContent = error?.handled ? "画像を表示できません" : "画像を読み込めません";
+      }
+    }
+  }
+
+  async function openAttachment(attachmentId) {
+    const id = text(attachmentId);
+    const existing = state.attachmentObjectUrls.get(id);
+    if (existing) {
+      window.open(existing, "_blank", "noopener");
+      return;
+    }
+    try {
+      const blob = await fetchAttachmentBlob(id, false);
+      const url = URL.createObjectURL(blob);
+      state.attachmentObjectUrls.set(id, url);
+      window.open(url, "_blank", "noopener");
+    } catch (error) {
+      if (!error?.handled) toast(`添付ファイルを開けませんでした：${error.message}`, true);
+    }
+  }
+
+  async function downloadAttachment(attachmentId, fileName) {
+    try {
+      const blob = await fetchAttachmentBlob(attachmentId, true);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = text(fileName, "attachment");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      if (!error?.handled) toast(`添付ファイルを保存できませんでした：${error.message}`, true);
+    }
+  }
+
   function renderMessages() {
+    revokeAttachmentObjectUrls();
     const list = $("messageList");
     if (!list) return;
     list.innerHTML = "";
@@ -557,8 +733,10 @@
       const deliveryNote = msg.direction === "outbound" && msg.deliveryStatus === "failed"
         ? " ・ 送信失敗"
         : "";
+      const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
       div.innerHTML = `
         <p>${esc(msg.body || "")}</p>
+        ${attachments.length ? `<div class="dc-message-attachments">${attachments.map(renderAttachmentHtml).join("")}</div>` : ""}
         <small>${formatDate(msg.occurredAt, true)}${msg.direction === "outbound" ? (threadChannelType() === "web" ? " ・ メール返信" : " ・ 返信") : ""}${deliveryNote}</small>
       `;
       list.appendChild(div);
@@ -566,12 +744,18 @@
 
     requestAnimationFrame(() => {
       list.scrollTop = list.scrollHeight;
+      hydrateAttachmentPreviews();
     });
   }
 
   async function submitReply(event) {
     event.preventDefault();
     const thread = state.selectedThread;
+
+    if (thread && features().attachments && state.selectedFiles.length) {
+      await submitAttachmentReply(thread);
+      return;
+    }
 
     if (thread && threadChannelType(thread) === "web") {
       await submitWebEmailReply(thread);
@@ -606,6 +790,86 @@
       await loadAll({ keepSelection: true, silent: true });
     } catch (error) {
       if (!error?.handled) toast(`送信できませんでした：${error.message}`, true);
+    } finally {
+      if (button) button.textContent = original;
+      applyComposerMode(thread);
+    }
+  }
+
+  function fileSignature(files = state.selectedFiles) {
+    return files.map((file) => `${file.name}:${file.size}:${file.lastModified}`).join("|");
+  }
+
+  function clearSelectedFiles() {
+    state.selectedFiles = [];
+    state.pendingAttachmentReply = null;
+    if ($("attachmentInput")) $("attachmentInput").value = "";
+    renderSelectedFiles();
+  }
+
+  function renderSelectedFiles() {
+    const box = $("attachmentSelection");
+    if (!box) return;
+    const files = state.selectedFiles || [];
+    box.classList.toggle("dc-hidden", !files.length);
+    box.innerHTML = files.map((file, index) => `
+      <span class="dc-selected-file"><b>📎 ${esc(file.name)}</b><small>${esc(formatBytes(file.size))}</small><button type="button" data-remove-attachment="${index}" aria-label="${esc(file.name)}を削除">×</button></span>
+    `).join("");
+  }
+
+  function selectAttachments(event) {
+    const input = event?.target;
+    const picked = Array.from(input?.files || []);
+    if (!picked.length) return;
+    const maxFiles = num(CONFIG.attachments?.maxFiles, 3) || 3;
+    const maxBytes = num(CONFIG.attachments?.maxFileBytes, 6 * 1024 * 1024) || 6 * 1024 * 1024;
+    const next = [...state.selectedFiles];
+    for (const file of picked) {
+      if (next.length >= maxFiles) {
+        toast(`添付は一度に${maxFiles}ファイルまでです。`, true);
+        break;
+      }
+      if (!file.size || file.size > maxBytes) {
+        toast(`${file.name} は${Math.round(maxBytes / 1024 / 1024)}MBを超えているため添付できません。`, true);
+        continue;
+      }
+      next.push(file);
+    }
+    state.selectedFiles = next;
+    if (input) input.value = "";
+    renderSelectedFiles();
+  }
+
+  async function submitAttachmentReply(thread) {
+    if (!thread || state.operator?.readOnly || !features().attachments || !state.selectedFiles.length) return;
+    const channel = threadChannelType(thread);
+    if (channel === "line" && (!features().line || !features().lineReply)) return;
+    if (channel === "web" && (!features().web || !features().email)) return;
+
+    const textValue = text($("replyText")?.value);
+    const signature = `${thread.id}|${textValue}|${fileSignature()}`;
+    if (!state.pendingAttachmentReply || state.pendingAttachmentReply.signature !== signature) {
+      state.pendingAttachmentReply = { signature, clientRequestId: newClientRequestId() };
+    }
+
+    const form = new FormData();
+    form.append("text", textValue);
+    form.append("clientRequestId", state.pendingAttachmentReply.clientRequestId);
+    for (const file of state.selectedFiles) form.append("files", file, file.name);
+
+    const button = $("sendButton");
+    const original = button?.textContent || (channel === "web" ? "メールで返信" : "LINEへ返信");
+    if (button) { button.disabled = true; button.textContent = "添付送信中…"; }
+    if ($("attachmentButton")) $("attachmentButton").disabled = true;
+
+    try {
+      await contactApiForm(`/api/contact/threads/${encodeURIComponent(thread.id)}/attachments`, form);
+      if ($("replyText")) $("replyText").value = "";
+      clearSelectedFiles();
+      toast(channel === "web" ? "添付資料をメールで送信しました。" : "添付資料をLINEへ送信しました。");
+      await loadAll({ keepSelection: true, silent: true });
+    } catch (error) {
+      if (!error?.handled) toast(`添付資料を送信できませんでした：${error.message}`, true);
     } finally {
       if (button) button.textContent = original;
       applyComposerMode(thread);
@@ -773,6 +1037,31 @@
   }
 
   $("replyForm")?.addEventListener("submit", submitReply);
+  $("messageList")?.addEventListener("click", (event) => {
+    const openButton = event.target.closest?.("[data-attachment-open]");
+    if (openButton) {
+      event.preventDefault();
+      openAttachment(openButton.dataset.attachmentOpen);
+      return;
+    }
+    const downloadButton = event.target.closest?.("[data-attachment-download]");
+    if (downloadButton) {
+      event.preventDefault();
+      downloadAttachment(downloadButton.dataset.attachmentDownload, downloadButton.dataset.attachmentName || "attachment");
+    }
+  });
+
+  $("attachmentButton")?.addEventListener("click", () => $("attachmentInput")?.click());
+  $("attachmentInput")?.addEventListener("change", selectAttachments);
+  $("attachmentSelection")?.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-remove-attachment]");
+    if (!button) return;
+    const index = Number(button.dataset.removeAttachment);
+    if (!Number.isInteger(index) || index < 0) return;
+    state.selectedFiles.splice(index, 1);
+    state.pendingAttachmentReply = null;
+    renderSelectedFiles();
+  });
   $("statusButton")?.addEventListener("click", toggleStatus);
   $("refreshButton")?.addEventListener("click", () => loadAll().catch((e) => !e?.handled && toast(e.message, true)));
   $("retryButton")?.addEventListener("click", boot);
