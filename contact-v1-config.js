@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R5-PROD",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R5.1-PROD",
 
   enabled: true,
 
@@ -37,7 +37,7 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     brandName: "DPRO SHOP",
     systemName: "CONTROL CENTER / CONTACT V1",
     brandMark: "D",
-    pageTitle: "LINE・WEBの問い合わせを\\n一つの顧客対応へ",
+    pageTitle: "LINE・WEBの問い合わせを\n一つの顧客対応へ",
     pageLead: "LINE公式とWEB問い合わせフォームに届いた相談を、同じ顧客対応画面で確認します。",
     topbarDescription: "LINE・WEB問い合わせを一元確認",
     channelName: "LINE + WEB Inbox",
