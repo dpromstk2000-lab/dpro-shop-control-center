@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CONTROL-CENTER-PRODUCT-READY-V1.0-FRONTEND-20260820";
+  const BUILD = "CONTROL-CENTER-PRODUCT-READY-V1.1-UX-20260820";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
   const $$ = (selector, scope=document) => Array.from(scope.querySelectorAll(selector));
@@ -12,6 +12,9 @@
     staff:null,
     products:[],
     summary:null,
+    openAudits:new Map(),
+    openAuditCounts:new Map(),
+    openItemCounts:new Map(),
     selectedProductId:"",
     filter:"ALL",
     search:"",
@@ -43,8 +46,11 @@
 
   function fmtDate(value) {
     if (!value) return "—";
-    try { return new Intl.DateTimeFormat("ja-JP",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)); }
-    catch { return String(value); }
+    try {
+      return new Intl.DateTimeFormat("ja-JP",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value));
+    } catch {
+      return String(value);
+    }
   }
 
   function canWrite() {
@@ -67,7 +73,7 @@
   }
 
   function installStyle() {
-    if ($("productReadyStyle")) return;
+    if ($("productReadyStyle")) $("productReadyStyle").remove();
     const style=document.createElement("style");
     style.id="productReadyStyle";
     style.textContent=`
@@ -75,7 +81,7 @@
       .ready-head h2{margin:0;font-size:24px}.ready-head p{margin:6px 0 0;color:#68766f;font-size:11px;line-height:1.75}
       .ready-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#e9f7f1;color:#096245;font-size:9px;font-weight:900}
       .ready-guide{padding:14px 16px;border:1px solid #b9dccd;border-radius:14px;background:#f0faf6;font-size:10px;line-height:1.8;color:#455f56}
-      .ready-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:14px 0}
+      .ready-metrics{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;margin:14px 0}
       .ready-metric{padding:14px;border:1px solid #dce7e2;border-radius:14px;background:#fff}
       .ready-metric strong,.ready-metric span{display:block}.ready-metric strong{font-size:23px;color:#0b5f49}.ready-metric span{font-size:9px;color:#697870;margin-top:3px}
       .ready-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) 170px auto;gap:9px;margin:14px 0}
@@ -83,38 +89,61 @@
         width:100%;min-height:42px;border:1px solid #d8e4df;border-radius:10px;background:#fff;padding:9px 11px;color:#172820
       }
       .ready-table-wrap{overflow:auto;border:1px solid #dce7e2;border-radius:16px;background:#fff}
-      .ready-table{width:100%;min-width:1020px;border-collapse:collapse}
-      .ready-table th,.ready-table td{padding:10px 11px;border-bottom:1px solid #edf2ef;text-align:left;vertical-align:top;font-size:10px}
+      .ready-table{width:100%;min-width:1040px;border-collapse:collapse}
+      .ready-table th,.ready-table td{padding:10px 11px;border-bottom:1px solid #edf2ef;text-align:left;vertical-align:top;font-size:10px;transition:background .15s}
       .ready-table th{background:#f5f8f6;color:#52645c;font-size:9px;white-space:nowrap}
+      .ready-table tr.is-selected td{background:#ecf8f2}
+      .ready-table tr.is-selected td:first-child{box-shadow:inset 4px 0 0 #147457}
       .ready-product strong{display:block;font-size:11px}.ready-product small{display:block;color:#74817c;margin-top:3px;font-size:8px}
-      .ready-pill{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:8px;font-weight:900;background:#eef2f0;color:#66746e}
+      .ready-pill{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;font-size:8px;font-weight:900;background:#eef2f0;color:#66746e;white-space:nowrap}
       .ready-pill.green{background:#def5ea;color:#087253}.ready-pill.amber{background:#fff6df;color:#906000}
       .ready-pill.orange{background:#fff0df;color:#a44f00}.ready-pill.red{background:#ffe8ec;color:#a92e42}
       .ready-pill.gray{background:#eef2f0;color:#66746e}.ready-pill.blue{background:#eaf4ff;color:#2b66a0}
+      .ready-pill.deep{background:#0d6b50;color:#fff}
       .ready-actions{display:flex;gap:7px;flex-wrap:wrap}.ready-actions button{white-space:nowrap}
-      .ready-empty{padding:34px;text-align:center;color:#66756f;border:1px dashed #bfd0c8;border-radius:15px;background:#fff}
-      .ready-detail{margin-top:16px;border:1px solid #dce7e2;border-radius:17px;background:#fff;overflow:hidden}
-      .ready-detail-head{padding:16px 17px;background:#f6faf8;border-bottom:1px solid #dce7e2;display:flex;justify-content:space-between;gap:14px;align-items:center}
-      .ready-detail-head h3{margin:0;font-size:17px}.ready-detail-head p{margin:5px 0 0;color:#6b7973;font-size:9px}
+      .ready-actions .is-current{background:#dff4ea!important;border-color:#8dcab3!important;color:#075d43!important;font-weight:900}
+      .ready-empty{padding:28px;text-align:center;color:#66756f;border:1px dashed #bfd0c8;border-radius:15px;background:#fff}
+      .ready-empty strong{display:block;color:#183b2f;font-size:13px;margin-bottom:6px}
+      .ready-detail-anchor{scroll-margin-top:18px}
+      .ready-detail{margin-top:16px;border:2px solid #9acfb9;border-radius:17px;background:#fff;overflow:hidden;box-shadow:0 16px 38px rgba(22,84,63,.10)}
+      .ready-detail.is-completed{border-color:#dce7e2;box-shadow:none}
+      .ready-detail-head{padding:16px 17px;background:#f1faf6;border-bottom:1px solid #dce7e2;display:flex;justify-content:space-between;gap:14px;align-items:center}
+      .ready-detail-head h3{margin:0;font-size:17px}.ready-detail-head p{margin:5px 0 0;color:#6b7973;font-size:9px;line-height:1.65}
+      .ready-detail-status{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+      .ready-progress{padding:13px 16px;border-bottom:1px solid #e3ece8;background:#fbfdfc}
+      .ready-progress-message{margin:0 0 9px;font-size:10px;color:#435d53;line-height:1.7}
+      .ready-progress-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+      .ready-progress-card{padding:9px 10px;border:1px solid #dfe9e4;border-radius:10px;background:#fff}
+      .ready-progress-card b,.ready-progress-card span{display:block}.ready-progress-card b{font-size:16px;color:#155f49}.ready-progress-card span{font-size:8px;color:#718079;margin-top:2px}
+      .ready-duplicate-warning{margin-top:9px;padding:9px 11px;border-radius:10px;background:#fff1f3;color:#9a2b3c;font-size:9px;font-weight:800}
       .ready-item-table{width:100%;min-width:1120px;border-collapse:collapse}
       .ready-item-table th,.ready-item-table td{padding:9px;border-bottom:1px solid #edf2ef;vertical-align:top;font-size:9px}
       .ready-item-table th{position:sticky;top:0;background:#f5f8f6;z-index:1}
       .ready-item-name{min-width:200px}.ready-item-name strong{display:block}.ready-item-name small{display:block;color:#718079;margin-top:3px}
       .ready-item-table select{min-width:110px}.ready-item-table input{min-width:160px}.ready-item-table textarea{min-width:220px;min-height:68px;resize:vertical}
-      .ready-detail-foot{display:flex;justify-content:flex-end;gap:9px;padding:14px 16px;background:#fafcfb}
+      .ready-detail-foot{display:flex;justify-content:space-between;gap:9px;padding:14px 16px;background:#fafcfb;align-items:center}
+      .ready-detail-foot-note{font-size:9px;color:#6a7872;line-height:1.5}
+      .ready-detail-buttons{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
       .ready-toast{position:fixed;right:18px;bottom:18px;z-index:300;padding:13px 16px;border-radius:11px;background:#0b5f49;color:#fff;font-size:11px;font-weight:800;box-shadow:0 16px 46px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:.18s;pointer-events:none}
       .ready-toast.show{opacity:1;transform:none}.ready-toast.error{background:#a92e42}
-      @media(max-width:1100px){.ready-metrics{grid-template-columns:repeat(3,1fr)}}
+      @media(max-width:1200px){.ready-metrics{grid-template-columns:repeat(4,1fr)}}
+      @media(max-width:900px){.ready-progress-grid{grid-template-columns:repeat(3,1fr)}}
       @media(max-width:700px){
         .ready-head{display:block}.ready-metrics{grid-template-columns:repeat(2,1fr)}.ready-toolbar{grid-template-columns:1fr}
         .ready-table-wrap{overflow:visible;border:0;background:transparent}.ready-table{min-width:0;display:block}
-        .ready-table thead{display:none}.ready-table tbody{display:grid;gap:10px}.ready-table tr{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:13px;border:1px solid #dce7e2;border-radius:14px;background:#fff}
-        .ready-table td{display:block;border:0;padding:3px}.ready-table td:first-child{grid-column:1/-1}.ready-table td:last-child{grid-column:1/-1}
+        .ready-table thead{display:none}.ready-table tbody{display:grid;gap:10px}
+        .ready-table tr{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:13px;border:1px solid #dce7e2;border-radius:14px;background:#fff}
+        .ready-table tr.is-selected{border:2px solid #66af92;background:#f1faf6}
+        .ready-table tr.is-selected td:first-child{box-shadow:none}
+        .ready-table td{display:block;border:0;padding:3px;background:transparent!important}
+        .ready-table td:first-child{grid-column:1/-1}.ready-table td:last-child{grid-column:1/-1}
+        .ready-detail-head{align-items:flex-start}.ready-detail-status{justify-content:flex-start}
+        .ready-progress-grid{grid-template-columns:repeat(2,1fr)}
+        .ready-detail-foot{display:block}.ready-detail-buttons{margin-top:10px;justify-content:stretch}.ready-detail-buttons button{flex:1}
       }
     `;
     document.head.appendChild(style);
   }
-
 
   function normalizeProductViewCopy() {
     const view=document.getElementById("view-products");
@@ -136,18 +165,26 @@
     const pub=await response.json().catch(()=>({}));
     if (!response.ok) throw new Error(pub.message||pub.error||`HTTP ${response.status}`);
     if (!window.supabase?.createClient) throw new Error("Supabaseライブラリを読み込めません。");
+
     state.supabase=window.supabase.createClient(
       pub.supabaseUrl,
       pub.supabasePublishableKey||pub.supabaseAnonKey,
       {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:pub.sessionStorageKey||"dpro-control-center-auth-v1"}}
     );
+
     const {data:sessionData,error:sessionError}=await state.supabase.auth.getSession();
     if (sessionError) throw sessionError;
     state.session=sessionData.session;
     if (!state.session?.user) throw new Error("CONTROL CENTERへログインしてください。");
+
     const {data:aal}=await state.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.currentLevel!=="aal2") throw new Error("二段階認証を完了してください。");
-    const {data:staff,error:staffError}=await state.supabase.from("cc_staff").select("id,role_key,status").eq("auth_user_id",state.session.user.id).maybeSingle();
+
+    const {data:staff,error:staffError}=await state.supabase
+      .from("cc_staff")
+      .select("id,role_key,status")
+      .eq("auth_user_id",state.session.user.id)
+      .maybeSingle();
     if (staffError) throw staffError;
     if (!staff||staff.status!=="active") throw new Error("有効なDPROスタッフではありません。");
     state.staff=staff;
@@ -157,7 +194,12 @@
   function installPanel() {
     const tabs=document.querySelector("#view-products .product-tabs");
     if (!tabs) return false;
-    if ($("product-panel-ready")) return true;
+
+    const oldPanel=$("product-panel-ready");
+    const oldTab=document.querySelector('[data-product-ready-tab="true"]');
+
+    if (oldPanel) oldPanel.remove();
+    if (oldTab) oldTab.remove();
 
     const tab=document.createElement("button");
     tab.className="product-tab";
@@ -174,19 +216,20 @@
       <div class="ready-head">
         <div>
           <h2>製品READY監査</h2>
-          <p>契約前に「製品そのもの」がDPRO最新基準へ適合しているか確認します。顧客固有の本番設定は既存の本番準備ナビで行います。</p>
+          <p>契約前に「製品そのもの」がDPRO最新基準へ適合しているか確認します。進行中監査がある製品は、その監査をそのまま続けます。</p>
         </div>
-        <span class="ready-badge">PRE-CONTRACT / V1.0</span>
+        <span class="ready-badge">PRE-CONTRACT / V1.1</span>
       </div>
       <div class="ready-guide">
         <strong>READY</strong> は「この製品から契約が入っても、顧客設定へ進める」状態です。
-        旧 <code>complete</code> や <code>production_ready</code> を自動でREADY扱いせず、全製品を新基準で再監査します。
+        <strong>監査中</strong> の製品は「詳細」または「監査を続ける」で現在の監査票を開きます。重複した初回監査は作成しません。
       </div>
       <div id="readyMetrics" class="ready-metrics"></div>
       <div class="ready-toolbar">
         <input id="readySearch" type="search" placeholder="製品名・SYSTEM CODEで検索">
         <select id="readyFilter">
           <option value="ALL">すべて</option>
+          <option value="IN_PROGRESS">監査中</option>
           <option value="READY">READY</option>
           <option value="REVIEW">REVIEW</option>
           <option value="UPDATE">UPDATE</option>
@@ -196,7 +239,7 @@
         <button id="readyReload" class="btn btn-secondary" type="button">再読込</button>
       </div>
       <div id="readyBoard"></div>
-      <div id="readyDetail"></div>
+      <div id="readyDetail" class="ready-detail-anchor"></div>
     `;
 
     const lastPanel=$$("#view-products .product-panel").at(-1);
@@ -209,30 +252,97 @@
       panel.classList.remove("hidden");
       if (!state.loaded) await loadOverview();
     });
-    $("readySearch").addEventListener("input",()=>{state.search=$("readySearch").value.trim().toLowerCase();renderBoard();});
-    $("readyFilter").addEventListener("change",()=>{state.filter=$("readyFilter").value;renderBoard();});
-    $("readyReload").addEventListener("click",loadOverview);
+
+    $("readySearch").addEventListener("input",()=>{
+      state.search=$("readySearch").value.trim().toLowerCase();
+      renderBoard();
+    });
+
+    $("readyFilter").addEventListener("change",()=>{
+      state.filter=$("readyFilter").value;
+      renderBoard();
+    });
+
+    $("readyReload").addEventListener("click",async()=>{
+      const selected=state.selectedProductId;
+      await loadOverview();
+      if (selected) await openDetail(selected,{scroll:false});
+    });
+
     return true;
+  }
+
+  function buildOpenAuditMaps(audits) {
+    state.openAudits=new Map();
+    state.openAuditCounts=new Map();
+
+    for (const audit of audits||[]) {
+      state.openAuditCounts.set(audit.product_id,(state.openAuditCounts.get(audit.product_id)||0)+1);
+      if (!state.openAudits.has(audit.product_id)) state.openAudits.set(audit.product_id,audit);
+    }
+  }
+
+  async function loadOpenItemCounts(sb) {
+    state.openItemCounts=new Map();
+    const ids=Array.from(state.openAudits.values()).map(x=>x.id);
+    if (!ids.length) return;
+
+    const {data,error}=await sb
+      .from("cc_product_ready_audit_items")
+      .select("audit_id,result,is_blocking")
+      .in("audit_id",ids);
+
+    if (error) throw error;
+
+    for (const row of data||[]) {
+      if (!state.openItemCounts.has(row.audit_id)) {
+        state.openItemCounts.set(row.audit_id,{PASS:0,REVIEW:0,FAIL:0,HOLD:0,"N/A":0,UNKNOWN:0,blocking:0});
+      }
+      const c=state.openItemCounts.get(row.audit_id);
+      c[row.result]=(c[row.result]||0)+1;
+      if (row.is_blocking && ["REVIEW","FAIL","HOLD","UNKNOWN"].includes(row.result)) c.blocking+=1;
+    }
   }
 
   async function loadOverview() {
     try {
       const sb=await getClient();
-      const [productsResult,summaryResult]=await Promise.all([
+
+      const [productsResult,summaryResult,openResult]=await Promise.all([
         sb.from("cc_v_product_ready_current").select("*").order("product_number"),
-        sb.from("cc_v_product_ready_summary").select("*").maybeSingle()
+        sb.from("cc_v_product_ready_summary").select("*").maybeSingle(),
+        sb.from("cc_product_ready_audits")
+          .select("id,product_id,audit_sequence,audit_mode,overall_status,started_at,completed_at")
+          .is("completed_at",null)
+          .order("started_at",{ascending:false})
       ]);
+
       if (productsResult.error) throw productsResult.error;
       if (summaryResult.error) throw summaryResult.error;
+      if (openResult.error) throw openResult.error;
+
       state.products=productsResult.data||[];
       state.summary=summaryResult.data||{total:0,ready:0,review:0,update_required:0,hold:0,unassessed:0};
+
+      buildOpenAuditMaps(openResult.data||[]);
+      await loadOpenItemCounts(sb);
+
+      state.products=state.products.map(p=>({
+        ...p,
+        open_audit:state.openAudits.get(p.product_id)||null,
+        open_audit_count:state.openAuditCounts.get(p.product_id)||0,
+        open_counts:state.openAudits.get(p.product_id)
+          ? (state.openItemCounts.get(state.openAudits.get(p.product_id).id)||null)
+          : null
+      }));
+
       state.loaded=true;
       renderMetrics();
       renderBoard();
-      toast("製品READY状況を読み込みました。");
+      toast(`製品READY状況を読み込みました。監査中 ${state.openAudits.size}件`);
     } catch(error) {
       console.error(BUILD,error);
-      $("readyBoard").innerHTML=`<div class="ready-empty">${esc(error.message||"READY監査を読み込めませんでした。")}</div>`;
+      $("readyBoard").innerHTML=`<div class="ready-empty"><strong>READY監査を読み込めませんでした。</strong>${esc(error.message||"読み込みエラー")}</div>`;
       toast(error.message||"読み込みに失敗しました。",true);
     }
   }
@@ -241,18 +351,22 @@
     const s=state.summary||{};
     const vals=[
       [s.total||0,"管理対象"],
+      [state.openAudits.size||0,"監査中"],
       [s.ready||0,"READY"],
       [s.review||0,"REVIEW"],
       [s.update_required||0,"UPDATE"],
       [s.hold||0,"HOLD"],
       [s.unassessed||0,"未監査"]
     ];
-    $("readyMetrics").innerHTML=vals.map(([v,l])=>`<article class="ready-metric"><strong>${Number(v)||0}</strong><span>${esc(l)}</span></article>`).join("");
+    $("readyMetrics").innerHTML=vals.map(([v,l])=>
+      `<article class="ready-metric"><strong>${Number(v)||0}</strong><span>${esc(l)}</span></article>`
+    ).join("");
   }
 
   function filteredProducts() {
     return state.products.filter(p=>{
-      if (state.filter!=="ALL"&&p.ready_status!==state.filter) return false;
+      if (state.filter==="IN_PROGRESS"&&!p.open_audit) return false;
+      if (!["ALL","IN_PROGRESS"].includes(state.filter)&&p.ready_status!==state.filter) return false;
       if (!state.search) return true;
       return `${p.product_name||""} ${p.system_code||""} ${p.category||""}`.toLowerCase().includes(state.search);
     });
@@ -261,93 +375,275 @@
   function renderBoard() {
     const rows=filteredProducts();
     const board=$("readyBoard");
-    if (!rows.length) {board.innerHTML='<div class="ready-empty">条件に一致する製品はありません。</div>';return;}
+
+    if (!rows.length) {
+      board.innerHTML='<div class="ready-empty"><strong>該当製品はありません。</strong>検索条件または絞り込みを変更してください。</div>';
+      return;
+    }
+
     board.innerHTML=`
       <div class="ready-table-wrap"><table class="ready-table">
         <thead><tr><th>No</th><th>製品</th><th>READY</th><th>Blocking</th><th>最終監査</th><th>公開</th><th>操作</th></tr></thead>
         <tbody>${rows.map(p=>{
           const meta=statusMeta[p.ready_status]||statusMeta.UNASSESSED;
-          const block=Number(p.blocking_fail_count||0)+Number(p.blocking_review_count||0)+Number(p.blocking_unknown_count||0)+Number(p.hold_count||0);
-          return `<tr>
+          const completedBlock=Number(p.blocking_fail_count||0)+Number(p.blocking_review_count||0)+Number(p.blocking_unknown_count||0)+Number(p.hold_count||0);
+          const openBlock=Number(p.open_counts?.blocking||0);
+          const block=p.open_audit?openBlock:completedBlock;
+          const selected=p.product_id===state.selectedProductId;
+          const open=p.open_audit;
+
+          let mainAction="";
+          if (canWrite()) {
+            if (open) {
+              mainAction=`<button class="btn btn-primary" type="button" data-ready-continue="${esc(p.product_id)}">監査を続ける</button>`;
+            } else {
+              mainAction=`<button class="btn btn-primary" type="button" data-ready-start="${esc(p.product_id)}">${p.audit_id?"再監査":"初回監査"}</button>`;
+            }
+          }
+
+          return `<tr data-ready-product-row="${esc(p.product_id)}" class="${selected?"is-selected":""}">
             <td>${String(p.product_number||"").padStart(2,"0")}</td>
-            <td class="ready-product"><strong>${esc(p.product_name)}</strong><small>${esc(p.system_code)}・${esc(p.category||"")}</small></td>
-            <td><span class="ready-pill ${meta[1]}">${meta[0]}</span></td>
+            <td class="ready-product">
+              <strong>${esc(p.product_name)}</strong>
+              <small>${esc(p.system_code)}・${esc(p.category||"")}</small>
+              ${p.open_audit_count>1?`<div class="ready-duplicate-warning">進行中監査が${p.open_audit_count}件あります。新規作成は禁止しています。</div>`:""}
+            </td>
+            <td>
+              <span class="ready-pill ${meta[1]}">${meta[0]}</span>
+              ${open?'<span class="ready-pill deep" style="margin-left:4px">監査中</span>':""}
+            </td>
             <td>${block}</td>
-            <td>${esc(fmtDate(p.last_audited_at))}</td>
+            <td>${open?`開始 ${esc(fmtDate(open.started_at))}`:esc(fmtDate(p.last_audited_at))}</td>
             <td>${p.product_page_url?'<span class="ready-pill blue">PRODUCT</span>':'—'} ${p.demo_url?'<span class="ready-pill blue">DEMO</span>':''}</td>
             <td><div class="ready-actions">
-              <button class="btn btn-secondary" type="button" data-ready-open="${esc(p.product_id)}">詳細</button>
-              ${canWrite()?`<button class="btn btn-primary" type="button" data-ready-start="${esc(p.product_id)}">${p.audit_id?"再監査":"初回監査"}</button>`:""}
+              <button class="btn btn-secondary ${selected?"is-current":""}" type="button" data-ready-open="${esc(p.product_id)}">${selected?"表示中":"詳細を見る"}</button>
+              ${mainAction}
             </div></td>
           </tr>`;
         }).join("")}</tbody>
       </table></div>
     `;
-    $$("[data-ready-open]",board).forEach(b=>b.addEventListener("click",()=>openDetail(b.dataset.readyOpen)));
-    $$("[data-ready-start]",board).forEach(b=>b.addEventListener("click",()=>startAudit(b.dataset.readyStart)));
+
+    $$("[data-ready-open]",board).forEach(b=>
+      b.addEventListener("click",()=>openDetail(b.dataset.readyOpen,{scroll:true}))
+    );
+
+    $$("[data-ready-continue]",board).forEach(b=>
+      b.addEventListener("click",()=>continueAudit(b.dataset.readyContinue))
+    );
+
+    $$("[data-ready-start]",board).forEach(b=>
+      b.addEventListener("click",()=>startAudit(b.dataset.readyStart))
+    );
+  }
+
+  async function findLatestOpenAudit(productId) {
+    const cached=state.openAudits.get(productId);
+    if (cached) return cached;
+
+    const sb=await getClient();
+    const {data,error}=await sb
+      .from("cc_product_ready_audits")
+      .select("id,product_id,audit_sequence,audit_mode,overall_status,started_at,completed_at")
+      .eq("product_id",productId)
+      .is("completed_at",null)
+      .order("started_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data||null;
+  }
+
+  async function continueAudit(productId) {
+    try {
+      const open=await findLatestOpenAudit(productId);
+      if (!open) {
+        toast("進行中監査が見つかりません。再読込します。",true);
+        await loadOverview();
+        return;
+      }
+      await openAudit(open.id,productId,{scroll:true});
+    } catch(error) {
+      toast(error.message||"進行中監査を開けませんでした。",true);
+    }
   }
 
   async function startAudit(productId) {
     if (!canWrite()) return toast("編集権限がありません。",true);
+
     try {
+      const open=await findLatestOpenAudit(productId);
+      if (open) {
+        toast("この製品には進行中監査があります。新規作成せず、その監査を開きます。");
+        await openAudit(open.id,productId,{scroll:true});
+        return;
+      }
+
       const sb=await getClient();
       const product=state.products.find(p=>p.product_id===productId);
       const mode=product?.audit_id?"recheck":"initial";
-      const {data,error}=await sb.rpc("cc_product_ready_start_audit",{p_product_id:productId,p_audit_mode:mode});
+
+      const {data,error}=await sb.rpc("cc_product_ready_start_audit",{
+        p_product_id:productId,
+        p_audit_mode:mode
+      });
       if (error) throw error;
+
       toast("監査を開始しました。自動判定できる項目だけ先に反映しました。");
       await loadOverview();
-      await openAudit(data,productId);
-    } catch(error) {toast(error.message||"監査を開始できませんでした。",true);}
+      await openAudit(data,productId,{scroll:true});
+    } catch(error) {
+      toast(error.message||"監査を開始できませんでした。",true);
+    }
   }
 
-  async function openDetail(productId) {
+  function scrollToDetail() {
+    requestAnimationFrame(()=>{
+      const detail=$("readyDetail");
+      if (detail) detail.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+  }
+
+  async function openDetail(productId,{scroll=true}={}) {
     const product=state.products.find(p=>p.product_id===productId);
     if (!product) return;
-    if (!product.audit_id) {
-      state.currentAudit=null;state.currentItems=[];
+
+    state.selectedProductId=productId;
+    renderBoard();
+
+    try {
+      const open=await findLatestOpenAudit(productId);
+      if (open) {
+        await openAudit(open.id,productId,{scroll});
+        return;
+      }
+
+      if (product.audit_id) {
+        await openAudit(product.audit_id,productId,{scroll});
+        return;
+      }
+
+      state.currentAudit=null;
+      state.currentItems=[];
       $("readyDetail").innerHTML=`<section class="ready-detail">
-        <div class="ready-detail-head"><div><h3>${esc(product.product_name)}</h3><p>${esc(product.system_code)} / まだ完了済みREADY監査はありません。</p></div><span class="ready-pill gray">未監査</span></div>
-        <div class="ready-empty">「初回監査」を押すと42項目の監査票を作成します。自動で確認できない項目を勝手にPASSにはしません。</div>
+        <div class="ready-detail-head">
+          <div>
+            <h3>${esc(product.product_name)}</h3>
+            <p>${esc(product.system_code)} / READY監査はまだ開始されていません。</p>
+          </div>
+          <div class="ready-detail-status"><span class="ready-pill gray">未監査</span></div>
+        </div>
+        <div class="ready-empty">
+          <strong>まだ監査票はありません。</strong>
+          ${canWrite()?"下のボタンで42項目の初回監査を作成します。自動で確認できない項目を勝手にPASSにはしません。":"編集権限のあるスタッフが初回監査を開始します。"}
+          ${canWrite()?`<div style="margin-top:12px"><button class="btn btn-primary" id="readyEmptyStart" type="button">初回監査を開始</button></div>`:""}
+        </div>
+        <div class="ready-detail-foot">
+          <span class="ready-detail-foot-note">「詳細を見る」を押した製品がここに表示されます。</span>
+          <div class="ready-detail-buttons"><button class="btn btn-secondary" type="button" id="readyCloseDetail">閉じる</button></div>
+        </div>
       </section>`;
-      return;
+
+      if ($("readyEmptyStart")) $("readyEmptyStart").addEventListener("click",()=>startAudit(productId));
+      $("readyCloseDetail").addEventListener("click",closeDetail);
+      if (scroll) scrollToDetail();
+    } catch(error) {
+      toast(error.message||"監査情報を取得できませんでした。",true);
     }
-    await openAudit(product.audit_id,productId,true);
   }
 
-  async function openAudit(auditId,productId,completedAudit=false) {
+  async function openAudit(auditId,productId,{scroll=true}={}) {
     try {
       const sb=await getClient();
+
       const [auditResult,itemsResult]=await Promise.all([
         sb.from("cc_product_ready_audits").select("*").eq("id",auditId).single(),
-        sb.from("cc_product_ready_audit_items").select("*,standard_item:cc_standard_items(item_name,category,description,requirement_type,condition_feature_code)").eq("audit_id",auditId).order("item_code")
+        sb.from("cc_product_ready_audit_items")
+          .select("*,standard_item:cc_standard_items(item_name,category,description,requirement_type,condition_feature_code)")
+          .eq("audit_id",auditId)
+          .order("item_code")
       ]);
+
       if (auditResult.error) throw auditResult.error;
       if (itemsResult.error) throw itemsResult.error;
+
       state.currentAudit=auditResult.data;
       state.currentItems=itemsResult.data||[];
       state.selectedProductId=productId;
+
+      renderBoard();
       renderDetail();
-    } catch(error) {toast(error.message||"監査詳細を取得できませんでした。",true);}
+      if (scroll) scrollToDetail();
+    } catch(error) {
+      toast(error.message||"監査詳細を取得できませんでした。",true);
+    }
+  }
+
+  function auditCounts() {
+    const counts={PASS:0,REVIEW:0,FAIL:0,HOLD:0,"N/A":0,UNKNOWN:0,blocking:0};
+    for (const item of state.currentItems) {
+      counts[item.result]=(counts[item.result]||0)+1;
+      if (item.is_blocking && ["REVIEW","FAIL","HOLD","UNKNOWN"].includes(item.result)) counts.blocking+=1;
+    }
+    return counts;
   }
 
   function renderDetail() {
     const audit=state.currentAudit;
     const product=state.products.find(p=>p.product_id===state.selectedProductId)||{};
     if (!audit) return;
+
     const locked=Boolean(audit.completed_at)||!canWrite();
+    const incomplete=!audit.completed_at;
     const meta=statusMeta[audit.overall_status]||statusMeta.UNASSESSED;
-    $("readyDetail").innerHTML=`<section class="ready-detail">
+    const c=auditCounts();
+    const duplicateCount=state.openAuditCounts.get(state.selectedProductId)||0;
+
+    $("readyDetail").innerHTML=`<section class="ready-detail ${locked&&audit.completed_at?"is-completed":""}">
       <div class="ready-detail-head">
-        <div><h3>${esc(product.product_name||audit.source_system_code)}</h3><p>監査 #${audit.audit_sequence} / ${esc(audit.audit_mode)} / 開始 ${esc(fmtDate(audit.started_at))}${audit.completed_at?` / 確定 ${esc(fmtDate(audit.completed_at))}`:""}</p></div>
-        <span class="ready-pill ${meta[1]}">${meta[0]}</span>
+        <div>
+          <h3>${esc(product.product_name||audit.source_system_code)}</h3>
+          <p>
+            監査 #${audit.audit_sequence} / ${esc(audit.audit_mode)} /
+            開始 ${esc(fmtDate(audit.started_at))}
+            ${audit.completed_at?` / 確定 ${esc(fmtDate(audit.completed_at))}`:" / 現在進行中"}
+          </p>
+        </div>
+        <div class="ready-detail-status">
+          ${incomplete?'<span class="ready-pill deep">監査中</span>':""}
+          <span class="ready-pill ${meta[1]}">${incomplete?"未確定":meta[0]}</span>
+        </div>
       </div>
+
+      <div class="ready-progress">
+        <p class="ready-progress-message">
+          ${incomplete
+            ? `この監査は進行中です。現在 <strong>PASS ${c.PASS}</strong> / REVIEW ${c.REVIEW} / UNKNOWN ${c.UNKNOWN} / N/A ${c["N/A"]} / FAIL ${c.FAIL} / HOLD ${c.HOLD}。下の監査票をそのまま続けてください。`
+            : `この監査は確定済みです。確定結果は <strong>${esc(meta[0])}</strong> です。`}
+        </p>
+        <div class="ready-progress-grid">
+          ${[
+            ["PASS",c.PASS],
+            ["REVIEW",c.REVIEW],
+            ["UNKNOWN",c.UNKNOWN],
+            ["N/A",c["N/A"]],
+            ["FAIL",c.FAIL],
+            ["HOLD",c.HOLD]
+          ].map(([label,value])=>`<div class="ready-progress-card"><b>${Number(value)||0}</b><span>${label}</span></div>`).join("")}
+        </div>
+        ${duplicateCount>1?`<div class="ready-duplicate-warning">注意：この製品には進行中監査が${duplicateCount}件あります。現在は最新監査を表示しています。新しい監査は作成しません。</div>`:""}
+      </div>
+
       <div class="ready-table-wrap"><table class="ready-item-table">
         <thead><tr><th>項目</th><th>結果</th><th>Evidence</th><th>Evidence Ref</th><th>Version</th><th>メモ</th><th>保存</th></tr></thead>
         <tbody>${state.currentItems.map(item=>{
           const s=item.standard_item||{};
           return `<tr data-ready-item="${esc(item.item_code)}">
-            <td class="ready-item-name"><strong>${esc(item.item_code)}｜${esc(s.item_name||"")}</strong><small>${esc(s.category||"")} / ${item.is_blocking?"BLOCKING":"NON-BLOCK"}${s.condition_feature_code?` / ${esc(s.condition_feature_code)}`:""}</small></td>
+            <td class="ready-item-name">
+              <strong>${esc(item.item_code)}｜${esc(s.item_name||"")}</strong>
+              <small>${esc(s.category||"")} / ${item.is_blocking?"BLOCKING":"NON-BLOCK"}${s.condition_feature_code?` / ${esc(s.condition_feature_code)}`:""}</small>
+            </td>
             <td><select data-ready-result ${locked?"disabled":""}>${itemResults.map(v=>`<option value="${v}" ${v===item.result?"selected":""}>${v}</option>`).join("")}</select></td>
             <td><select data-ready-evidence ${locked?"disabled":""}>${evidenceTypes.map(v=>`<option value="${esc(v)}" ${v===(item.evidence_type||"")?"selected":""}>${esc(v||"—")}</option>`).join("")}</select></td>
             <td><input data-ready-ref value="${esc(item.evidence_ref||"")}" ${locked?"disabled":""}></td>
@@ -357,14 +653,33 @@
           </tr>`;
         }).join("")}</tbody>
       </table></div>
+
       <div class="ready-detail-foot">
-        <button class="btn btn-secondary" type="button" id="readyCloseDetail">閉じる</button>
-        ${!locked?'<button class="btn btn-primary" type="button" id="readyCompleteAudit">監査を確定</button>':""}
+        <span class="ready-detail-foot-note">
+          ${incomplete?`Blocking未解決：${c.blocking}件。内容を確認してから監査結果を確定します。`:"確定済み監査は編集できません。"}
+        </span>
+        <div class="ready-detail-buttons">
+          <button class="btn btn-secondary" type="button" id="readyCloseDetail">閉じる</button>
+          ${!locked?'<button class="btn btn-primary" type="button" id="readyCompleteAudit">監査結果を確定</button>':""}
+        </div>
       </div>
     </section>`;
-    $("readyCloseDetail").addEventListener("click",()=>{$("readyDetail").innerHTML="";});
-    $$("[data-ready-save]",$("readyDetail")).forEach(btn=>btn.addEventListener("click",()=>saveItem(btn.closest("[data-ready-item]"))));
+
+    $("readyCloseDetail").addEventListener("click",closeDetail);
+
+    $$("[data-ready-save]",$("readyDetail")).forEach(btn=>
+      btn.addEventListener("click",()=>saveItem(btn.closest("[data-ready-item]")))
+    );
+
     if ($("readyCompleteAudit")) $("readyCompleteAudit").addEventListener("click",completeAudit);
+  }
+
+  function closeDetail() {
+    state.selectedProductId="";
+    state.currentAudit=null;
+    state.currentItems=[];
+    $("readyDetail").innerHTML="";
+    renderBoard();
   }
 
   async function saveItem(tr) {
@@ -379,28 +694,58 @@
         p_observed_version:tr.querySelector("[data-ready-version]").value.trim()||null,
         p_note:tr.querySelector("[data-ready-note]").value.trim()||null
       });
+
       if (error) throw error;
       toast(`${tr.dataset.readyItem} を保存しました。`);
-    } catch(error) {toast(error.message||"監査項目を保存できませんでした。",true);}
+      await openAudit(state.currentAudit.id,state.selectedProductId,{scroll:false});
+    } catch(error) {
+      toast(error.message||"監査項目を保存できませんでした。",true);
+    }
   }
 
   async function completeAudit() {
-    if (!confirm("現在の監査結果を確定します。確定後はこの監査票を編集できません。よろしいですか？")) return;
+    const c=auditCounts();
+    const unresolved=c.blocking;
+
+    const message=unresolved>0
+      ? `Blocking未解決が${unresolved}件あります。この状態で確定するとREADYではなくREVIEW/UPDATE等になる可能性があります。\n\nそれでも現在の監査結果を確定しますか？`
+      : "Blocking未解決はありません。現在の監査結果を確定しますか？";
+
+    if (!confirm(message)) return;
+
     try {
       const sb=await getClient();
-      const {data,error}=await sb.rpc("cc_product_ready_complete_audit",{p_audit_id:state.currentAudit.id});
+      const {data,error}=await sb.rpc("cc_product_ready_complete_audit",{
+        p_audit_id:state.currentAudit.id
+      });
+
       if (error) throw error;
+
       toast(`監査を確定しました：${data}`);
+      const selected=state.selectedProductId;
       await loadOverview();
-      await openDetail(state.selectedProductId);
-    } catch(error) {toast(error.message||"監査を確定できませんでした。",true);}
+      await openDetail(selected,{scroll:false});
+    } catch(error) {
+      toast(error.message||"監査を確定できませんでした。",true);
+    }
   }
 
   function boot() {
     installStyle();
     normalizeProductViewCopy();
-    if (installPanel()) return;
-    const observer=new MutationObserver(()=>{if(installPanel()) observer.disconnect();});
+
+    const setup=()=>{
+      const tabs=document.querySelector("#view-products .product-tabs");
+      if (!tabs) return false;
+      installPanel();
+      return true;
+    };
+
+    if (setup()) return;
+
+    const observer=new MutationObserver(()=>{
+      if (setup()) observer.disconnect();
+    });
     observer.observe(document.documentElement,{childList:true,subtree:true});
     setTimeout(()=>observer.disconnect(),12000);
   }
