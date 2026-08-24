@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CONTACT-MULTI-STORE-R2-20260824";
+  const BUILD = "DPRO-CONTACT-MULTI-STORE-R2.1-SCROLLFIX-20260824";
   const PACKAGE_VERSION = "DPRO-CONTACT-AUTO-DEPLOY-R2-MULTI-STORE-20260824";
   const ARCH_VERSION = "DPRO-CONTACT-MULTI-STORE-ARCHITECTURE-V1.0";
   const WORKER_VERSION = "DPRO-CONTACT-1-WORKER-20260824-MULTI-STORE-R7.1-STAGED";
@@ -417,7 +417,9 @@
   }
 
   function disableLegacy() {
-    const archWarn=document.querySelector("#contactArchitectureR1 .contact-arch-r1-warn"); if(archWarn)archWarn.textContent="R2はR7.1 Multi Store基準へ更新済みです。旧20260815 R2/R3は使用せず、R3共通MAIL GATEWAYは次フェーズまでHOLDします。";
+    const archWarn=document.querySelector("#contactArchitectureR1 .contact-arch-r1-warn");
+    const archMessage="R2はR7.1 Multi Store基準へ更新済みです。旧20260815 R2/R3は使用せず、R3共通MAIL GATEWAYは次フェーズまでHOLDします。";
+    if(archWarn && archWarn.textContent!==archMessage) archWarn.textContent=archMessage;
     const old=$("contactOnboardingR2"); if(old)old.hidden=true;
     const oldGenerate=$("contactR23Generate"); if(oldGenerate){oldGenerate.disabled=true;oldGenerate.title="R7.1 Multi Store R2を使用してください";}
     document.querySelectorAll("#detailContent button").forEach((button)=>{
