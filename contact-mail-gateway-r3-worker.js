@@ -1,6 +1,6 @@
 /**
  * DPRO CONTACT COMMON MAIL GATEWAY
- * Version: DPRO-CONTACT-MAIL-GATEWAY-R3-20260824-STAGED
+ * Version: DPRO-CONTACT-MAIL-GATEWAY-R3-A1-OWNER-DOMAIN-FIRST-20260824-STAGED
  * Purpose:
  *   One shared outbound/inbound mail transport for all DPRO CONTACT tenants.
  *   Canonical conversation data stays in each tenant's DPRO CONTACT database.
@@ -8,7 +8,7 @@
  *
  * Required bindings / vars:
  *   MAIL_ROUTES                         Workers KV binding
- *   MAIL_DOMAIN                         shared verified mail domain
+ *   MAIL_FALLBACK_DOMAIN                optional DPRO shared fallback mail domain
  *   MAIL_FROM_LOCAL=contact             envelope/header From local part
  *   MAIL_REPLY_LOCAL=r                  Reply-To local prefix
  *
@@ -28,6 +28,13 @@
  *     "system_code":"SYSTEM_CODE",
  *     "worker_url":"https://...workers.dev",
  *     "display_name":"Store Name",
+ *     "domain_mode":"OWNER_DOMAIN",
+ *     "owner_domain":"example.jp",
+ *     "mail_domain":"contact.example.jp",
+ *     "from_local":"contact",
+ *     "mail_dns_verified":true,
+ *     "resend_domain_verified":true,
+ *     "cloudflare_email_routing_verified":true,
  *     "archive_enabled":false,
  *     "archive_email":"",
  *     "client_secret_sha256":"<64 lower hex>",
@@ -42,8 +49,8 @@
  *   - No conversation body is persisted in MAIL_ROUTES KV.
  */
 
-const VERSION = "DPRO-CONTACT-MAIL-GATEWAY-R3-20260824-STAGED";
-const ROUTE_VERSION = "DPRO-CONTACT-MAIL-ROUTE-R3-20260824";
+const VERSION = "DPRO-CONTACT-MAIL-GATEWAY-R3-A1-OWNER-DOMAIN-FIRST-20260824-STAGED";
+const ROUTE_VERSION = "DPRO-CONTACT-MAIL-ROUTE-R3-A1-20260824";
 const MAX_JSON_BYTES = 36 * 1024 * 1024;
 const MAX_RAW_BYTES = 32 * 1024 * 1024;
 const MAX_TEXT_CHARS = 20000;
@@ -99,6 +106,14 @@ export default {
     const route = await loadRoute(env, parsed.routeToken);
     if (!route || !route.active) {
       message?.setReject?.("Inactive DPRO CONTACT mail route");
+      return;
+    }
+    if (parsed.domain !== route.mail_domain) {
+      message?.setReject?.("DPRO CONTACT mail domain mismatch");
+      return;
+    }
+    if (!route.mail_ready) {
+      message?.setReject?.("DPRO CONTACT mail domain is not ready");
       return;
     }
 
@@ -166,10 +181,10 @@ function fail(message, status = 400) {
   throw e;
 }
 
-function normalizeDomain(raw) {
+function normalizeDomain(raw, label = "mail_domain", status = 503) {
   const domain = String(raw || "").trim().toLowerCase().replace(/^@+/, "");
   if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) {
-    fail("invalid_MAIL_DOMAIN", 503);
+    fail(`invalid_${label}`, status);
   }
   return domain;
 }
@@ -211,9 +226,10 @@ function tagValue(raw, fallback = "value") {
 
 function validateRuntime(env) {
   if (!env?.MAIL_ROUTES || typeof env.MAIL_ROUTES.get !== "function") fail("missing_MAIL_ROUTES_binding", 503);
-  normalizeDomain(value(env, "MAIL_DOMAIN"));
   normalizeLocal(value(env, "MAIL_FROM_LOCAL", "contact"), "contact");
   normalizeLocal(value(env, "MAIL_REPLY_LOCAL", "r"), "r");
+  const fallback = value(env, "MAIL_FALLBACK_DOMAIN");
+  if (fallback) normalizeDomain(fallback, "MAIL_FALLBACK_DOMAIN");
 
   const resend = value(env, "RESEND_API_KEY");
   if (!resend || !resend.startsWith("re_")) fail("invalid_RESEND_API_KEY", 503);
@@ -231,18 +247,21 @@ function validateRuntime(env) {
 async function health(env) {
   const checks = {
     routesKv: Boolean(env?.MAIL_ROUTES && typeof env.MAIL_ROUTES.get === "function"),
-    mailDomain: false,
     mailLocals: false,
+    fallbackDomain: true,
     resendSecret: value(env, "RESEND_API_KEY").startsWith("re_"),
     signingPrivateKey: false,
   };
 
-  try { normalizeDomain(value(env, "MAIL_DOMAIN")); checks.mailDomain = true; } catch (_) {}
   try {
     normalizeLocal(value(env, "MAIL_FROM_LOCAL", "contact"), "contact");
     normalizeLocal(value(env, "MAIL_REPLY_LOCAL", "r"), "r");
     checks.mailLocals = true;
   } catch (_) {}
+  try {
+    const fallback = value(env, "MAIL_FALLBACK_DOMAIN");
+    if (fallback) normalizeDomain(fallback, "MAIL_FALLBACK_DOMAIN");
+  } catch (_) { checks.fallbackDomain = false; }
   try {
     const jwk = JSON.parse(value(env, "MAIL_GATEWAY_SIGNING_PRIVATE_JWK"));
     checks.signingPrivateKey = jwk?.kty === "EC" && jwk?.crv === "P-256" && Boolean(jwk?.d && jwk?.x && jwk?.y);
@@ -254,7 +273,8 @@ async function health(env) {
     service: "DPRO CONTACT MAIL GATEWAY",
     version: VERSION,
     routeVersion: ROUTE_VERSION,
-    mailDomain: checks.mailDomain ? value(env, "MAIL_DOMAIN").toLowerCase() : null,
+    domainPolicy: "OWNER_DOMAIN_FIRST",
+    fallbackMailDomain: value(env, "MAIL_FALLBACK_DOMAIN") || null,
     fromLocal: value(env, "MAIL_FROM_LOCAL", "contact"),
     replyLocal: value(env, "MAIL_REPLY_LOCAL", "r"),
     checks,
@@ -323,7 +343,37 @@ async function loadRoute(env, routeToken) {
   if (route.archive_enabled && !route.archive_email) fail("route_archive_email_missing", 503);
   if (!HEX64_RE.test(String(route.client_secret_sha256 || "").toLowerCase())) fail("route_client_secret_hash_invalid", 503);
   route.client_secret_sha256 = String(route.client_secret_sha256).toLowerCase();
+
+  route.domain_mode = String(route.domain_mode || "OWNER_DOMAIN").trim().toUpperCase();
+  if (!["OWNER_DOMAIN", "DPRO_SHARED"].includes(route.domain_mode)) fail("route_domain_mode_invalid", 503);
+  route.mail_domain = normalizeDomain(route.mail_domain, "route_mail_domain");
+  route.from_local = normalizeLocal(route.from_local || value(env, "MAIL_FROM_LOCAL", "contact"), "contact");
+  route.mail_dns_verified = flagValue(route.mail_dns_verified);
+  route.resend_domain_verified = flagValue(route.resend_domain_verified);
+  route.cloudflare_email_routing_verified = flagValue(route.cloudflare_email_routing_verified);
+
+  if (route.domain_mode === "OWNER_DOMAIN") {
+    route.owner_domain = normalizeDomain(route.owner_domain, "route_owner_domain");
+    if (route.mail_domain === route.owner_domain || !route.mail_domain.endsWith(`.${route.owner_domain}`)) {
+      fail("route_owner_mail_domain_must_be_subdomain", 503);
+    }
+  } else {
+    route.owner_domain = route.owner_domain ? normalizeDomain(route.owner_domain, "route_owner_domain") : "";
+    const fallback = value(env, "MAIL_FALLBACK_DOMAIN");
+    if (!fallback) fail("MAIL_FALLBACK_DOMAIN_not_configured", 503);
+    const fallbackDomain = normalizeDomain(fallback, "MAIL_FALLBACK_DOMAIN");
+    if (route.mail_domain !== fallbackDomain) fail("route_fallback_domain_mismatch", 503);
+  }
+
+  route.mail_ready =
+    route.mail_dns_verified &&
+    route.resend_domain_verified &&
+    route.cloudflare_email_routing_verified;
   return route;
+}
+
+function requireRouteMailReady(route) {
+  if (!route?.mail_ready) fail("route_mail_domain_not_ready", 409);
 }
 
 function validateAttachments(raw) {
@@ -374,8 +424,9 @@ async function handleSend(request, env) {
   if (!idempotencyKey || idempotencyKey.length > 220) fail("invalid_idempotency_key", 400);
 
   const attachments = validateAttachments(body?.attachments);
-  const mailDomain = normalizeDomain(value(env, "MAIL_DOMAIN"));
-  const fromLocal = normalizeLocal(value(env, "MAIL_FROM_LOCAL", "contact"), "contact");
+  requireRouteMailReady(route);
+  const mailDomain = route.mail_domain;
+  const fromLocal = route.from_local;
   const replyLocal = normalizeLocal(value(env, "MAIL_REPLY_LOCAL", "r"), "r");
   const replyLocalPart = `${replyLocal}+${routeToken}.${threadId}`;
   if (replyLocalPart.length > 64) fail("reply_local_part_too_long", 503);
@@ -405,6 +456,8 @@ async function handleSend(request, env) {
     provider: "resend",
     gatewayVersion: VERSION,
     routeVersion: ROUTE_VERSION,
+    domainMode: route.domain_mode,
+    mailDomain: route.mail_domain,
     replyTo,
     archiveCopy: Boolean(route.archive_enabled && route.archive_email),
   };
@@ -412,16 +465,24 @@ async function handleSend(request, env) {
 
 function parseReplyRecipient(env, recipient) {
   const target = String(recipient || "").trim().toLowerCase();
-  const domain = normalizeDomain(value(env, "MAIL_DOMAIN"));
+  const at = target.lastIndexOf("@");
+  if (at <= 0) return null;
+  const localPart = target.slice(0, at);
+  let domain;
+  try { domain = normalizeDomain(target.slice(at + 1), "recipient_domain", 400); }
+  catch (_) { return null; }
+
   const replyLocal = normalizeLocal(value(env, "MAIL_REPLY_LOCAL", "r"), "r");
-  const escapedLocal = replyLocal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const escapedDomain = domain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = new RegExp(`^${escapedLocal}\\+([a-z2-7]{16})\\.([0-9a-f-]{36})@${escapedDomain}$`, "i").exec(target);
-  if (!match) return null;
-  const routeToken = match[1].toLowerCase();
-  const threadId = match[2].toLowerCase();
+  const prefix = `${replyLocal}+`;
+  if (!localPart.startsWith(prefix)) return null;
+  const rest = localPart.slice(prefix.length);
+  const dot = rest.indexOf(".");
+  if (dot <= 0) return null;
+
+  const routeToken = rest.slice(0, dot).toLowerCase();
+  const threadId = rest.slice(dot + 1).toLowerCase();
   if (!ROUTE_TOKEN_RE.test(routeToken) || !UUID_RE.test(threadId)) return null;
-  return { routeToken, threadId };
+  return { routeToken, threadId, domain };
 }
 
 function bytesToBase64Url(bytes) {
