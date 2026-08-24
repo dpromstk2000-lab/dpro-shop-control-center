@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CONTACT-MULTI-STORE-R2.1-SCROLLFIX-20260824";
-  const PACKAGE_VERSION = "DPRO-CONTACT-AUTO-DEPLOY-R2-MULTI-STORE-20260824";
+  const BUILD = "DPRO-CONTACT-MULTI-STORE-R2.2-SAFE-DISPLAY-20260824";
+  const PACKAGE_VERSION = "DPRO-CONTACT-AUTO-DEPLOY-R2.2-MULTI-STORE-20260824";
   const ARCH_VERSION = "DPRO-CONTACT-MULTI-STORE-ARCHITECTURE-V1.0";
   const WORKER_VERSION = "DPRO-CONTACT-1-WORKER-20260824-MULTI-STORE-R7.1-STAGED";
   const WORKER_ASSET = "./contact-onboarding-r1-worker-r7-multistore.js?v=DPRO-CONTACT-R7.1-MULTI-STORE-20260824";
@@ -113,6 +113,25 @@
     };
   }
 
+  function legacyDproShopSenderForOtherTenant(r = state.readiness || {}, dp = state.deploy || {}) {
+    const tenantCode = String(r?.tenant_code || "").trim().toUpperCase();
+    const sender = String(dp?.web_email_from_address || "").trim().toLowerCase();
+    return tenantCode !== "DPRO_SHOP" && sender.endsWith("@dpro-shop.com");
+  }
+
+  function emailFromDisplayValue(r = state.readiness || {}, dp = state.deploy || {}) {
+    return legacyDproShopSenderForOtherTenant(r, dp) ? "" : String(dp?.web_email_from_address || "").trim();
+  }
+
+  function emailFromValueForSave(r, current, input) {
+    if (!r?.email_reply_enabled) return null;
+    const typed = String(input?.value || "").trim().toLowerCase();
+    if (typed) return typed;
+    const masked = input?.dataset?.legacyDproShopSenderMasked === "true";
+    if (masked) return String(current?.web_email_from_address || "").trim().toLowerCase() || null;
+    return null;
+  }
+
   function effectiveOrigins() {
     const override = Array.isArray(state.deploy?.allowed_origins_override) ? state.deploy.allowed_origins_override.filter(Boolean) : [];
     const auto = Array.isArray(state.readiness?.allowed_origins_candidates) ? state.readiness.allowed_origins_candidates.filter(Boolean) : [];
@@ -145,8 +164,7 @@
       if (fs.mailDeliveryMethod === "CUSTOM_DOMAIN") {
         if (!emailOk(dp.web_email_from_address)) missing.push("WEB_EMAIL_FROM_ADDRESS");
         if (!dp.web_email_inbound_enabled) missing.push("WEB_EMAIL_INBOUND_ENABLED");
-        const sender = String(dp.web_email_from_address || "").toLowerCase();
-        if (r.tenant_code !== "DPRO_SHOP" && sender.endsWith("@dpro-shop.com")) missing.push("契約店舗固有の送信ドメイン");
+        if (legacyDproShopSenderForOtherTenant(r, dp)) missing.push("契約店舗固有の送信ドメイン");
       }
       if (fs.gmailSentCopy && !emailOk(fs.archiveEmail)) missing.push("Gmail送信控え先メール");
     }
@@ -183,6 +201,8 @@
     const autoHosts = urlHostnames(origins);
     const badge = detail.ready ? ["R2 READY", "green"] : [`HOLD ${detail.missing.length}件`, "amber"];
     const mailDisabled = !emailEnabled || !canWrite();
+    const legacySenderMasked = legacyDproShopSenderForOtherTenant(r, dp);
+    const emailFromDisplay = emailFromDisplayValue(r, dp);
 
     return `
       <section id="contactMultiStoreR2" class="contact-ms-r2" data-project-id="${esc(r.project_id || currentProjectId())}">
@@ -224,7 +244,7 @@
               <option value="R3_MAIL_GATEWAY" ${fs.mailDeliveryMethod === "R3_MAIL_GATEWAY" ? "selected" : ""}>DPRO共通MAIL GATEWAY（R3待ち）</option>
               ${!emailEnabled ? `<option value="NONE" selected>メール返信なし</option>` : ""}
             </select><div class="contact-ms-r2-help">R3共通MAIL GATEWAYはまだDeploy対象にしません。今R2で進める場合は店舗独自ドメイン方式です。</div></div>
-            <div class="contact-ms-r2-field"><label>WEB_EMAIL_FROM_ADDRESS</label><input id="msR2EmailFrom" value="${esc(dp.web_email_from_address || "")}" placeholder="reply@example.jp" ${mailDisabled ? "disabled" : ""}></div>
+            <div class="contact-ms-r2-field"><label>WEB_EMAIL_FROM_ADDRESS</label><input id="msR2EmailFrom" value="${esc(emailFromDisplay)}" data-legacy-dpro-shop-sender-masked="${legacySenderMasked ? "true" : "false"}" placeholder="reply@example.jp" ${mailDisabled ? "disabled" : ""}>${legacySenderMasked ? `<div class="contact-ms-r2-help">旧DPRO SHOP用の送信元は安全のため非表示です。表示を隠すだけでDB値は変更しません。店舗固有アドレスを入力した時だけ更新します。</div>` : ""}</div>
             <div class="contact-ms-r2-field"><label>WEB_EMAIL_FROM_NAME</label><input id="msR2EmailName" value="${esc(dp.web_email_from_name || r.client_name || "")}" ${mailDisabled ? "disabled" : ""}></div>
             <div class="contact-ms-r2-field"><label>受信メールをGmail等へ転送</label><select id="msR2Inbound" ${mailDisabled ? "disabled" : ""}><option value="false" ${dp.web_email_inbound_enabled ? "" : "selected"}>OFF</option><option value="true" ${dp.web_email_inbound_enabled ? "selected" : ""}>ON</option></select></div>
             <div class="contact-ms-r2-field"><label>WEB_EMAIL_FORWARD_TO</label><input id="msR2ForwardTo" value="${esc(dp.web_email_forward_to || "")}" placeholder="owner@example.jp" ${mailDisabled ? "disabled" : ""}></div>
@@ -277,6 +297,7 @@
     const manualHosts = unique(csv($("msR2TurnstileHosts")?.value));
     const publishableKey = $("msR2PublishableKey")?.value.trim() || null;
     if (publishableKey?.startsWith("sb_secret_") || publishableKey?.startsWith("service_role")) throw new Error("SUPABASE_SECRET_KEY / service_roleを入力しないでください。");
+    const emailFromAddress = emailFromValueForSave(r, current, $("msR2EmailFrom"));
     return {
       project_id: r.project_id || currentProjectId(),
       system_instance_id: r.system_instance_id || null,
@@ -285,7 +306,7 @@
       allowed_origins_override: overrideOrigins,
       web_turnstile_site_key: r.web_enabled ? ($("msR2TurnstileSite")?.value.trim() || null) : null,
       web_turnstile_hostnames: r.web_enabled ? (manualHosts.length ? manualHosts : urlHostnames(origins)) : [],
-      web_email_from_address: r.email_reply_enabled ? ($("msR2EmailFrom")?.value.trim().toLowerCase() || null) : null,
+      web_email_from_address: emailFromAddress,
       web_email_from_name: r.email_reply_enabled ? ($("msR2EmailName")?.value.trim() || r.client_name || null) : null,
       web_email_inbound_enabled: r.email_reply_enabled ? ($("msR2Inbound")?.value === "true") : false,
       web_email_forward_to: r.email_reply_enabled ? ($("msR2ForwardTo")?.value.trim().toLowerCase() || null) : null,
