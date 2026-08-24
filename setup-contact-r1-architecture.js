@@ -1,12 +1,12 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CONTACT-MULTI-STORE-R1-20260824";
+  const BUILD = "DPRO-CONTACT-MULTI-STORE-R1.1-20260824";
   const ARCH_VERSION = "DPRO-CONTACT-MULTI-STORE-ARCHITECTURE-V1.0";
-  const PACKAGE_VERSION = "DPRO-CONTACT-ONBOARDING-R1-MULTI-STORE-20260824";
-  const WORKER_VERSION = "DPRO-CONTACT-1-WORKER-20260824-GMAIL-SENT-COPY-R7-STAGED";
-  const WORKER_ASSET = "./contact-onboarding-r1-worker-r7.js?v=DPRO-CONTACT-R7-20260824";
-  const WORKER_SHA256 = "5cb3e545c952194aefab6b49ddc5bfd081755cc71f6ba8aad2378fb0f6d3ba34";
+  const PACKAGE_VERSION = "DPRO-CONTACT-ONBOARDING-R1-MULTI-STORE-V1.1-20260824";
+  const WORKER_VERSION = "DPRO-CONTACT-1-WORKER-20260824-MULTI-STORE-R7.1-STAGED";
+  const WORKER_ASSET = "./contact-onboarding-r1-worker-r7-multistore.js?v=DPRO-CONTACT-MULTI-STORE-R7.1-20260824";
+  const WORKER_SHA256 = "2a3cb6ebd68e7f19ddd6f0043e5853921bf6d9a5f0345c1754834da5629fbe19";
   const DB_VERSION = "DPRO-CONTACT-1-DB-20260814-WEB-R1";
   const ATTACHMENT_DB_VERSION = "DPRO-CONTACT-ATTACHMENTS-DB-20260815-R1";
   const DESIGN_VERSION = "DPRO-CONTACT-1.0-DESIGN-20260808";
@@ -194,7 +194,7 @@
       <div id="contactArchitectureR1" class="contact-arch-r1">
         <div class="contact-arch-r1-head">
           <div>
-            <h4>契約店舗展開 V1.0</h4>
+            <h4>契約店舗展開 V1.1</h4>
             <p>CONTACTは共通MASTER。店舗ごとのCONTACT専用GitHub Repoは作らず、既存Repoを再利用します。</p>
           </div>
           <span class="contact-arch-r1-badge">ARCHITECTURE LOCK</span>
@@ -224,12 +224,12 @@
         </div>
         <div class="contact-arch-r1-package">
           <div>
-            <strong>V1.0 CONTACT導入ZIP</strong>
+            <strong>V1.1 CONTACT導入ZIP</strong>
             <p>R7 Worker・店舗別wrangler設定・Profile・DB確認・R1安全CMDを生成。Cloudflare DeployはR1では実行しません。</p>
           </div>
-          ${canWrite() && state.row.contact_enabled ? `<button id="contactArchPackage" class="btn secondary" type="button">V1.0 ZIP生成</button>` : ""}
+          ${canWrite() && state.row.contact_enabled ? `<button id="contactArchPackage" class="btn secondary" type="button">V1.1 ZIP生成</button>` : ""}
         </div>
-        <div class="contact-arch-r1-warn">R2 / R3の旧20260815自動導入フローは、このV1.0 R1のQA完了まで実行しないでください。R2は次フェーズでR7基準へ更新します。</div>
+        <div class="contact-arch-r1-warn">R2 / R3の旧20260815自動導入フローは、このV1.1 R1のQA完了まで実行しないでください。R2は次フェーズでR7基準へ更新します。</div>
       </div>`;
     target.insertAdjacentHTML("beforebegin", html);
     $("contactArchGmailCopy")?.addEventListener("change", () => {
@@ -273,7 +273,7 @@
       if (error) throw error;
       state.row = data;
       renderExtension();
-      notify("CONTACT V1.0拡張設定を保存しました。");
+      notify("CONTACT V1.1拡張設定を保存しました。");
     } catch (error) {
       console.error(BUILD, error);
       notify(error.message || "拡張設定を保存できませんでした。", true);
@@ -315,6 +315,7 @@
       generated_at: new Date().toISOString(),
       source_worker_version: WORKER_VERSION,
       source_worker_sha256: WORKER_SHA256,
+      source_worker_policy: "MULTI_STORE_GENERIC_NO_DPRO_SHOP_RUNTIME_DEFAULTS",
       database_expected: DB_VERSION,
       attachment_db_extension: ATTACHMENT_DB_VERSION,
       design_version: DESIGN_VERSION,
@@ -426,7 +427,7 @@
   }
 
   function dbCheckSql(p) {
-    return `-- DPRO CONTACT V1.0 / READ-ONLY DB CHECK
+    return `-- DPRO CONTACT V1.1 / READ-ONLY DB CHECK
 -- Tenant: ${p.contact.tenant_code}
 -- Expected DB: ${DB_VERSION}
 -- ADDITIVE SETUP PRECHECK ONLY. No write operation.
@@ -448,7 +449,7 @@ where module_code = 'DPRO_CONTACT';
 
   function startHere(p) {
     return [
-      "DPRO CONTACT / 契約店舗導入パッケージ R1 V1.0",
+      "DPRO CONTACT / 契約店舗導入パッケージ R1 V1.1",
       `PACKAGE: ${PACKAGE_VERSION}`,
       `ARCHITECTURE: ${ARCH_VERSION}`,
       `WORKER: ${WORKER_VERSION}`,
@@ -478,7 +479,7 @@ where module_code = 'DPRO_CONTACT';
       ? p.r1.missing_non_secret_config.map((x) => `- ${x}`).join("\r\n")
       : "- なし";
     return [
-      "DPRO CONTACT / R1 V1.0 SETUP INFO",
+      "DPRO CONTACT / R1 V1.1 SETUP INFO",
       "",
       `GitHub: 新規CONTACT Repo不要 / 既存店舗Repo再利用`,
       `Cloudflare: CONTACT Workerを店舗ごとに1個`,
@@ -526,7 +527,7 @@ chcp 65001 >nul\r
 title DPRO CONTACT R1 MULTI STORE PACKAGE\r
 echo.\r
 echo ============================================================\r
-echo DPRO CONTACT R1 V1.0 / PREPARE ONLY\r
+echo DPRO CONTACT R1 V1.1 / PREPARE ONLY\r
 echo ============================================================\r
 echo Tenant : ${p.contact.tenant_code}\r
 echo System : ${p.contact.system_code}\r
@@ -611,7 +612,7 @@ exit /b 0\r
   function packageName(p) {
     const tenant = String(p.contact.tenant_code || "TENANT").replace(/[^A-Z0-9_-]+/gi, "_").slice(0, 32);
     const system = String(p.contact.system_code || "DPRO").replace(/[^A-Z0-9_-]+/gi, "_").slice(0, 24);
-    return `DPRO_CONTACT_SETUP_${tenant}_${system}_R1_V1.0_20260824.zip`;
+    return `DPRO_CONTACT_SETUP_${tenant}_${system}_R1_V1.1_20260824.zip`;
   }
 
   async function generatePackage() {
@@ -632,7 +633,7 @@ exit /b 0\r
       if (!response.ok) throw new Error(`R7共通Workerを取得できません。HTTP ${response.status}`);
       const workerBytes = new Uint8Array(await response.arrayBuffer());
       const hash = await sha256Hex(workerBytes);
-      if (hash !== WORKER_SHA256) throw new Error("R7共通Worker SHA256不一致。ZIP生成を停止しました。");
+      if (hash !== WORKER_SHA256) throw new Error("R7.1 Multi-Store共通Worker SHA256不一致。ZIP生成を停止しました。");
       const p = profile();
       const sql = dbCheckSql(p);
       const files = [
@@ -672,11 +673,11 @@ exit /b 0\r
       if (error) throw error;
       state.row = data;
       renderExtension();
-      notify("DPRO CONTACT R1 V1.0セットアップZIPを生成しました。R2には進みません。");
+      notify("DPRO CONTACT R1 V1.1セットアップZIPを生成しました。R2には進みません。");
     } catch (error) {
       console.error(BUILD, error);
-      notify(error.message || "R1 V1.0 ZIPを生成できませんでした。", true);
-      if (btn) { btn.disabled = false; btn.textContent = "V1.0 ZIP生成"; }
+      notify(error.message || "R1 V1.1 ZIPを生成できませんでした。", true);
+      if (btn) { btn.disabled = false; btn.textContent = "V1.1 ZIP生成"; }
     }
   }
 
