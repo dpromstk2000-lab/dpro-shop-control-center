@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#102a23">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <title>DPRO SHOP CONTROL CENTER｜新規顧客セットアップ</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="provision.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="provision.js"></script>
+</head>
+<body>
+  <main class="provision-shell">
+    <header class="provision-head">
+      <div>
+        <p class="eyebrow">CUSTOMER PROVISIONING CENTER R1</p>
+        <h1>新規顧客＋店舗＋0円契約をまとめて登録</h1>
+        <p>契約後のオンボーディング開始に必要な最小台帳を、一度の確定操作で安全に作成します。</p>
+      </div>
+      <div class="provision-links">
+        <a class="btn btn-secondary" href="index.html">統合管理へ戻る</a>
+        <a class="btn btn-secondary" href="delivery.html">制作・納品</a>
+      </div>
+    </header>
+
+    <section id="authNotice" class="panel hidden">
+      <h2>ログインが必要です</h2>
+      <p>CONTROL CENTERへログインし、二段階認証を完了してからこの画面を開いてください。</p>
+      <a class="btn btn-primary" href="index.html">CONTROL CENTERへ</a>
+    </section>
+
+    <section id="loadingPanel" class="panel">
+      <h2>接続確認中</h2>
+      <p id="loadingText">安全なログイン状態とサービス台帳を確認しています…</p>
+    </section>
+
+    <section id="appPanel" class="hidden">
+      <div class="provision-status panel">
+        <div><small>ログイン</small><strong id="staffName">DPROスタッフ</strong></div>
+        <div><small>料金</small><strong>初期 0円 / 月額 0円</strong></div>
+        <div><small>登録状態</small><strong>顧客：オンボーディング</strong></div>
+      </div>
+
+      <form id="provisionForm" class="panel provision-form" novalidate>
+        <div class="panel-head">
+          <div>
+            <h2>1. 顧客・店舗情報</h2>
+            <p>Secret・管理コード・アクセストークンは入力しないでください。</p>
+          </div>
+        </div>
+
+        <div class="form-grid-two">
+          <label class="field"><span>顧客表示名 *</span><input id="displayName" required maxlength="160" placeholder="例：DPRO美容室 天神店"></label>
+          <label class="field"><span>店舗名</span><input id="siteName" maxlength="160" placeholder="空欄なら顧客表示名と同じ"></label>
+          <label class="field"><span>法人名</span><input id="legalName" maxlength="160"></label>
+          <label class="field"><span>屋号</span><input id="tradeName" maxlength="160"></label>
+          <label class="field"><span>連絡用メール</span><input id="mainEmail" type="email" autocomplete="email"></label>
+          <label class="field"><span>連絡用電話</span><input id="mainPhone" type="tel" autocomplete="tel"></label>
+          <label class="field"><span>契約名</span><input id="contractName" maxlength="160" placeholder="空欄なら「顧客名 0円プラン」"></label>
+          <label class="field"><span>開始日 *</span><input id="startsOn" type="date" required></label>
+        </div>
+
+        <div class="panel-head services-head">
+          <div>
+            <h2>2. 0円で開始するサービス</h2>
+            <p>料金はすべて0円固定です。製品・本番環境はこの後の制作・納品工程で紐付けます。</p>
+          </div>
+        </div>
+        <div id="serviceGrid" class="service-grid"></div>
+
+        <div class="zero-yen-box">
+          <span>初期費用 <strong>0円</strong></span>
+          <span>月額費用 <strong>0円</strong></span>
+          <span>課金値は画面から変更できません</span>
+        </div>
+
+        <div id="formMessage" class="form-message" role="alert"></div>
+
+        <div class="provision-actions">
+          <button id="previewButton" class="btn btn-secondary" type="button">事前確認</button>
+          <button id="createButton" class="btn btn-primary" type="submit" disabled>0円契約で登録</button>
+        </div>
+      </form>
+
+      <section id="previewPanel" class="panel hidden">
+        <div class="panel-head"><div><h2>事前確認結果</h2><p>まだ登録はされていません。</p></div><span class="pill green">DRY RUN PASS</span></div>
+        <div id="previewContent" class="preview-grid"></div>
+      </section>
+
+      <section id="successPanel" class="panel hidden">
+        <div class="panel-head"><div><h2>登録完了</h2><p>顧客・店舗・契約・契約サービスを同一トランザクションで作成しました。</p></div><span class="pill green">COMPLETE</span></div>
+        <div id="successContent" class="preview-grid"></div>
+        <div class="provision-actions">
+          <a class="btn btn-primary" href="delivery.html">次：制作・納品を開く</a>
+          <a class="btn btn-secondary" href="index.html">顧客台帳を確認</a>
+          <button id="resetButton" class="btn btn-secondary" type="button">続けて別の顧客を登録</button>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
