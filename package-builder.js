@@ -45,18 +45,33 @@
     state.projects=p.data||[];state.spec=s.data;
     if(!state.spec)throw new Error("GYM Package Specがありません。");
     $("shortHash").textContent=`${state.spec.source_sha256.slice(0,12)}…${state.spec.source_sha256.slice(-8)}`;
-    $("projectSelect").innerHTML=state.projects.map(x=>`<option value="${esc(x.id)}">${esc(x.client_name)}｜${esc(x.project_code)}</option>`).join("");
+    const sourceOnly=`<option value="__SOURCE_ONLY__">Adapter QA（顧客案件なし / source-only）</option>`;
+    const projects=state.projects.map(x=>`<option value="${esc(x.id)}">${esc(x.client_name)}｜${esc(x.project_code)}</option>`).join("");
+    $("projectSelect").innerHTML=state.projects.length?projects+sourceOnly:sourceOnly;
     renderProject();renderSpec();
   }
 
+  function isSourceOnly(){return $("projectSelect").value==="__SOURCE_ONLY__";}
   function selected(){return state.projects.find(x=>x.id===$("projectSelect").value)||null;}
+  function rpcArgs(dryRun){
+    return isSourceOnly()
+      ? {p_system_code:"GYM",p_dry_run:dryRun}
+      : {p_project_id:selected()?.id,p_dry_run:dryRun};
+  }
   function renderProject(){
     const p=selected();
     state.preview=null;$("buildButton").disabled=true;$("result").innerHTML="";message("");
+    if(isSourceOnly()){
+      $("projectDetail").innerHTML=[
+        ["対象","Adapter QA"],["顧客","なし"],["案件コード","ADAPTER-QA-SOURCE-ONLY"],["build scope","source_only"],
+        ["system_code","GYM"],["本番Deploy","禁止"],["用途","原本・Cloudflare設定の事前検証"],["顧客データ作成","なし"]
+      ].map(x=>item(...x)).join("");
+      return;
+    }
     $("projectDetail").innerHTML=p?[
       ["顧客",p.client_name],["案件",p.project_name],["案件コード",p.project_code],["状態",p.status],
       ["system_code",p.product_system_code],["STANDARD",p.standard_version||"—"],["更新",p.updated_at],["Project ID",p.id]
-    ].map(x=>item(...x)).join(""):"<p>GYM案件がありません。</p>";
+    ].map(x=>item(...x)).join(""):"<p>対象を選択してください。</p>";
   }
   function renderSpec(){
     const s=state.spec;
@@ -68,13 +83,13 @@
   }
 
   async function preview(){
-    const p=selected();if(!p)return message("GYM案件を選択してください。",true);
+    const p=selected();if(!isSourceOnly()&&!p)return message("GYM案件またはAdapter QAを選択してください。",true);
     $("previewButton").disabled=true;message("DRY RUN確認中…");
     try{
-      const {data,error}=await state.supabase.rpc("cc_prepare_package_build",{p_project_id:p.id,p_dry_run:true});if(error)throw error;
+      const {data,error}=await state.supabase.rpc("cc_prepare_package_build",rpcArgs(true));if(error)throw error;
       state.preview=data;
       $("result").innerHTML=[
-        ["結果",data.ok?"PASS":"FAIL"],["Package",data.packageName],["Fingerprint",data.packageFingerprint],
+        ["結果",data.ok?"PASS":"FAIL"],["Build scope",data.buildScope||"project"],["Package",data.packageName],["Fingerprint",data.packageFingerprint],
         ["Source SHA256",data.sourceSha256],["Worker",data.workerName],["実行ポリシー",data.executionPolicy],
         ["本番Deploy",data.productionDeployAllowed?"許可":"禁止"],["次工程",data.next]
       ].map(x=>item(...x)).join("");
@@ -156,7 +171,7 @@ exit /b 0
   }
 
   async function build(){
-    const p=selected();if(!p||!state.preview?.ok)return message("先にDRY RUNをPASSさせてください。",true);
+    const p=selected();if((!isSourceOnly()&&!p)||!state.preview?.ok)return message("先にDRY RUNをPASSさせてください。",true);
     $("buildButton").disabled=true;message("GitHub原本取得・SHA256照合中…");
     try{
       const d=state.preview;
@@ -166,11 +181,12 @@ exit /b 0
       const actual=await sha256Text(worker);
       if(actual!==d.sourceSha256)throw new Error(`SHA256不一致。生成を停止しました。 expected=${d.sourceSha256} actual=${actual}`);
 
-      const {data:logged,error}=await state.supabase.rpc("cc_prepare_package_build",{p_project_id:p.id,p_dry_run:false});if(error)throw error;
+      const {data:logged,error}=await state.supabase.rpc("cc_prepare_package_build",rpcArgs(false));if(error)throw error;
       const manifest={
         packageType:"DPRO_GUARDED_WORKER_CANDIDATE",
         packageVersion:logged.packageVersion,
         buildCode:logged.buildCode,
+        buildScope:logged.buildScope||"project",
         projectCode:logged.projectCode,
         systemCode:logged.systemCode,
         workerName:logged.workerName,
@@ -184,10 +200,12 @@ exit /b 0
       };
       const start=`DPRO GYM PACKAGE BUILDER R1
 Build: ${logged.buildCode}
+Build scope: ${logged.buildScope||"project"}
 Project: ${logged.projectCode}
 Worker: ${logged.workerName}
 
 This package is BUILD/PREFLIGHT ONLY.
+If Build scope is source_only, no customer/delivery project was created or modified.
 It does NOT contain Cloudflare secret values.
 It does NOT deploy or upload a Worker version.
 
