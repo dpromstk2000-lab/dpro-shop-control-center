@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#102a23">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <title>DPRO SHOP CONTROL CENTER｜Deployment Center</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="deploy-center.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="deploy-center.js"></script>
+</head>
+<body>
+<main class="deploy-shell">
+  <header class="deploy-head">
+    <div>
+      <p class="eyebrow">DEPLOYMENT CENTER R1</p>
+      <h1>51システム共通 Deploy 準備センター</h1>
+      <p>1案件ずつpreflightし、安全なDeploy Jobを作成します。R1ではここから本番Deployを自動実行しません。</p>
+    </div>
+    <div class="deploy-links">
+      <a class="btn btn-secondary" href="index.html">統合管理へ戻る</a>
+      <a class="btn btn-secondary" href="provision.html">新規顧客セットアップ</a>
+      <a class="btn btn-secondary" href="delivery.html">制作・納品</a>
+    </div>
+  </header>
+
+  <section id="loadingPanel" class="panel"><h2>接続確認中</h2><p id="loadingText">AAL2・制作案件・Deploy Adapterを確認しています…</p></section>
+  <section id="authPanel" class="panel hidden"><h2>権限確認が必要です</h2><p id="authText"></p><a class="btn btn-primary" href="index.html">CONTROL CENTERへ</a></section>
+
+  <section id="appPanel" class="hidden">
+    <div class="deploy-status panel">
+      <div><small>ログイン</small><strong id="staffName">DPROスタッフ</strong></div>
+      <div><small>製品Adapter</small><strong id="adapterCount">—</strong></div>
+      <div><small>本番実行</small><strong>R1では自動実行なし</strong></div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>1. 対象案件を選択</h2><p>制作・納品案件から1件だけ選びます。全店舗一括実行はできません。</p></div>
+      </div>
+      <div class="deploy-filter">
+        <input id="projectSearch" placeholder="顧客名・案件コード・system_codeで検索">
+        <select id="projectSelect"></select>
+      </div>
+      <div id="projectDetail" class="project-detail"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>2. Preflight</h2><p>repository・adapter・実行方式だけを確認します。Secretは扱いません。</p></div>
+      </div>
+      <div class="deploy-actions">
+        <button id="preflightButton" class="btn btn-primary" type="button">DRY RUNを実行</button>
+        <button id="queueButton" class="btn btn-secondary" type="button" disabled>Deploy Jobを作成</button>
+      </div>
+      <div id="message" class="message"></div>
+      <div id="preflightResult" class="result-grid"></div>
+      <div class="safety-note">
+        <strong>重要：</strong> Deploy Job作成は「実行予約台帳」を作るだけです。Cloudflare Deploy・GitHub書換・SQL投入は自動では行いません。
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>最近のDeploy Job</h2><p>監査用の共通キューです。削除はできません。</p></div>
+        <button id="reloadButton" class="btn btn-secondary" type="button">再読込</button>
+      </div>
+      <div id="jobsTable" class="jobs-wrap"></div>
+    </section>
+  </section>
+</main>
+</body>
+</html>
