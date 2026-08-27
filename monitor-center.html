@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#102a23">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <title>DPRO SHOP CONTROL CENTER｜稼働監視センター</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="monitor-center.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="monitor-center.js"></script>
+</head>
+<body>
+<main class="monitor-shell">
+  <header class="monitor-head">
+    <div>
+      <p class="eyebrow">MONITORING CENTER R0</p>
+      <h1>稼働監視センター</h1>
+      <p>MASTER 51製品と、実際に導入済みのシステム・Worker・Health履歴を分離して一覧化します。R0は読取専用です。</p>
+    </div>
+    <div class="monitor-links">
+      <a class="btn btn-secondary" href="index.html">統合管理へ戻る</a>
+      <a class="btn btn-secondary" href="deploy-center.html">Deployment Center</a>
+      <a class="btn btn-secondary" href="provision.html">Provisioning</a>
+    </div>
+  </header>
+
+  <section id="loadingPanel" class="panel">
+    <h2>接続確認中</h2>
+    <p id="loadingText">AAL2・MASTER台帳・監視VIEWを確認しています…</p>
+  </section>
+
+  <section id="authPanel" class="panel hidden">
+    <h2>権限確認が必要です</h2>
+    <p id="authText"></p>
+    <a class="btn btn-primary" href="index.html">CONTROL CENTERへ</a>
+  </section>
+
+  <section id="appPanel" class="hidden">
+    <div class="r0-banner">
+      <strong>R0 READ ONLY</strong>
+      <span>MASTER 51製品 ＝ 51環境が本番稼働中、ではありません。実導入は別集計です。</span>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>現在の監視サマリー</h2>
+          <p>MASTER、実導入、Worker、監視履歴を同じ画面で確認します。</p>
+        </div>
+        <div class="summary-actions">
+          <span id="staffName" class="pill">DPROスタッフ</span>
+          <button id="reloadButton" class="btn btn-secondary" type="button">再読込</button>
+        </div>
+      </div>
+      <div id="summaryGrid" class="summary-grid"></div>
+      <p id="latestCheckNote" class="latest-note"></p>
+    </section>
+
+    <section class="panel finding-panel">
+      <div class="panel-head">
+        <div>
+          <h2>R0監査結果</h2>
+          <p>既存DB資産を再利用できているかを自動確認します。</p>
+        </div>
+        <span class="pill green">NO DEPLOY / NO WRITE</span>
+      </div>
+      <div id="qaGrid" class="qa-grid"></div>
+      <div id="monitorFinding" class="finding-note"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>1. 全51システム MASTER台帳</h2>
+          <p>Product Readyの正式状態とDeploy分類、実導入件数を並べます。</p>
+        </div>
+        <span id="masterCount" class="pill">51</span>
+      </div>
+      <div class="filters">
+        <input id="masterSearch" type="search" placeholder="製品名・system_code・カテゴリで検索">
+        <select id="masterStateFilter">
+          <option value="">全状態</option>
+          <option value="operational">実導入・監視正常</option>
+          <option value="attention">実導入・要確認</option>
+          <option value="not_deployed">未導入</option>
+        </select>
+      </div>
+      <div id="masterTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>2. 実導入インスタンス</h2>
+          <p>顧客・店舗へ実際に登録されたシステムだけを表示します。デモはデモとして明示します。</p>
+        </div>
+        <span id="instanceCount" class="pill">0</span>
+      </div>
+      <div id="instanceTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>3. Worker基盤</h2>
+          <p>登録Workerの監視状態・Version一致・最終HTTP確認を表示します。</p>
+        </div>
+        <span id="workerCount" class="pill">0</span>
+      </div>
+      <div id="workerTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>4. 最新監視履歴</h2>
+          <p>既存Monitor APIとHealth履歴から、対象ごとの最新1件だけを表示します。</p>
+        </div>
+        <span id="checkCount" class="pill">0</span>
+      </div>
+      <div id="checkTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel next-panel">
+      <h2>R1で行うこと</h2>
+      <p>R0では監視データを「見える化」するだけです。R1では既存の <strong>dpro-shop-site-monitor-api</strong> を壊さず、登録済み <code>cc_system_instances / cc_workers</code> の <code>monitoring_enabled</code> 対象を定期Health確認できるよう拡張します。</p>
+      <p>R1でも全51製品を勝手に本番監視対象へ登録しません。Provisioningで実導入されたインスタンスを起点にします。</p>
+    </section>
+  </section>
+</main>
+</body>
+</html>
