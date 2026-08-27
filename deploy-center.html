@@ -17,9 +17,9 @@
 <main class="deploy-shell">
   <header class="deploy-head">
     <div>
-      <p class="eyebrow">DEPLOYMENT CENTER R1</p>
-      <h1>51システム共通 Deploy 準備センター</h1>
-      <p>1案件ずつpreflightし、安全なDeploy Jobを作成します。R1ではここから本番Deployを自動実行しません。</p>
+      <p class="eyebrow">DEPLOYMENT CENTER R2</p>
+      <h1>51システム共通 Deploy 判定・準備センター</h1>
+      <p>51製品の自動化可否を証拠ベースで判定し、許可された案件だけpreflightします。R2でも本番Deployは自動実行しません。</p>
     </div>
     <div class="deploy-links">
       <a class="btn btn-secondary" href="index.html">統合管理へ戻る</a>
@@ -37,6 +37,22 @@
       <div><small>製品Adapter</small><strong id="adapterCount">—</strong></div>
       <div><small>本番実行</small><strong>R1では自動実行なし</strong></div>
     </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>51製品 自動化判定 R2</h2>
+          <p>Product Readyを再オープンせず、Deployに必要な実行証拠だけを別レイヤーで判定しています。</p>
+        </div>
+        <span class="pill green">SAFE CLASSIFICATION</span>
+      </div>
+      <div id="automationSummary" class="automation-summary"></div>
+      <div class="readiness-note">
+        <strong>ONE-CMD READY</strong> は「本番実行に必要な実行経路まで証明済み」のみ。
+        Worker名やURLがあるだけではREADYに昇格しません。
+      </div>
+      <div id="adapterReadinessTable" class="jobs-wrap readiness-table"></div>
+    </section>
 
     <section class="panel">
       <div class="panel-head">

@@ -38,14 +38,55 @@
   async function load(){
     const [p,a,j]=await Promise.all([
       state.supabase.from("cc_v_delivery_project_overview_v2").select("*").order("updated_at",{ascending:false}),
-      state.supabase.from("cc_deployment_adapters").select("system_code,product_code,product_name,adapter_key,execution_mode,readiness_status,source_repository,default_worker_name").order("product_name"),
+      state.supabase.from("cc_v_deployment_adapter_readiness_r2").select("*").order("automation_sort").order("product_number",{ascending:true,nullsFirst:false}),
       state.supabase.from("cc_v_deployment_job_overview").select("*").order("created_at",{ascending:false}).limit(50)
     ]);
     for(const r of [p,a,j])if(r.error)throw r.error;
     state.projects=(p.data||[]).filter(x=>x.effective_system_code||x.product_system_code||x.system_code);
     state.adapters=a.data||[]; state.jobs=j.data||[];
-    $("adapterCount").textContent=`${state.adapters.filter(x=>x.product_code).length}/51 + CONTACT`;
+    const products=state.adapters.filter(x=>x.product_code);
+    const ready=products.filter(x=>x.automation_class==="one_cmd_ready").length;
+    const buildable=products.filter(x=>x.automation_class==="package_buildable").length;
+    $("adapterCount").textContent=`READY ${ready}/51 / 構築可 ${buildable}`;
+    renderReadiness();
     filterProjects(); renderJobs();
+  }
+
+  const classLabels={
+    one_cmd_ready:"ONE-CMD READY",
+    package_buildable:"PACKAGE BUILDABLE",
+    manual_assisted:"手動支援",
+    evidence_required:"証拠不足"
+  };
+  const classCss={
+    one_cmd_ready:"class-ready",
+    package_buildable:"class-buildable",
+    manual_assisted:"class-manual",
+    evidence_required:"class-evidence"
+  };
+  function renderReadiness(){
+    const products=state.adapters.filter(x=>x.product_code);
+    const count=k=>products.filter(x=>x.automation_class===k).length;
+    const cards=[
+      ["ONE-CMD READY",count("one_cmd_ready"),"実行経路まで証明済み"],
+      ["PACKAGE BUILDABLE",count("package_buildable"),"安全パッケージ構築可能"],
+      ["手動支援",count("manual_assisted"),"追加の対象・設定確認が必要"],
+      ["証拠不足",count("evidence_required"),"Deploy Jobを禁止"]
+    ];
+    $("automationSummary").innerHTML=cards.map(([label,value,note])=>`<article class="automation-card"><small>${esc(label)}</small><strong>${esc(value)}</strong><span>${esc(note)}</span></article>`).join("");
+    const contact=state.adapters.find(x=>x.system_code==="CONTACT");
+    const rows=products.map(a=>`<tr>
+      <td>${esc(a.product_number??"—")}</td>
+      <td><strong>${esc(a.product_name)}</strong><br><small>${esc(a.system_code)}</small></td>
+      <td class="${esc(classCss[a.automation_class]||"")}">${esc(classLabels[a.automation_class]||a.automation_class)}</td>
+      <td>${a.supports_deploy?"Job作成可":"停止"}</td>
+      <td>${esc(a.execution_mode)}</td>
+      <td>${esc(a.default_worker_name||"—")}</td>
+      <td>${esc(a.source_repository||"—")}</td>
+      <td>${esc(a.assessment_detail||"—")}</td>
+    </tr>`).join("");
+    const contactNote=contact?`<p class="readiness-note">別系統の既存実装：CONTACT は <strong>${esc(classLabels[contact.automation_class]||contact.automation_class)}</strong>（${esc(contact.adapter_key)}）。既存R6-PROD本体は変更していません。</p>`:"";
+    $("adapterReadinessTable").innerHTML=contactNote+`<table><thead><tr><th>#</th><th>製品</th><th>判定</th><th>Deploy Job</th><th>方式</th><th>Worker</th><th>Repository</th><th>判定根拠</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   function systemCode(p){return String(p?.effective_system_code||p?.product_system_code||p?.system_code||"").toUpperCase();}
@@ -66,7 +107,9 @@
     $("projectDetail").innerHTML=[
       ["顧客",p.client_name],["案件",p.project_name],["案件コード",p.project_code],
       ["system_code",systemCode(p)],["案件状態",p.status],["STANDARD",p.standard_version||"—"],
-      ["Adapter",a?.adapter_key||"未登録"],["方式",a?.execution_mode||"—"],["Repository",a?.source_repository||"—"]
+      ["Adapter",a?.adapter_key||"未登録"],["自動化判定",classLabels[a?.automation_class]||a?.automation_class||"未判定"],
+      ["Deploy Job",a?.supports_deploy?"作成可":"停止"],["方式",a?.execution_mode||"—"],["Repository",a?.source_repository||"—"],
+      ["判定根拠",a?.assessment_detail||"—"]
     ].map(x=>item(...x)).join("");
   }
 
@@ -82,7 +125,7 @@
       if(dryRun){
         state.preview=data;
         $("queueButton").disabled=!data?.ok;
-        msg(data?.ok?"DRY RUN PASS。Deploy Jobを作成できます。":"Preflightで要確認項目があります。",!data?.ok);
+        msg(data?.ok?"DRY RUN PASS。Deploy Jobを作成できます。":(data?.reason==="deploy_not_supported_by_assessment"?"この製品は現在の証拠判定ではDeploy Job作成を停止しています。":"Preflightで要確認項目があります。"),!data?.ok);
       }else{
         state.preview=null;$("queueButton").disabled=true;
         msg(`Deploy Job ${data.jobCode} を作成しました。本番Deployはまだ実行されていません。`);
@@ -94,7 +137,7 @@
 
   function renderResult(d){
     if(!d){$("preflightResult").innerHTML="";return;}
-    const rows=[["結果",d.ok?"PASS":"要確認"],["system_code",d.systemCode],["Adapter",d.adapterKey],["Adapter状態",d.adapterStatus],["実行方式",d.executionMode],["Repository",d.repository],["Worker",d.workerName||"未確定"],["次工程",d.next],["理由",d.reason||"なし"]];
+    const rows=[["結果",d.ok?"PASS":"要確認"],["system_code",d.systemCode],["Adapter",d.adapterKey],["自動化判定",classLabels[d.automationClass]||d.automationClass||"未判定"],["Adapter状態",d.adapterStatus],["実行方式",d.executionMode],["Repository",d.repository],["Worker",d.workerName||"未確定"],["次工程",d.next],["停止理由",d.reason||"なし"],["判定根拠",d.assessmentDetail||"—"]];
     $("preflightResult").innerHTML=rows.map(([k,v])=>`<div class="result-item"><small>${esc(k)}</small><strong>${esc(v??"—")}</strong></div>`).join("");
   }
 
