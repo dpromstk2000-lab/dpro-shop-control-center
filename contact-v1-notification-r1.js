@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R1-20260830";
+  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R1.1-20260830-PC-HOTFIX";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -263,8 +263,22 @@
       (pending ? pendingRows : otherRows).push(row);
     });
 
-    // Pending customer replies always float to the top without replacing core event handlers.
-    [...pendingRows, ...otherRows].forEach((row) => list.appendChild(row));
+    // Pending customer replies float to the top, but only mutate the DOM when
+    // the order actually needs to change. Re-appending every row on every sync
+    // can race with the core click handler and also self-trigger MutationObserver.
+    const desiredRows = [...pendingRows, ...otherRows];
+    const currentRows = Array.from(list.querySelectorAll(".dc-thread-item"));
+    const orderChanged =
+      desiredRows.length === currentRows.length &&
+      desiredRows.some((row, index) => row !== currentRows[index]);
+
+    if (orderChanged) {
+      state.observer?.disconnect();
+      desiredRows.forEach((row) => list.appendChild(row));
+      if (state.observer) {
+        state.observer.observe(list, { childList: true, subtree: true });
+      }
+    }
   }
 
   const syncAll = async () => {
