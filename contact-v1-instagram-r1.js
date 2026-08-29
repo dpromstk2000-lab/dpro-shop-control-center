@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.2-20260829";
+  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.3-USERNAME-20260829";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -23,6 +23,9 @@
     if (raw === "web") return "web";
     return "line";
   };
+
+  const instagramUsername = (thread) =>
+    text(thread?.instagramUsername || thread?.instagram_username).replace(/^@+/, "");
 
   const accessToken = () => {
     const key = text(CONFIG.auth?.sessionStorageKey, "dpro-control-center-auth-v1");
@@ -90,6 +93,20 @@
         badge.classList.remove("dc-channel-line");
         badge.classList.add("dc-channel-web");
       }
+
+      const username = instagramUsername(thread);
+      let usernameRow = row.querySelector(".dc-instagram-username-row");
+      if (username) {
+        if (!usernameRow) {
+          usernameRow = document.createElement("span");
+          usernameRow.className = "dc-instagram-username-row";
+          const nameRow = row.querySelector(".dc-thread-name");
+          nameRow?.insertAdjacentElement("afterend", usernameRow);
+        }
+        usernameRow.textContent = `@${username}`;
+      } else if (usernameRow) {
+        usernameRow.remove();
+      }
     });
   };
 
@@ -118,9 +135,25 @@
     if (!thread) return;
 
     const type = channelType(thread);
+    const existingUsername = document.querySelector(".dc-instagram-username-head");
     if (type !== "instagram") {
+      existingUsername?.remove();
       restoreNonInstagramComposer();
       return;
+    }
+
+    const username = instagramUsername(thread);
+    const conversationName = document.getElementById("conversationName");
+    let usernameHead = document.querySelector(".dc-instagram-username-head");
+    if (username && conversationName) {
+      if (!usernameHead) {
+        usernameHead = document.createElement("small");
+        usernameHead.className = "dc-instagram-username-head";
+        conversationName.insertAdjacentElement("afterend", usernameHead);
+      }
+      usernameHead.textContent = `@${username}`;
+    } else if (usernameHead) {
+      usernameHead.remove();
     }
 
     const meta = document.getElementById("conversationMeta");
@@ -182,6 +215,17 @@
     });
   };
 
+  const installUsernameStyle = () => {
+    if (document.getElementById("dpro-instagram-username-style")) return;
+    const style = document.createElement("style");
+    style.id = "dpro-instagram-username-style";
+    style.textContent = `
+      .dc-instagram-username-row{display:block;margin-top:2px;color:#6f7f79;font-size:9px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .dc-instagram-username-head{display:block!important;margin-top:2px!important;color:#6b4aa0!important;font-size:10px!important;font-weight:800}
+    `;
+    document.head.appendChild(style);
+  };
+
   const boot = async () => {
     let attempts = 0;
     while (!window.DPRO_CONTACT_UI && attempts < 40) {
@@ -190,6 +234,7 @@
     }
     if (!window.DPRO_CONTACT_UI) return;
 
+    installUsernameStyle();
     installEvents();
     await refreshAndSync();
 

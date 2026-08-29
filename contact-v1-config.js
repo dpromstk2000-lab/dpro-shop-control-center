@@ -136,13 +136,13 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
   }
 })();
 
-/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.2 */
+/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.3 username */
 (() => {
   "use strict";
   const install = () => {
     if (document.querySelector('script[data-dpro-instagram-r1-helper]')) return;
     const script = document.createElement("script");
-    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.2-20260829";
+    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.3-USERNAME-20260829";
     script.defer = true;
     script.dataset.dproInstagramR1Helper = "true";
     document.head.appendChild(script);
