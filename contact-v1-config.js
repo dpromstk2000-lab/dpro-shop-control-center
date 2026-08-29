@@ -1,10 +1,10 @@
 /**
- * DPRO CONTACT V1.0 - DPRO SHOP LINE + WEB CONFIG
+ * DPRO CONTACT V1.0 - DPRO SHOP LINE + WEB + INSTAGRAM CONFIG
  * STEP DPRO CONTACT WEB / 2026-08-15
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R5.1-PROD",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1.4-BRANDING-PROD",
 
   enabled: true,
 
@@ -37,10 +37,10 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     brandName: "DPRO SHOP",
     systemName: "CONTROL CENTER / CONTACT V1",
     brandMark: "D",
-    pageTitle: "LINE・WEBの問い合わせを\n一つの顧客対応へ",
-    pageLead: "LINE公式とWEB問い合わせフォームに届いた相談を、同じ顧客対応画面で確認します。",
-    topbarDescription: "LINE・WEB問い合わせを一元確認",
-    channelName: "LINE + WEB Inbox",
+    pageTitle: "LINE・WEB・Instagramの問い合わせを\n一つの顧客対応へ",
+    pageLead: "LINE公式・WEB問い合わせフォーム・Instagram DMに届いた相談を、同じ顧客対応画面で確認します。",
+    topbarDescription: "LINE・WEB・Instagram問い合わせを一元確認",
+    channelName: "LINE + WEB + Instagram Inbox",
     homeUrl: "index.html",
     homeLabel: "CONTROL CENTER",
     loginUrl: "index.html",
@@ -136,13 +136,13 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
   }
 })();
 
-/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.3 username */
+/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.4 branding */
 (() => {
   "use strict";
   const install = () => {
     if (document.querySelector('script[data-dpro-instagram-r1-helper]')) return;
     const script = document.createElement("script");
-    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.3-USERNAME-20260829";
+    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.4-BRANDING-20260829";
     script.defer = true;
     script.dataset.dproInstagramR1Helper = "true";
     document.head.appendChild(script);

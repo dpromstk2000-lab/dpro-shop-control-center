@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.3-USERNAME-20260829";
+  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.4-BRANDING-20260829";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -194,6 +194,11 @@
     sync();
   };
 
+  const installBrandingLabels = () => {
+    const eyebrow = document.querySelector(".dc-eyebrow");
+    if (eyebrow) eyebrow.textContent = "DPRO CONTACT / LINE + WEB + INSTAGRAM";
+  };
+
   const installEvents = () => {
     // Bubble phase only. Core button click runs first; this helper never prevents or stops events.
     document.addEventListener("click", (event) => {
@@ -235,6 +240,7 @@
     if (!window.DPRO_CONTACT_UI) return;
 
     installUsernameStyle();
+    installBrandingLabels();
     installEvents();
     await refreshAndSync();
 
