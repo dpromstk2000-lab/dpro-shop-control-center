@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1.4-BRANDING-PROD",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1.5-BRANDING-FINAL-PROD",
 
   enabled: true,
 
@@ -136,13 +136,13 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
   }
 })();
 
-/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.4 branding */
+/* DPRO CONTACT Instagram R1 display helper loader / safe-no-hook V1.5 branding final */
 (() => {
   "use strict";
   const install = () => {
     if (document.querySelector('script[data-dpro-instagram-r1-helper]')) return;
     const script = document.createElement("script");
-    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.4-BRANDING-20260829";
+    script.src = "contact-v1-instagram-r1.js?v=DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.5-BRANDING-FINAL-20260829";
     script.defer = true;
     script.dataset.dproInstagramR1Helper = "true";
     document.head.appendChild(script);

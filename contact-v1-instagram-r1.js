@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.4-BRANDING-20260829";
+  const VERSION = "DPRO-CONTACT-INSTAGRAM-R1-UI-SAFE-V1.5-BRANDING-FINAL-20260829";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -197,6 +197,17 @@
   const installBrandingLabels = () => {
     const eyebrow = document.querySelector(".dc-eyebrow");
     if (eyebrow) eyebrow.textContent = "DPRO CONTACT / LINE + WEB + INSTAGRAM";
+
+    const emptyChannels = document.querySelector("#emptyConversation > span");
+    if (emptyChannels) {
+      emptyChannels.innerHTML = "LINE<br>WEB<br>IG";
+    }
+
+    const securityNote = document.getElementById("securityNote");
+    if (securityNote) {
+      securityNote.textContent =
+        "LINEユーザーID、WEB問い合わせのメールアドレス、Instagramユーザー情報・表示名・会話本文はWorker側で暗号化して保存します。Secretはブラウザへ配置しません。";
+    }
   };
 
   const installEvents = () => {
