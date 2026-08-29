@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R1.1-20260830-PC-HOTFIX";
+  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R1.2-20260830-BADGE-SYNC";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -11,6 +11,7 @@
     refreshTimer: null,
     observer: null,
     notificationPermissionAsked: false,
+    lastBadgeCount: 0,
     originalTitle: document.title,
   };
 
@@ -143,14 +144,47 @@
   };
 
   const setPageBadge = async (count) => {
+    const n = Math.max(0, Math.floor(num(count, 0)));
+    state.lastBadgeCount = n;
+
+    // Route 1: window Navigator Badging API.
     try {
-      if (count > 0 && "setAppBadge" in navigator) {
-        await navigator.setAppBadge(count);
-      } else if (count <= 0 && "clearAppBadge" in navigator) {
+      if (n > 0 && "setAppBadge" in navigator) {
+        await navigator.setAppBadge(n);
+      } else if (n <= 0 && "clearAppBadge" in navigator) {
         await navigator.clearAppBadge();
       }
     } catch (_) {
-      // Badge support/permission differs by browser. Never block CONTACT.
+      // Keep going: some installed web apps expose the API more reliably
+      // inside the Service Worker than on the page Navigator.
+    }
+
+    // Route 2: explicitly ask the active Service Worker to set the same badge.
+    // The R1 Service Worker already had this receiver, but R1 never sent to it.
+    if (!("serviceWorker" in navigator)) return;
+
+    try {
+      const registration =
+        (await navigator.serviceWorker.getRegistration("./")) ||
+        (await navigator.serviceWorker.ready);
+
+      if (registration?.update) {
+        try { await registration.update(); } catch (_) {}
+      }
+
+      const worker =
+        navigator.serviceWorker.controller ||
+        registration?.active ||
+        registration?.waiting ||
+        registration?.installing;
+
+      worker?.postMessage({
+        type: "DPRO_CONTACT_BADGE",
+        count: n,
+        version: VERSION,
+      });
+    } catch (_) {
+      // Badge is an enhancement; never block CONTACT.
     }
   };
 
@@ -331,7 +365,7 @@
       }
 
       try {
-        await navigator.serviceWorker.register("./contact-v1-sw.js", { scope: "./" });
+        await navigator.serviceWorker.register("./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R1.2-20260830", { scope: "./", updateViaCache: "none" });
         const permission = await Notification.requestPermission();
         syncButtonState();
 
@@ -352,7 +386,7 @@
   const registerServiceWorker = async () => {
     if (!("serviceWorker" in navigator)) return;
     try {
-      await navigator.serviceWorker.register("./contact-v1-sw.js", { scope: "./" });
+      await navigator.serviceWorker.register("./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R1.2-20260830", { scope: "./", updateViaCache: "none" });
     } catch (_) {
       // PWA/notification is an enhancement only.
     }
@@ -408,7 +442,14 @@
     state.refreshTimer = setInterval(refreshAndSync, 30000);
   };
 
+  window.addEventListener("pagehide", () => {
+    // Re-assert the last known count immediately before the installed app
+    // moves to the background/home screen.
+    setPageBadge(state.lastBadgeCount).catch(() => {});
+  });
+
   window.addEventListener("beforeunload", () => {
+    setPageBadge(state.lastBadgeCount).catch(() => {});
     if (state.syncTimer) clearInterval(state.syncTimer);
     if (state.refreshTimer) clearInterval(state.refreshTimer);
     state.observer?.disconnect();

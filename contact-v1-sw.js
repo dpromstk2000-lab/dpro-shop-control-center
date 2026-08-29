@@ -1,4 +1,4 @@
-const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R1-20260830";
+const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R1.2-20260830-BADGE-SYNC";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -22,7 +22,17 @@ async function setBadge(count) {
 self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type !== "DPRO_CONTACT_BADGE") return;
-  event.waitUntil(setBadge(data.count || 0));
+
+  event.waitUntil((async () => {
+    await setBadge(data.count || 0);
+    try {
+      event.source?.postMessage?.({
+        type: "DPRO_CONTACT_BADGE_ACK",
+        count: Number(data.count || 0),
+        version: DPRO_CONTACT_SW_VERSION,
+      });
+    } catch (_) {}
+  })());
 });
 
 self.addEventListener("push", (event) => {

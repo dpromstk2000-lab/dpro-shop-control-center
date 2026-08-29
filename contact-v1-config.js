@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260830-R1.7-REPLY-ALERT-PC-HOTFIX",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260830-R1.8-BADGE-SYNC",
 
   enabled: true,
 
@@ -187,7 +187,7 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
 
   if (!document.querySelector('script[data-dpro-reply-alert-r1]')) {
     const script = document.createElement("script");
-    script.src = "contact-v1-notification-r1.js?v=DPRO-CONTACT-REPLY-ALERT-R1.1-20260830";
+    script.src = "contact-v1-notification-r1.js?v=DPRO-CONTACT-REPLY-ALERT-R1.2-20260830";
     script.defer = true;
     script.dataset.dproReplyAlertR1 = "true";
     document.head.appendChild(script);
