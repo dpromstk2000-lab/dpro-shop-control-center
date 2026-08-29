@@ -4,7 +4,7 @@
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1.5-BRANDING-FINAL-PROD",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260830-R1.6-REPLY-ALERT-PWA-STAGED",
 
   enabled: true,
 
@@ -148,4 +148,48 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     document.head.appendChild(script);
   };
   install();
+})();
+
+/* DPRO CONTACT reply-alert + PWA loader / add-only R1 */
+(() => {
+  "use strict";
+
+  const ensureMeta = (name, content) => {
+    let meta = document.querySelector(`meta[name="${name}"]`);
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = name;
+      document.head.appendChild(meta);
+    }
+    meta.content = content;
+  };
+
+  const ensureLink = (rel, href, attrs = {}) => {
+    let link = document.querySelector(`link[rel="${rel}"][data-dpro-reply-alert-r1]`);
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = rel;
+      link.dataset.dproReplyAlertR1 = "true";
+      document.head.appendChild(link);
+    }
+    link.href = href;
+    Object.entries(attrs).forEach(([key, value]) => link.setAttribute(key, value));
+  };
+
+  ensureMeta("mobile-web-app-capable", "yes");
+  ensureMeta("apple-mobile-web-app-capable", "yes");
+  ensureMeta("apple-mobile-web-app-status-bar-style", "default");
+  ensureMeta("apple-mobile-web-app-title", "DPRO CONTACT");
+
+  ensureLink("manifest", "contact-v1.webmanifest?v=DPRO-CONTACT-PWA-R1-20260830");
+  ensureLink("apple-touch-icon", "dpro-contact-apple-touch-icon.png?v=DPRO-CONTACT-PWA-R1-20260830", { sizes: "180x180" });
+  ensureLink("stylesheet", "contact-v1-notification-r1.css?v=DPRO-CONTACT-REPLY-ALERT-R1-20260830");
+
+  if (!document.querySelector('script[data-dpro-reply-alert-r1]')) {
+    const script = document.createElement("script");
+    script.src = "contact-v1-notification-r1.js?v=DPRO-CONTACT-REPLY-ALERT-R1-20260830";
+    script.defer = true;
+    script.dataset.dproReplyAlertR1 = "true";
+    document.head.appendChild(script);
+  }
 })();

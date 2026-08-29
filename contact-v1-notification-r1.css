@@ -1,0 +1,125 @@
+.dpro-reply-summary{
+  margin: -4px 0 14px;
+  min-height: 42px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:9px 12px;
+  border:1px solid rgba(192,45,45,.22);
+  border-radius:12px;
+  background:#fff8f7;
+  color:#7b2525;
+  font-size:12px;
+}
+.dpro-reply-summary strong{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-size:13px;
+  color:#a51f1f;
+}
+.dpro-reply-summary span:not(.dpro-live-dot){
+  padding:3px 8px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid rgba(192,45,45,.14);
+  color:#6b4a4a;
+}
+.dpro-reply-summary.is-zero{
+  background:#f7fbf9;
+  border-color:rgba(11,95,73,.16);
+  color:#587269;
+}
+.dpro-reply-summary.is-zero strong{
+  color:#0b5f49;
+}
+.dpro-live-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#d52b2b;
+  box-shadow:0 0 0 3px rgba(213,43,43,.12);
+}
+.dpro-reply-summary.is-zero .dpro-live-dot{
+  background:#7d9b91;
+  box-shadow:none;
+}
+.dc-thread-item.dpro-reply-waiting{
+  background:#fff8f7;
+  box-shadow:inset 4px 0 0 #d52b2b;
+}
+.dc-thread-item.dpro-reply-waiting .dc-thread-name strong,
+.dc-thread-item.dpro-reply-waiting .dc-thread-preview{
+  font-weight:800;
+  color:#2e201f;
+}
+.dpro-reply-state{
+  display:inline-flex;
+  align-items:center;
+  min-height:18px;
+  margin-left:6px;
+  padding:1px 6px;
+  border-radius:999px;
+  background:#d52b2b;
+  color:#fff;
+  font-size:9px;
+  line-height:1.2;
+  font-weight:900;
+  white-space:nowrap;
+  letter-spacing:.02em;
+}
+.dpro-reply-filter{
+  display:inline-flex!important;
+  align-items:center;
+  gap:5px;
+  min-height:32px;
+  padding:0 8px;
+  border:1px solid rgba(213,43,43,.22);
+  border-radius:9px;
+  background:#fff8f7;
+  color:#8f2929;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.dpro-reply-filter input{
+  width:15px;
+  height:15px;
+  accent-color:#c62828;
+}
+.dpro-notification-button{
+  margin-left:auto;
+}
+.dpro-notification-button.is-on{
+  border-color:rgba(11,95,73,.24)!important;
+  background:#e9f7f1!important;
+  color:#0b5f49!important;
+  font-weight:900;
+}
+#refreshButton + .dpro-notification-button,
+.dpro-notification-button + #refreshButton{
+  margin-left:8px;
+}
+@media (max-width:760px){
+  .dc-page-head{
+    align-items:flex-start;
+  }
+  .dpro-notification-button{
+    margin-left:0;
+  }
+  .dpro-reply-summary{
+    margin-top:0;
+    gap:6px;
+  }
+  .dpro-reply-state{
+    display:inline-flex;
+    margin-left:4px;
+    font-size:8px;
+  }
+  .dpro-reply-filter{
+    width:100%;
+    justify-content:center;
+    min-height:36px;
+  }
+}
