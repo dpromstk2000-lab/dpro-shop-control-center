@@ -1,10 +1,10 @@
 /**
  * DPRO CONTACT V1.0 - DPRO SHOP LINE + WEB + INSTAGRAM CONFIG
- * Instagram UI compatibility patch / 2026-08-29
+ * Instagram UI compatibility patch V1.1 / 2026-08-29
  * Public configuration only. No secrets.
  */
 window.DPRO_CONTACT_CONFIG = Object.freeze({
-  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1-UI-PROD",
+  version: "DPRO-CONTACT-1-FRONTEND-LINE-WEB-INSTAGRAM-20260829-R1-UI-PROD-V1.1",
 
   enabled: true,
 
@@ -248,10 +248,12 @@ window.DPRO_CONTACT_CONFIG = Object.freeze({
     }
 
     if (sendButton) {
-      sendButton.textContent = "Instagramへ返信";
+      if (sendButton.textContent !== "Instagramへ返信") sendButton.textContent = "Instagramへ返信";
       sendButton.dataset.dproInstagramUi = "1";
     }
-    if (composerHint) composerHint.textContent = "本文をInstagram DMへ送信します";
+    if (composerHint && composerHint.textContent !== "本文をInstagram DMへ送信します") {
+      composerHint.textContent = "本文をInstagram DMへ送信します";
+    }
 
     // Instagram R1 is text-DM verified. Keep attachment sending hidden until its
     // dedicated transport is independently verified, preventing LINE fallback.
