@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R1.2-20260830-BADGE-SYNC";
+  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R2-20260830-WEB-PUSH";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -12,6 +12,8 @@
     observer: null,
     notificationPermissionAsked: false,
     lastBadgeCount: 0,
+    pushConnected: false,
+    pushConnecting: false,
     originalTitle: document.title,
   };
 
@@ -56,6 +58,113 @@
       );
     } catch (_) {
       return "";
+    }
+  };
+
+
+  const authHeaders = () => {
+    const token = accessToken();
+    return token
+      ? {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        }
+      : { "content-type": "application/json" };
+  };
+
+  const pushApi = async (path, options = {}) => {
+    const base = apiBase();
+    const token = accessToken();
+    if (!base || !token) throw new Error("ログインセッションがありません。");
+
+    const response = await fetch(`${base}${path}`, {
+      ...options,
+      headers: {
+        ...authHeaders(),
+        ...(options.headers || {}),
+      },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data?.error || data?.message || `HTTP ${response.status}`);
+      error.status = response.status;
+      error.code = data?.error || "";
+      throw error;
+    }
+    return data;
+  };
+
+  const urlBase64ToUint8Array = (value) => {
+    const raw = text(value).replace(/-/g, "+").replace(/_/g, "/");
+    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  };
+
+  const registerPushServiceWorker = async () => {
+    if (!("serviceWorker" in navigator)) throw new Error("Service Worker非対応");
+    return navigator.serviceWorker.register(
+      "./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R2-20260830",
+      { scope: "./", updateViaCache: "none" }
+    );
+  };
+
+  const ensurePushSubscription = async ({ interactive = false } = {}) => {
+    if (state.pushConnecting) return state.pushConnected;
+    if (
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      state.pushConnected = false;
+      return false;
+    }
+
+    state.pushConnecting = true;
+    try {
+      let permission = Notification.permission;
+      if (permission === "default" && interactive) {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== "granted") {
+        state.pushConnected = false;
+        return false;
+      }
+
+      const registration = await registerPushServiceWorker();
+      await navigator.serviceWorker.ready;
+
+      const keyData = await pushApi("/api/contact/push/key");
+      const publicKey = text(keyData?.publicKey);
+      if (!publicKey) throw new Error("Push公開鍵を取得できません。");
+
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      await pushApi("/api/contact/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+          userAgent: navigator.userAgent || "",
+        }),
+      });
+
+      state.pushConnected = true;
+      return true;
+    } catch (error) {
+      state.pushConnected = false;
+      if (interactive) throw error;
+      return false;
+    } finally {
+      state.pushConnecting = false;
     }
   };
 
@@ -205,6 +314,10 @@
 
   const maybeNotifyForeground = async (pending) => {
     const count = pending.length;
+    if (state.pushConnected) {
+      state.lastPendingCount = count;
+      return;
+    }
     if (state.lastPendingCount === null) {
       state.lastPendingCount = count;
       return;
@@ -327,8 +440,42 @@
     await syncAll();
   };
 
+  const syncNotificationButtonState = () => {
+    const button = document.getElementById("dproNotificationButton");
+    if (!button) return;
+
+    if (
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      button.textContent = "通知非対応";
+      button.disabled = true;
+      button.classList.remove("is-on");
+      return;
+    }
+
+    button.disabled = false;
+    if (Notification.permission === "denied") {
+      button.textContent = "通知がOFF";
+      button.classList.remove("is-on");
+    } else if (state.pushConnected) {
+      button.textContent = "Push通知ON";
+      button.classList.add("is-on");
+    } else if (Notification.permission === "granted") {
+      button.textContent = "Push通知を接続";
+      button.classList.remove("is-on");
+    } else {
+      button.textContent = "スマホ通知をON";
+      button.classList.remove("is-on");
+    }
+  };
+
   const ensureNotificationButton = () => {
-    if (document.getElementById("dproNotificationButton")) return;
+    if (document.getElementById("dproNotificationButton")) {
+      syncNotificationButtonState();
+      return;
+    }
 
     const refresh = document.getElementById("refreshButton");
     if (!refresh) return;
@@ -340,55 +487,53 @@
     button.textContent = "スマホ通知をON";
     refresh.insertAdjacentElement("beforebegin", button);
 
-    const syncButtonState = () => {
-      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-        button.textContent = "通知非対応";
-        button.disabled = true;
-        return;
-      }
-      if (Notification.permission === "granted") {
-        button.textContent = "通知ON";
-        button.classList.add("is-on");
-      } else if (Notification.permission === "denied") {
-        button.textContent = "通知がOFF";
-        button.classList.remove("is-on");
-      } else {
-        button.textContent = "スマホ通知をON";
-        button.classList.remove("is-on");
-      }
-    };
-
     button.addEventListener("click", async () => {
-      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-        showToast("このブラウザは通知に対応していません。", true);
+      if (
+        !("Notification" in window) ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window)
+      ) {
+        showToast("このブラウザはPush通知に対応していません。", true);
         return;
       }
+
+      button.disabled = true;
+      button.textContent = "通知を接続中…";
 
       try {
-        await navigator.serviceWorker.register("./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R1.2-20260830", { scope: "./", updateViaCache: "none" });
-        const permission = await Notification.requestPermission();
-        syncButtonState();
+        const connected = await ensurePushSubscription({ interactive: true });
+        syncNotificationButtonState();
 
-        if (permission === "granted") {
-          showToast("DPRO CONTACTのスマホ通知をONにしました。");
+        if (connected) {
+          showToast("DPRO CONTACTのPush通知をONにしました。");
           await syncSummary();
-        } else if (permission === "denied") {
-          showToast("通知がOFFです。ブラウザまたは端末設定から許可してください。", true);
+        } else if (Notification.permission === "denied") {
+          showToast("通知がOFFです。端末設定からDPRO CONTACTの通知を許可してください。", true);
+        } else {
+          showToast("Push通知を接続できませんでした。", true);
         }
       } catch (error) {
-        showToast(`通知設定に失敗しました：${text(error?.message, "不明なエラー")}`, true);
+        syncNotificationButtonState();
+        const code = text(error?.code || error?.message);
+        if (code === "push_disabled") {
+          showToast("サーバー側のPush通知設定がまだ有効になっていません。", true);
+        } else {
+          showToast(`Push通知の接続に失敗しました：${text(error?.message, "不明なエラー")}`, true);
+        }
+      } finally {
+        syncNotificationButtonState();
       }
     });
 
-    syncButtonState();
+    syncNotificationButtonState();
   };
 
   const registerServiceWorker = async () => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) return null;
     try {
-      await navigator.serviceWorker.register("./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R1.2-20260830", { scope: "./", updateViaCache: "none" });
+      return await registerPushServiceWorker();
     } catch (_) {
-      // PWA/notification is an enhancement only.
+      return null;
     }
   };
 
@@ -420,7 +565,15 @@
     document.getElementById("threadSearch")?.addEventListener("input", () => setTimeout(syncAll, 0));
 
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) setTimeout(refreshAndSync, 250);
+      if (!document.hidden) {
+        setTimeout(refreshAndSync, 250);
+        if ("Notification" in window && Notification.permission === "granted" && !state.pushConnected) {
+          setTimeout(async () => {
+            await ensurePushSubscription({ interactive: false });
+            syncNotificationButtonState();
+          }, 400);
+        }
+      }
     });
   };
 
@@ -436,6 +589,10 @@
     installObserver();
     installEvents();
     await registerServiceWorker();
+    if ("Notification" in window && Notification.permission === "granted") {
+      await ensurePushSubscription({ interactive: false });
+      syncNotificationButtonState();
+    }
     await refreshAndSync();
 
     state.syncTimer = setInterval(syncAll, 5000);
@@ -458,6 +615,8 @@
   window.DPRO_CONTACT_REPLY_ALERT_R1 = Object.freeze({
     version: VERSION,
     refresh: refreshAndSync,
+    reconnectPush: () => ensurePushSubscription({ interactive: true }),
+    isPushConnected: () => state.pushConnected,
   });
 
   if (document.readyState === "loading") {

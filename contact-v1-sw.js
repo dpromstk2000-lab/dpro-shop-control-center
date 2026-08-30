@@ -1,4 +1,4 @@
-const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R1.2-20260830-BADGE-SYNC";
+const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R2-20260830-WEB-PUSH";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -7,16 +7,26 @@ self.addEventListener("activate", (event) => {
 });
 
 async function setBadge(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+
   try {
-    const n = Number(count);
-    if (Number.isFinite(n) && n > 0 && self.navigator && "setAppBadge" in self.navigator) {
+    if (n > 0 && self.navigator && "setAppBadge" in self.navigator) {
       await self.navigator.setAppBadge(n);
-    } else if (self.navigator && "clearAppBadge" in self.navigator) {
+    } else if (n <= 0 && self.navigator && "clearAppBadge" in self.navigator) {
       await self.navigator.clearAppBadge();
     }
   } catch (_) {
-    // Badge API differs by browser/OS.
+    // Android launchers normally derive their badge/dot from active notifications.
   }
+
+  // Keep Android's notification-backed launcher badge aligned when the app
+  // later learns the authoritative pending-thread count.
+  try {
+    const notifications = await self.registration.getNotifications();
+    if (notifications.length > n) {
+      notifications.slice(n).forEach((item) => item.close());
+    }
+  } catch (_) {}
 }
 
 self.addEventListener("message", (event) => {
@@ -37,29 +47,41 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("push", (event) => {
   let data = {};
+  let hasPayload = false;
+
   try {
-    data = event.data ? event.data.json() : {};
+    if (event.data) {
+      hasPayload = true;
+      data = event.data.json();
+    }
   } catch (_) {
+    hasPayload = Boolean(event.data);
     data = { body: event.data ? event.data.text() : "" };
   }
 
-  const count = Number(data.badgeCount ?? data.count ?? 1);
-  const title = data.title || "DPRO CONTACT";
+  const title = data.title || "先方から返信があります";
   const options = {
-    body: data.body || "先方から新しい返信があります。",
+    body: data.body || "DPRO CONTACTに新しい返信があります。",
     icon: "./dpro-contact-icon-192.png",
     badge: "./dpro-contact-icon-192.png",
-    tag: data.tag || "dpro-contact-reply",
+    tag: data.tag || `dpro-contact-reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     renotify: true,
+    timestamp: Date.now(),
     data: {
       url: data.url || "./contact-v1.html"
     }
   };
 
-  event.waitUntil(Promise.all([
-    self.registration.showNotification(title, options),
-    setBadge(count)
-  ]));
+  event.waitUntil((async () => {
+    await self.registration.showNotification(title, options);
+
+    // Encrypted-payload support can supply an authoritative count in the future.
+    // R2 intentionally uses empty Web Push payloads so the Cloudflare Worker
+    // needs VAPID signing only; Android still receives a real OS notification.
+    if (hasPayload && (data.badgeCount != null || data.count != null)) {
+      await setBadge(Number(data.badgeCount ?? data.count ?? 0));
+    }
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {
