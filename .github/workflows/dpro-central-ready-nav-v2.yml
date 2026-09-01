@@ -1,0 +1,122 @@
+name: DPRO CENTRAL READY Navigation Integration V2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "dpro-central-ready-nav-${{ github.repository }}"
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository guard
+        shell: bash
+        run: |
+          if [ "$GITHUB_REPOSITORY" != "dpromstk2000-lab/dpro-shop-control-center" ]; then
+            echo "Wrong repository" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add READY navigation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("config.js")
+          s = p.read_text(encoding="utf-8")
+          before = s
+
+          if "data-cc-ready-link" not in s:
+              setup_style = "      .cc-setup-link span{background:rgba(159,227,189,.20)!important;color:#d9fff0!important}\\n"
+              ready_style = "      .cc-ready-link span{background:rgba(99,179,237,.22)!important;color:#e7f5ff!important}\\n"
+              if setup_style not in s:
+                  raise SystemExit("READY NAV: setup style anchor not found")
+              s = s.replace(setup_style, setup_style + ready_style, 1)
+
+              ready_fn = "\n".join([
+                  "  const installReadyLink = (nav) => {",
+                  "    if (document.body?.dataset.ccReadyPage === \\\"true\\\") return true;",
+                  "    if (nav.querySelector(\\\"[data-cc-ready-link]\\\")) return true;",
+                  "    const link = document.createElement(\\\"a\\\");",
+                  "    link.href = \\\"ready-control-center.html\\\";",
+                  "    link.className = \\\"nav-button cc-addon-link cc-ready-link\\\";",
+                  "    link.dataset.ccReadyLink = \\\"true\\\";",
+                  "    link.innerHTML = \\\"<span>準</span>READY運用センター\\\";",
+                  "    link.setAttribute(\\\"aria-label\\\", \\\"DPRO READY運用センターを開く\\\");",
+                  "    const setupLink = nav.querySelector('\\\'[data-cc15-setup-link]\\\'');",
+                  "    if (setupLink) setupLink.insertAdjacentElement(\\\"afterend\\\", link);",
+                  "    else {",
+                  "      const contractButton = nav.querySelector('\\\'[data-view=\\\"contracts\\\"]\\\'');",
+                  "      if (contractButton) contractButton.insertAdjacentElement(\\\"afterend\\\", link);",
+                  "      else nav.appendChild(link);",
+                  "    }",
+                  "    return true;",
+                  "  };",
+                  "",
+              ])
+              insert_marker = "  const installCenter7DeliveryQuality = () => {"
+              if insert_marker not in s:
+                  raise SystemExit("READY NAV: function insertion anchor not found")
+              s = s.replace(insert_marker, ready_fn + "\n" + insert_marker, 1)
+
+              old_setup = "    const setup = installSetupLink(nav);\n    const start = installStartLink(nav);"
+              new_setup = "    const setup = installSetupLink(nav);\n    const ready = installReadyLink(nav);\n    const start = installStartLink(nav);"
+              if old_setup not in s:
+                  raise SystemExit("READY NAV: installLinks setup anchor not found")
+              s = s.replace(old_setup, new_setup, 1)
+
+              old_return = "    return delivery && setup && start && contact && monitor;"
+              new_return = "    return delivery && setup && ready && start && contact && monitor;"
+              if old_return not in s:
+                  raise SystemExit("READY NAV: installLinks return anchor not found")
+              s = s.replace(old_return, new_return, 1)
+
+          for token in [
+              "data-cc-ready-link",
+              "ready-control-center.html",
+              "READY運用センター",
+              "installReadyLink(nav)",
+          ]:
+              if token not in s:
+                  raise SystemExit(f"READY NAV: missing token: {token}")
+
+          if s != before:
+              p.write_text(s, encoding="utf-8")
+          print("READY navigation patch: PASS")
+          PY
+
+      - name: Static QA
+        shell: bash
+        run: |
+          grep -q 'data-cc-ready-link' config.js
+          grep -q 'ready-control-center.html' config.js
+          grep -q 'READY運用センター' config.js
+          grep -q 'installReadyLink(nav)' config.js
+          test -f ready-control-center.html
+          test -f ready-control-center.js
+          echo "READY NAV static QA: PASS"
+
+      - name: Commit forward-only integration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm --ignore-unmatch '.github/workflows/dpro-central-ready-nav.yml'
+          git rm --ignore-unmatch '.github/workflows/dpro-central-ready-nav-v2.yml'
+          git add config.js
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Integrate READY operation center navigation"
+          git push
