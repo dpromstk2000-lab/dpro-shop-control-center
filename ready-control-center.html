@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="format-detection" content="telephone=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>READY運用センター｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="ready-control-center.css?v=DPRO-READY-CONTROL-CENTER-V1.0-20260901">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=DPRO-READY-CONTROL-CENTER-V1.0-20260901"></script>
+  <script defer src="ready-control-center.js?v=DPRO-READY-CONTROL-CENTER-V1.0-20260901"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>DPRO READY 運用センター</strong>
+    <p id="loadingText">ログイン状態とREADY証拠を確認しています…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <div class="state-icon">鍵</div>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>この画面はDPROスタッフ専用です。既存のCONTROL CENTERへログイン後、同じブラウザで再度開いてください。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <div class="state-icon error">!</div>
+      <h1>READY運用センターを開けません</h1>
+      <p id="errorText">接続状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="index.html">CONTROL CENTERへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="start.html"><i>始</i>契約開始ナビ</a>
+        <a href="setup.html"><i>設</i>契約セットアップ</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a class="active" href="ready-control-center.html"><i>R</i>READY運用センター</a>
+        <a href="system-check.html"><i>✓</i>接続確認</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>SAFE OPERATION</strong>
+        <span>本番データ変更なし</span>
+        <small>確認・案内・証拠化のみ</small>
+      </div>
+      <div class="version">READY-CC V1.0<br><span>2026-09-01</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div><strong>READY運用センター</strong><small>受注 → 初期設定 → 本番準備 → 引き渡しを1本化</small></div>
+        <div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div>
+      </header>
+
+      <section class="content">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">READY / CONTROL CENTER ONBOARDING</p>
+            <h1>注文を受けた後、<br>ここから始めれば迷わない。</h1>
+            <p>契約受領、店舗設定、インフラ準備、デモ確認、Tutorial/PDF、認証実行証拠、オーナーアカウントまでを一つの安全な運用線にまとめます。</p>
+          </div>
+          <div class="head-actions">
+            <button id="refreshButton" class="btn secondary" type="button">認証・DBを再確認</button>
+            <button id="exportButton" class="btn primary" type="button">証拠JSONを保存</button>
+          </div>
+        </div>
+
+        <div class="safety-banner">
+          <strong>このページは本番業務データを書き換えません。</strong>
+          <span>Supabaseはログイン・スタッフ・制作案件・CENTER-8 RPCの読み取り確認だけを行い、チェック結果はこのブラウザのlocalStorageへ保存します。Secretや決済情報は保存しません。</span>
+        </div>
+
+        <section class="selector-panel">
+          <div>
+            <span class="step-label">対象案件</span>
+            <h2>READY確認する契約案件を選択</h2>
+            <p>制作案件がまだ無い場合は「新しい制作を登録」から先に登録し、契約が未登録なら受注確認で停止します。</p>
+          </div>
+          <div class="selector-actions">
+            <select id="projectSelect"><option value="">案件を選択してください</option></select>
+            <a class="btn secondary" href="delivery.html">＋ 新しい制作を登録</a>
+          </div>
+        </section>
+
+        <div id="metricGrid" class="metric-grid"></div>
+        <div id="runtimeProof" class="runtime-proof"></div>
+
+        <section class="flow-map" aria-label="READY運用の順番">
+          <a href="#order-intake"><b>1</b><span>受注確認</span></a>
+          <a href="#store-onboarding"><b>2</b><span>店舗設定</span></a>
+          <a href="#infra-runbook"><b>3</b><span>インフラ</span></a>
+          <a href="#demo-prepare"><b>4</b><span>デモ準備</span></a>
+          <a href="#tutorial-gate"><b>5</b><span>Tutorial/PDF</span></a>
+          <a href="#runtime-proof"><b>6</b><span>AAL2/RPC</span></a>
+          <a href="#owner-account"><b>7</b><span>オーナーID</span></a>
+        </section>
+
+        <section id="order-intake" class="ready-card">
+          <div class="card-head">
+            <div><span class="step-label">STEP 1 / ORDER INTAKE</span><h2>有償受注の受け口を1本化</h2><p>決済情報そのものは保存せず、「正式受注として進めてよいこと」と契約の紐付けだけを確認します。</p></div>
+            <span id="orderStatus" class="status-pill">未確認</span>
+          </div>
+          <div class="check-grid">
+            <label class="check-item"><input type="checkbox" data-ready-check="order.received"><span><strong>注文・入金確認済み</strong><small>決済番号・カード情報は記録しない</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="order.contract"><span><strong>正式契約を特定済み</strong><small>CENTER-10 R8の契約紐付けが確認できる</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="order.productionLock"><span><strong>本番変更はまだロック</strong><small>CENTER-7/8完了前に本番稼働へ進めない</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="order.handoff"><span><strong>制作案件へ引き渡し済み</strong><small>delivery.htmlの対象案件と一致</small></span></label>
+          </div>
+          <div class="action-row"><a class="btn secondary" href="start.html">契約開始ナビを開く</a><a class="btn primary" href="delivery.html">制作・納品を開く</a></div>
+        </section>
+
+        <section id="store-onboarding" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 2 / STORE ONBOARDING</span><h2>店舗・事業者設定を一つの完了表で管理</h2><p>製品ごとに入力場所が違っても、契約開始時に確認する8項目は共通化します。</p></div><span id="storeStatus" class="status-pill">0 / 8</span></div>
+          <div class="check-grid two">
+            <label class="check-item"><input type="checkbox" data-ready-check="store.identity"><span><strong>店舗名・事業者名</strong><small>表記と公開名を確認</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.hours"><span><strong>営業時間</strong><small>予約・HP・案内へ反映する基準値</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.holidays"><span><strong>休日・臨時休業</strong><small>通常休日と例外を確認</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.line"><span><strong>LINE公式</strong><small>利用有無・アカウント・連携責任者</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.staff"><span><strong>スタッフ</strong><small>必要な担当者・権限だけ登録</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.services"><span><strong>サービス・商品</strong><small>契約対象機能と初期マスタ</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.brand"><span><strong>写真・ブランド素材</strong><small>ロゴ・画像・公開許可を確認</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="store.permissions"><span><strong>権限・公開範囲</strong><small>オーナー／スタッフ／顧客の境界</small></span></label>
+          </div>
+          <div class="note-box"><strong>入力先の原則</strong><span>CONTROL CENTERは「完了を追跡する場所」。実データは各製品のオーナー画面・LINE公式・公開HP・契約セットアップなど、既存の正規入力先へ登録します。</span></div>
+        </section>
+
+        <section id="infra-runbook" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 3 / INFRA RESPONSIBILITY</span><h2>本番インフラの作成責任を固定</h2><p>51製品共通で「誰が何を作るか」を固定し、製品固有差分だけ個別仕様へ残します。</p></div><span class="status-pill info">RUNBOOK</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>対象</th><th>DPRO担当</th><th>オーナー担当</th><th>完了証拠</th></tr></thead>
+              <tbody>
+                <tr><td>GitHub / Pages</td><td>リポジトリ・公開設定・Version管理</td><td>原則なし</td><td>Repository / Pages URL・Commit</td></tr>
+                <tr><td>Cloudflare Worker</td><td>Worker作成・Binding・Health確認</td><td>必要な外部契約情報のみ提供</td><td>Production Worker URL・Health</td></tr>
+                <tr><td>Supabase</td><td>Project・Schema・Auth・RLS・必要RPC</td><td>Secret操作なし</td><td>Project ref・schema・read-only検査</td></tr>
+                <tr><td>製品アダプター</td><td>契約製品へ共通Adapter/Guard適用</td><td>業務設定を確認</td><td>製品Version・system-check</td></tr>
+                <tr><td>LINE / HP</td><td>技術連携・導線・同期確認</td><td>アカウント保有・公開内容承認</td><td>連携状態・公開URL</td></tr>
+                <tr><td>本番開始</td><td>CENTER-7 → CENTER-8 Gate確認</td><td>引き渡し・運用開始確認</td><td>Go-live記録・次回保守日</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="warning-box"><strong>禁止</strong><span>service_role、Secret、アクセストークン、顧客のパスワードをこの画面・証拠JSON・GitHubへ保存しない。</span></div>
+        </section>
+
+        <section id="demo-prepare" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 4 / DEMO_PREPARE</span><h2>共通 demo_prepare 契約</h2><p>既存製品へ新しい破壊的APIを一斉追加せず、デモ準備の最低条件と証拠形式を共通化します。</p></div><span id="demoStatus" class="status-pill">0 / 3</span></div>
+          <div class="contract-box">
+            <strong>共通仕様</strong>
+            <code>INPUT: product/system code + DEMO/TEST identifier only</code>
+            <code>GUARD: production identifier / production write = reject</code>
+            <code>OUTPUT: prepared_at + demo URL + system-check URL + production-unaffected evidence</code>
+          </div>
+          <div id="demoRows" class="demo-grid"></div>
+          <div class="warning-box"><strong>本番保護</strong><span>このページ自身は demo_prepare API を呼びません。製品側の既存デモ生成・system-checkを実行し、その結果だけを3製品分記録します。</span></div>
+        </section>
+
+        <section id="tutorial-gate" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 5 / TUTORIAL & PDF GATE</span><h2>Tutorial／Guide／PDFを納品Gateにする</h2><p>内容の作り直しはせず、納品対象のVersion・URL・hashと実表示確認を記録します。</p></div><span id="tutorialStatus" class="status-pill">未完了</span></div>
+          <div class="artifact-grid">
+            <div class="artifact-card"><h3>Tutorial</h3><label>Version<input data-ready-field="tutorial.version" placeholder="例：V1.2"></label><label>URL<input data-ready-field="tutorial.url" type="url" placeholder="https://..."></label><label>SHA256 / hash<input data-ready-field="tutorial.hash" placeholder="任意ではなく納品時に記録"></label></div>
+            <div class="artifact-card"><h3>Guide</h3><label>Version<input data-ready-field="guide.version" placeholder="例：V1.0"></label><label>URL<input data-ready-field="guide.url" type="url" placeholder="https://..."></label><label>SHA256 / hash<input data-ready-field="guide.hash" placeholder="納品物hash"></label></div>
+            <div class="artifact-card"><h3>PDF</h3><label>Version<input data-ready-field="pdf.version" placeholder="例：V1.0"></label><label>URL<input data-ready-field="pdf.url" type="url" placeholder="https://..."></label><label>SHA256 / hash<input data-ready-field="pdf.hash" placeholder="納品PDF hash"></label></div>
+          </div>
+          <div class="check-grid">
+            <label class="check-item"><input type="checkbox" data-ready-check="tutorial.linkQa"><span><strong>リンクQA済み</strong><small>Tutorial／Guide／PDFが開く</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="tutorial.visualQa"><span><strong>表示QA済み</strong><small>文字化け・欠落・誤版なし</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="tutorial.handoff"><span><strong>オーナーへ引き渡し済み</strong><small>利用方法まで案内済み</small></span></label>
+          </div>
+          <div class="generated-note"><label for="center8Note">CENTER-8 引き渡しメモ用証拠</label><textarea id="center8Note" readonly></textarea><button id="copyCenter8Note" class="btn secondary" type="button">証拠メモをコピー</button></div>
+        </section>
+
+        <section id="runtime-proof" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 6 / AUTHENTICATED RUNTIME PROOF</span><h2>AAL2／RPC／DBを実ログインで証明</h2><p>ソースが存在するだけでPASSにせず、現在のログイン状態で読み取り実行し結果を証拠化します。</p></div><span id="runtimeStatus" class="status-pill">未確認</span></div>
+          <div id="runtimeChecks" class="runtime-check-grid"></div>
+          <div class="action-row"><button id="runtimeCheckButton" class="btn primary" type="button">認証証拠を再確認</button><a class="btn secondary" href="delivery.html">CENTER-7 / 8を開く</a></div>
+        </section>
+
+        <section id="owner-account" class="ready-card">
+          <div class="card-head"><div><span class="step-label">STEP 7 / OWNER ACCOUNT</span><h2>オーナーアカウント引き渡しを共通Gate化</h2><p>製品固有の招待・ID発行方式は維持しつつ、完了条件だけを共通化します。パスワードは記録しません。</p></div><span id="ownerStatus" class="status-pill">0 / 6</span></div>
+          <div class="check-grid two">
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.provisioned"><span><strong>アカウント発行／招待済み</strong><small>製品の正規プロビジョニング経路</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.firstLogin"><span><strong>初回ログイン確認</strong><small>本人が実際にログインできた</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.permissions"><span><strong>権限確認</strong><small>オーナー権限が過不足ない</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.majorOperation"><span><strong>主要操作を1回確認</strong><small>予約・台帳・設定など製品の主要操作</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.reissue"><span><strong>再発行手順確認</strong><small>パスワード忘れ／招待再送の安全経路</small></span></label>
+            <label class="check-item"><input type="checkbox" data-ready-check="owner.handoff"><span><strong>問い合わせ先まで引き渡し</strong><small>運用担当とサポート境界を説明</small></span></label>
+          </div>
+          <div class="note-box"><strong>秘密情報を残さない</strong><span>証拠は「初回ログイン成功」「権限確認済み」まで。パスワード・一時コード・アクセストークンは保存しません。</span></div>
+        </section>
+
+        <section class="ready-card final-card">
+          <div class="card-head"><div><span class="step-label">READY EVIDENCE</span><h2>最終証拠パッケージ</h2><p>7項目の現時点をJSONへまとめます。CENTRALへ返却する前の実行証拠として使います。</p></div><span id="finalStatus" class="status-pill">HOLD</span></div>
+          <div id="finalSummary" class="final-summary"></div>
+          <div class="action-row"><button id="saveAllButton" class="btn secondary" type="button">現在の入力を保存</button><button id="exportButtonBottom" class="btn secondary" type="button">証拠JSONを保存</button><button id="goLiveButton" class="btn primary" type="button" disabled>READY完了後にCENTER-8へ</button></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
