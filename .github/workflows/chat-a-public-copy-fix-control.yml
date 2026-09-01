@@ -1,0 +1,91 @@
+name: CHAT A Inventory Copy Fix - Control Center
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/chat-a-public-copy-fix-control.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Normalize assigned inventory count copy to 51
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          targets = [
+              Path('index.html'), Path('app.js'), Path('start.html'), Path('start.js'),
+              Path('deploy-center.html'), Path('deploy-center.js'),
+              Path('center-product-ready-v1.js')
+          ]
+          changed=[]
+          old_refs=[]
+
+          def patch_text(text):
+              # User-visible inventory phrases only; do not replace arbitrary 49/50 values.
+              for n in ('49','50'):
+                  for suffix in ('製品','システム'):
+                      text = text.replace(n + suffix, '51' + suffix)
+                  text = text.replace(n + 'の業種', '51の業種')
+                  text = text.replace(n + '件の製品', '51件の製品')
+              # Context-named numeric fields used for inventory display.
+              patterns = [
+                  r'((?:product|system|inventory)[A-Za-z0-9_]*Count\s*[:=]\s*)(49|50)\b',
+                  r'((?:product|system|inventory)[_-]?total\s*[:=]\s*)(49|50)\b',
+                  r'(totalProducts\s*[:=]\s*)(49|50)\b',
+              ]
+              for pat in patterns:
+                  text = re.sub(pat, lambda m: m.group(1)+'51', text, flags=re.I)
+              return text
+
+          for path in targets:
+              if not path.exists():
+                  continue
+              old=path.read_text(encoding='utf-8')
+              text=patch_text(old)
+              if text != old:
+                  path.write_text(text,encoding='utf-8')
+                  changed.append(str(path))
+
+          # Scan assigned Control Center surfaces for stale inventory-context references.
+          scan_targets = list(targets)
+          for path in scan_targets:
+              if not path.exists():
+                  continue
+              text=path.read_text(encoding='utf-8')
+              for m in re.finditer(r'(?<!\d)(49|50)(?:製品|システム|の業種|件の製品)', text):
+                  old_refs.append(f'{path}: {m.group(0)}')
+
+          print('CHANGED FILES:')
+          for p in changed: print(' -',p)
+          if old_refs:
+              print('STALE INVENTORY REFERENCES REMAIN:')
+              for r in old_refs: print(' -',r)
+              raise SystemExit(1)
+          print('CHAT A CONTROL inventory validation: PASS')
+          PY
+      - name: Commit applied changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- ':!.github/workflows/chat-a-public-copy-fix-control.yml'
+          if git diff --cached --quiet; then
+            echo 'No business-source changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix(chat-a): canonical 51 inventory copy'
+          git push
