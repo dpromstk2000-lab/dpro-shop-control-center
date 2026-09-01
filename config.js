@@ -136,6 +136,25 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
     return true;
   };
 
+  const installReadyLink = (nav) => {
+  if (document.body?.dataset.ccReadyPage === "true") return true;
+  if (nav.querySelector("[data-cc-ready-link]")) return true;
+  const link = document.createElement("a");
+  link.href = "ready-control-center.html";
+  link.className = "nav-button cc-addon-link";
+  link.dataset.ccReadyLink = "true";
+  link.innerHTML = "<span>準</span>READY運用センター";
+  link.setAttribute("aria-label", "DPRO READY運用センターを開く");
+  const setupLink = nav.querySelector("[data-cc15-setup-link]");
+  if (setupLink) setupLink.insertAdjacentElement("afterend", link);
+  else {
+    const contractButton = nav.querySelector('[data-view="contracts"]');
+    if (contractButton) contractButton.insertAdjacentElement("afterend", link);
+    else nav.appendChild(link);
+  }
+  return true;
+};
+
   const installCenter7DeliveryQuality = () => {
     if (document.body?.dataset.cc11DeliveryPage !== "true") return;
     if (document.querySelector('script[data-center7-delivery-quality]')) return;
@@ -285,10 +304,11 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 
     const delivery = installDeliveryLink(nav);
     const setup = installSetupLink(nav);
+    const ready = installReadyLink(nav);
     const start = installStartLink(nav);
     const contact = installContactLink(nav);
     const monitor = installMonitorLink(nav);
-    return delivery && setup && start && contact && monitor;
+    return delivery && setup && ready && start && contact && monitor;
   };
 
   installGlobalReadability();
