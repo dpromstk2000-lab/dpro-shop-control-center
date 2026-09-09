@@ -1,9 +1,16 @@
-const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R3-20260909-BADGE-SYNC";
+const DPRO_CONTACT_SW_VERSION = "DPRO-CONTACT-PWA-SW-R3.1-20260909-AUTHORITATIVE-BADGE";
+const DPRO_CONTACT_BADGE_CACHE = "dpro-contact-badge-state-r3";
+const DPRO_CONTACT_BADGE_STATE_URL = new URL("./__dpro-contact-badge-state__", self.location.href).href;
+const DPRO_CONTACT_AUTHORITATIVE_GUARD_MS = 120000;
 
 self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const saved = await readAuthoritativeBadge();
+    if (saved) await setBadge(saved.count);
+  })());
 });
 
 const countValue = (value) => Math.max(0, Math.floor(Number(value) || 0));
@@ -20,6 +27,55 @@ async function setBadge(count) {
     // Android launchers may derive badges from active notifications instead.
   }
   return n;
+}
+
+async function storeAuthoritativeBadge(count, meta = {}) {
+  try {
+    const cache = await caches.open(DPRO_CONTACT_BADGE_CACHE);
+    await cache.put(DPRO_CONTACT_BADGE_STATE_URL, new Response(JSON.stringify({
+      count: countValue(count),
+      at: Date.now(),
+      reason: String(meta?.reason || "worker_push"),
+      version: DPRO_CONTACT_SW_VERSION,
+    }), {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      },
+    }));
+  } catch (_) {}
+}
+
+async function readAuthoritativeBadge() {
+  try {
+    const cache = await caches.open(DPRO_CONTACT_BADGE_CACHE);
+    const response = await cache.match(DPRO_CONTACT_BADGE_STATE_URL);
+    if (!response) return null;
+    const data = await response.json();
+    const at = Number(data?.at || 0);
+    if (!Number.isFinite(at) || at <= 0) return null;
+    return {
+      count: countValue(data?.count),
+      at,
+      reason: String(data?.reason || ""),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function resolvePageBadge(data) {
+  const requested = countValue(data?.count);
+  const pageVersion = String(data?.version || "");
+  if (!pageVersion.includes("R2")) return requested;
+
+  const authoritative = await readAuthoritativeBadge();
+  if (!authoritative) return requested;
+  if (Date.now() - authoritative.at > DPRO_CONTACT_AUTHORITATIVE_GUARD_MS) return requested;
+
+  // The current R2 page can re-send a stale lastBadgeCount during pagehide.
+  // For a short period after an R3 Worker push, the Worker-confirmed value wins.
+  return authoritative.count;
 }
 
 async function contactNotifications() {
@@ -42,6 +98,7 @@ async function clearThreadNotification(threadId) {
 
 async function applyStateSync(data) {
   const count = await setBadge(data?.badgeCount ?? data?.count ?? 0);
+  await storeAuthoritativeBadge(count, { reason: data?.reason || "state_sync" });
 
   if (data?.clearThread && data?.threadId) {
     await clearThreadNotification(data.threadId);
@@ -52,8 +109,6 @@ async function applyStateSync(data) {
     notifications.forEach((item) => item.close());
   }
 
-  // Tell any open CONTACT windows to refresh immediately instead of waiting
-  // for their normal refresh interval.
   try {
     const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     clients.forEach((client) => client.postMessage({
@@ -71,7 +126,8 @@ self.addEventListener("message", (event) => {
   if (data.type !== "DPRO_CONTACT_BADGE") return;
 
   event.waitUntil((async () => {
-    const count = await setBadge(data.count || 0);
+    const count = await resolvePageBadge(data);
+    await setBadge(count);
     if (count <= 0) {
       const notifications = await contactNotifications();
       notifications.forEach((item) => item.close());
@@ -106,15 +162,17 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil((async () => {
-    // R3 encrypted payload: state-only pushes never create a false notification.
     if (data?.type === "DPRO_CONTACT_STATE_SYNC" || data?.kind === "sync") {
       await applyStateSync(data);
       return;
     }
 
-    // R3 new-message payload (or a future payload with a badge count).
     if (data?.type === "DPRO_CONTACT_NEW_MESSAGE" || data?.kind === "new_message") {
       const count = await setBadge(data?.badgeCount ?? data?.count ?? 0);
+      const finalCount = count > 0 ? count : 1;
+      if (finalCount !== count) await setBadge(finalCount);
+      await storeAuthoritativeBadge(finalCount, { reason: data?.reason || "new_message" });
+
       const threadId = data?.threadId ? String(data.threadId) : "reply";
       await self.registration.showNotification(data.title || "先方から返信があります", {
         body: data.body || "DPRO CONTACTに新しい返信があります。",
@@ -128,13 +186,10 @@ self.addEventListener("push", (event) => {
           threadId: data?.threadId || null,
         },
       });
-      if (count <= 0) await setBadge(1);
       return;
     }
 
-    // Backward compatibility during deployment: the existing R2 Worker used
-    // empty Web Push payloads. Continue showing those as genuine new-message
-    // notifications until the R3 Worker is deployed.
+    // Backward compatibility while the existing R2 Worker still sends empty pushes.
     const title = data?.title || "先方から返信があります";
     await self.registration.showNotification(title, {
       body: data?.body || "DPRO CONTACTに新しい返信があります。",
@@ -147,7 +202,8 @@ self.addEventListener("push", (event) => {
     });
 
     if (hasPayload && (data?.badgeCount != null || data?.count != null)) {
-      await setBadge(data?.badgeCount ?? data?.count ?? 0);
+      const count = await setBadge(data?.badgeCount ?? data?.count ?? 0);
+      await storeAuthoritativeBadge(count, { reason: data?.reason || "legacy_payload" });
     }
   })());
 });
