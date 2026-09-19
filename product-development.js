@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-PRODUCT-DEVELOPMENT-R1-20260919";
+  const BUILD = "DPRO-PRODUCT-DEVELOPMENT-R2-PREBUILD-SPEC-20260919";
   const FACTORY_VERSION = "V2.0";
   const PACKAGE_SHA = "2e8b7cb07e33fe861b0c4829af197962560e2e62226bc6340d43436f254d2137";
   const LOCK_SHA = "ccf25b5f0bc7250e4080d8f561314a53338dcfaec44fb14c138da65b4b06ec59";
@@ -299,8 +299,8 @@
   function closeDetail() { $("detailModal").classList.add("hidden"); state.selectedId = ""; }
 
   function nextInstruction(p, f) {
-    if (p.status === "draft") return "製品定義を確認したらPREBUILDへ進み、FACTORY V2の10項目を1つずつ確認します。";
-    if (p.status === "prebuild" && !f?.prebuild_ready) return `FACTORY V2 PREBUILDを完了してください。現在 ${Number(f?.prebuild_done || 0)}/${Number(f?.prebuild_total || 10)}。`;
+    if (p.status === "draft") return "製品定義を確認したらPREBUILDへ進みます。PREBUILDでは自由入力PASSではなく、構造化された設計仕様を完成させます。";
+    if (p.status === "prebuild" && !f?.prebuild_ready) return `PREBUILD設計を完成してください。現在 ${Number(f?.prebuild_done || 0)}/${Number(f?.prebuild_total || 10)}。FACTORY基準は自動確認、残りは仕様がDB検証されるまでPASSになりません。`;
     if (p.status === "prebuild" && f?.prebuild_ready) return "PREBUILD 10/10です。「制作開始」へ進めます。";
     if (p.status === "building") return "標準製品本体を制作します。完成したらFINAL QAへ進みます。";
     if (p.status === "final_qa" && !f?.final_ready) return `FACTORY V2 FINALを完了してください。現在 ${Number(f?.final_done || 0)}/${Number(f?.final_total || 4)}。`;
@@ -348,6 +348,7 @@
       </div></section>
       <div class="next-panel"><strong>次にすること</strong><span>${esc(nextInstruction(p,f))}</span></div>
       <div class="detail-actions">
+        ${["draft","prebuild"].includes(p.status) ? `<a class="btn primary" href="factory-v2-prebuild.html?project=${encodeURIComponent(p.delivery_project_id)}">PREBUILD設計を開く</a>` : ""}
         <a class="btn secondary" href="factory-v2.html?project=${encodeURIComponent(p.delivery_project_id)}">FACTORY V2監査を開く</a>
         <button class="btn secondary" type="button" id="copyHandoff">ChatGPT開発指示をコピー</button>
         ${canWrite() && !["cataloged","cancelled"].includes(p.status) ? '<button class="btn secondary" type="button" id="editDefinition">製品定義を編集</button>' : ""}
@@ -406,6 +407,7 @@
       "- FACTORY V2.0の固定IDENTITYは変更しない。",
       "- 参考製品を再利用し、証明された不具合がない完成済み機能を無条件に再開発しない。",
       "- PREBUILD Gate完了前に本制作へ進まない。",
+      "- PREBUILDの設計項目はfactory-v2-prebuild.htmlで構造化仕様を完成させ、自由入力だけのPASS/N/Aは禁止する。",
       "- FINAL Gate完了前に製品台帳登録・販売可能判定へ進まない。",
       "- 個別顧客の本番テナント、患者情報、Secretは標準製品開発へ持ち込まない。",
       "- MutationObserver等の補助UIは冪等実装を必須とする。",

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>FACTORY V2 PREBUILD設計｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="factory-v2-prebuild.css?v=PREBUILD-SPEC-R2-20260919">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-43-CENTER10-R7-R10-R1-FINAL-AUDIT"></script>
+  <script defer src="factory-v2-prebuild.js?v=PREBUILD-SPEC-R2-20260919"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>FACTORY V2 PREBUILD設計</strong>
+    <p id="loadingText">固定IDENTITY・製品定義・構造化仕様を確認しています…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>PREBUILD設計はDPROスタッフ専用です。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>PREBUILD設計を開けません</h1>
+      <p id="errorText">DB拡張・案件指定・ログイン状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="product-development.html">新規製品開発へ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="product-development.html"><i>新</i>新規製品開発</a>
+        <a class="active" id="selfNav" href="factory-v2-prebuild.html"><i>設</i>PREBUILD設計</a>
+        <a id="factoryNav" href="factory-v2.html"><i>V2</i>FACTORY V2監査</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>FACTORY V2.0</strong>
+        <span>FINAL LOCK維持</span>
+        <small>PASSは構造化仕様が完成した項目だけ</small>
+      </div>
+      <div class="version">PREBUILD-SPEC-R2<br><span>2026-09-19</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div><strong>FACTORY V2 PREBUILD設計</strong><small>チェックを埋めるのではなく、制作仕様を完成させる</small></div>
+        <div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div>
+      </header>
+
+      <section class="content">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">MEANINGFUL PREBUILD GATE</p>
+            <h1>10/10にするたび、<br>実装仕様が1つ完成する。</h1>
+            <p>自由入力のPASSは禁止。FACTORY基準は自動確認し、残り9項目は必要な設計項目をDB検証してからPASS / N/Aへ進めます。</p>
+          </div>
+          <div class="head-actions">
+            <button id="reloadButton" class="btn secondary" type="button">最新情報に更新</button>
+            <button id="copySpecButton" class="btn secondary" type="button">PREBUILD仕様をコピー</button>
+            <a id="auditLink" class="btn primary" href="factory-v2.html">元のFACTORY監査</a>
+          </div>
+        </div>
+
+        <section id="identityBanner" class="identity-banner"></section>
+        <section id="projectSummary" class="project-summary"></section>
+        <section id="metricGrid" class="metric-grid"></section>
+
+        <div class="meaning-note">
+          <strong>この画面のルール</strong>
+          <span>① FACTORY基準はIDENTITY一致時に自動PASS。② 残り9項目は「仕様を保存」するとDBが必須項目を検証。③ 不足がある場合は未確認のまま、要対応ならACTION REQUIRED。④ 全項目がPASS/N/Aになった時だけ制作開始できます。</span>
+        </div>
+
+        <section id="baselineCard" class="spec-card baseline-card"></section>
+        <div id="specBoard" class="spec-board"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
