@@ -245,7 +245,7 @@
       state.supabase.from("cc_system_instances").select("id,client_id,system_code,system_name,status,facility_code").order("created_at",{ascending:false}),
       state.supabase.from("cc_v_delivery_project_overview_v2").select("*").order("updated_at",{ascending:false}),
       state.supabase.from("cc_v_standard_current_items").select("*").order("sort_order"),
-      state.supabase.from("cc_standard_versions").select("id,standard_code,version_code,title,status,effective_date").eq("status","current").order("effective_date",{ascending:false}).limit(1).maybeSingle(),
+      state.supabase.from("cc_standard_versions").select("id,standard_code,version_code,title,status,effective_date").eq("standard_code","DPRO_STANDARD").eq("status","current").order("effective_date",{ascending:false}).limit(1).maybeSingle(),
       state.supabase.from("cc_feature_catalog").select("*").eq("is_active",true).order("sort_order"),
       state.supabase.from("cc_standard_rollout_targets").select("*").order("rollout_name").order("system_code"),
       state.supabase.from("cc_v_standard_rollout_summary").select("*").order("rollout_name"),
@@ -783,7 +783,7 @@
         p_project_name: projectName,
         p_target_delivery_date: deliveryDate,
         p_project_code: null,
-        p_standard_version_code: state.standardVersion?.version_code || "V1.1",
+        p_standard_version_code: state.standardVersion?.version_code || "V1.2",
       });
       if (error) throw error;
 
@@ -806,20 +806,30 @@
       const overview = state.projects.find((p) => p.id === projectId);
       if (!overview) throw new Error("制作プロジェクトが見つかりません。");
 
-      const [projectResult, featureResult, stepResult, checkResult] = await Promise.all([
-        state.supabase.from("cc_delivery_projects").select("*").eq("id", projectId).single(),
-        state.supabase.from("cc_delivery_project_features").select("*").eq("project_id", projectId),
-        state.supabase.from("cc_delivery_steps").select("*").eq("project_id", projectId).order("sort_order"),
-        state.supabase.from("cc_delivery_checks").select("*").eq("project_id", projectId),
-      ]);
-      for (const r of [projectResult, featureResult, stepResult, checkResult]) if (r.error) throw r.error;
+      let detailTimer = null;
+      const detailTimeout = new Promise((_, reject) => {
+        detailTimer = setTimeout(() => {
+          reject(new Error("制作内容の取得が15秒を超えました。通信を確認してもう一度お試しください。"));
+        }, 15000);
+      });
+
+      const detailRequest = state.supabase
+        .rpc("cc_center4_get_delivery_project_detail", { p_project_id: projectId })
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data;
+        });
+
+      const detail = await Promise.race([detailRequest, detailTimeout]);
+      if (detailTimer) clearTimeout(detailTimer);
+      if (!detail?.project) throw new Error("制作プロジェクトの詳細を取得できませんでした。");
 
       state.currentProject = {
         overview,
-        project: projectResult.data,
-        projectFeatures: featureResult.data || [],
-        steps: stepResult.data || [],
-        checks: checkResult.data || [],
+        project: detail.project,
+        projectFeatures: Array.isArray(detail.features) ? detail.features : [],
+        steps: Array.isArray(detail.steps) ? detail.steps : [],
+        checks: Array.isArray(detail.checks) ? detail.checks : [],
       };
 
       renderProjectDetail();
@@ -1036,7 +1046,7 @@
       "以下を今回の開発の正式な前提として引き継いでください。",
       "",
       "## 0. 最重要ルール",
-      `- DPRO STANDARD ${p.standard_version || state.standardVersion?.version_code || "V1.1"} に従う。`,
+      `- DPRO STANDARD ${p.standard_version || state.standardVersion?.version_code || "V1.2"} に従う。`,
       "- 使用しない共通機能は削除せず、Feature FlagでOFFにする。",
       "- 本番とDEMOを混在させない。production_guardを維持する。",
       "- オーナー・顧客向け画面には技術用語やsystem-check等の内部情報を出さない。",
