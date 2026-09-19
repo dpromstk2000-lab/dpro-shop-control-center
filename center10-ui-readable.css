@@ -219,3 +219,44 @@ body .form-message{font-size:12px!important;line-height:1.6!important}
   body .page-head>div>p:last-child,body .hero-copy,body .hero p{font-size:14px!important}
   body input,body select,body textarea{font-size:16px!important} /* prevents iOS zoom */
 }
+
+/* ----------------------------------------------------------------
+   DELIVERY MODAL FIT R1 / 2026-09-19
+   Prevent long contract/product labels from forcing horizontal overflow.
+   UI-only: no DB / logic changes.
+   ---------------------------------------------------------------- */
+body[data-cc11-delivery-page="true"] .modal-card{
+  max-width:calc(100vw - 40px)!important;
+  overflow-x:hidden!important;
+}
+body[data-cc11-delivery-page="true"] .form-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+body[data-cc11-delivery-page="true"] .form-grid>*{
+  min-width:0!important;
+}
+body[data-cc11-delivery-page="true"] .form-grid input,
+body[data-cc11-delivery-page="true"] .form-grid select,
+body[data-cc11-delivery-page="true"] .form-grid textarea{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+}
+body[data-cc11-delivery-page="true"] .form-grid select{
+  text-overflow:ellipsis;
+}
+@media(max-width:720px){
+  body[data-cc11-delivery-page="true"] .form-grid{
+    grid-template-columns:1fr!important;
+  }
+  body[data-cc11-delivery-page="true"] .form-grid label.full,
+  body[data-cc11-delivery-page="true"] .form-grid .full{
+    grid-column:auto!important;
+  }
+  body[data-cc11-delivery-page="true"] .modal{
+    padding:10px!important;
+  }
+  body[data-cc11-delivery-page="true"] .modal-card{
+    max-width:calc(100vw - 20px)!important;
+  }
+}
