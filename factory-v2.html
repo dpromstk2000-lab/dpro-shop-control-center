@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#102a23">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <title>DPRO SHOP CONTROL CENTER｜FACTORY V2 導入前監査</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="factory-v2.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="factory-v2.js"></script>
+</head>
+<body>
+  <main class="fv2-shell">
+    <header class="fv2-head">
+      <div>
+        <p class="eyebrow">DPRO SYSTEM FACTORY V2.0 / CONTROL CENTER GATE</p>
+        <h1>契約後・本番構築前に、<br>必要な差分だけを確実にブラッシュアップ。</h1>
+        <p>既存FINAL LOCK製品を一律再開発せず、FACTORY V2.0との差分診断 → Controlled Retrofit → Regression / Runtime Truth → Customer Deploymentを案件単位で管理します。</p>
+      </div>
+      <div class="fv2-links">
+        <a class="btn secondary" href="delivery.html">制作・納品へ戻る</a>
+        <a class="btn secondary" href="setup.html">契約セットアップ</a>
+        <a class="btn secondary" href="index.html">統合管理</a>
+      </div>
+    </header>
+
+    <section id="authNotice" class="fv2-panel hidden">
+      <h2>CONTROL CENTERへのログインが必要です</h2>
+      <p>ログイン後、制作・納品からFACTORY V2監査を開いてください。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </section>
+
+    <section id="loadingPanel" class="fv2-panel">
+      <h2>FACTORY V2 Gateを確認中</h2>
+      <p id="loadingText">案件・監査状態・DPROスタッフ権限を読み込んでいます…</p>
+    </section>
+
+    <section id="appPanel" class="hidden">
+      <div class="fv2-metrics">
+        <article><small>FACTORY</small><strong>V2.0</strong><span>FINAL LOCK基準</span></article>
+        <article><small>PREBUILD</small><strong id="metricPrebuild">—</strong><span>Setup / Deploy前</span></article>
+        <article><small>FINAL</small><strong id="metricFinal">—</strong><span>GO LIVE前</span></article>
+        <article><small>ACTION REQUIRED</small><strong id="metricAction">—</strong><span>要ブラッシュアップ</span></article>
+      </div>
+
+      <section class="fv2-panel fv2-selector-panel">
+        <div class="fv2-panel-head">
+          <div>
+            <h2>1. 制作案件を選択</h2>
+            <p>新規案件は自動でV2対象。既存案件は明示的に移行したときだけGate対象になります。</p>
+          </div>
+          <button id="reloadButton" class="btn secondary" type="button">最新情報に更新</button>
+        </div>
+        <label class="fv2-field">
+          <span>制作案件</span>
+          <select id="projectSelect"><option value="">制作案件を選択</option></select>
+        </label>
+        <div id="projectSummary" class="fv2-project-summary hidden"></div>
+      </section>
+
+      <section id="legacyPanel" class="fv2-panel hidden">
+        <div class="fv2-panel-head">
+          <div>
+            <p class="eyebrow">LEGACY / NOT ENROLLED</p>
+            <h2>この既存案件はFACTORY V2 Gate未適用です</h2>
+            <p>既存案件を勝手に止めないため、自動移行していません。V2基準で再監査する場合のみ明示的に開始してください。</p>
+          </div>
+          <span class="fv2-pill neutral">既存案件</span>
+        </div>
+        <div class="fv2-warning">「V2監査対象にする」を実行すると、この案件はPREBUILD / FINAL Gateの対象になります。</div>
+        <button id="enrollButton" class="btn primary" type="button">この案件をV2監査対象にする</button>
+      </section>
+
+      <section id="auditPanel" class="hidden">
+        <section class="fv2-panel">
+          <div class="fv2-panel-head">
+            <div>
+              <p class="eyebrow">FACTORY IDENTITY</p>
+              <h2>2. FACTORY V2基準を固定</h2>
+              <p>VersionとFINAL LOCKハッシュが一致していることをGate自身でも検証します。</p>
+            </div>
+            <span id="identityPill" class="fv2-pill neutral">確認中</span>
+          </div>
+          <div id="identityGrid" class="fv2-identity-grid"></div>
+        </section>
+
+        <section class="fv2-panel">
+          <div class="fv2-panel-head">
+            <div>
+              <p class="eyebrow">PREBUILD GATE</p>
+              <h2>3. 導入前ブラッシュアップ</h2>
+              <p>ここがPASSするまで、契約セットアップ確定とCustomer DeploymentをDB側で遮断します。</p>
+            </div>
+            <span id="prebuildPill" class="fv2-pill neutral">0 / 0</span>
+          </div>
+          <div id="prebuildItems" class="fv2-items"></div>
+          <div id="prebuildNext" class="fv2-next hidden">
+            <strong>PREBUILD PASS</strong>
+            <span>契約セットアップ → Customer Deploymentへ進めます。</span>
+            <a class="btn primary" href="setup.html">契約セットアップを開く</a>
+          </div>
+        </section>
+
+        <section class="fv2-panel">
+          <div class="fv2-panel-head">
+            <div>
+              <p class="eyebrow">FINAL GATE</p>
+              <h2>4. 本番稼働前の証拠確認</h2>
+              <p>Customer Deployment / Runtime Truth / Regression / Handoff & Smoke Testを完了し、GO LIVEを解放します。</p>
+            </div>
+            <span id="finalPill" class="fv2-pill neutral">0 / 0</span>
+          </div>
+          <div id="finalLockNotice" class="fv2-warning">PREBUILD PASS後にFINAL項目を確定します。</div>
+          <div id="finalItems" class="fv2-items"></div>
+          <div id="finalNext" class="fv2-next hidden">
+            <strong>FINAL PASS</strong>
+            <span>FACTORY V2.0 Gate完了。CENTER-8の最終条件が揃えばGO LIVEできます。</span>
+            <a class="btn primary" href="delivery.html">本番稼働確認へ戻る</a>
+          </div>
+        </section>
+      </section>
+
+      <div id="toast" class="fv2-toast hidden" role="status"></div>
+    </section>
+  </main>
+</body>
+</html>
