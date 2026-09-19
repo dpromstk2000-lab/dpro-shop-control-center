@@ -800,29 +800,84 @@
     }
   }
 
+  function withProjectTimeout(promiseLike, ms, message) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), ms);
+      Promise.resolve(promiseLike).then(
+        (value) => { clearTimeout(timer); resolve(value); },
+        (error) => { clearTimeout(timer); reject(error); },
+      );
+    });
+  }
+
+  async function loadProjectDetailFallback(projectId) {
+    const specs = [
+      ["制作案件本体", () => state.supabase.from("cc_delivery_projects").select("*").eq("id", projectId).single()],
+      ["Feature Flag", () => state.supabase.from("cc_delivery_project_features").select("*").eq("project_id", projectId)],
+      ["制作STEP", () => state.supabase.from("cc_delivery_steps").select("*").eq("project_id", projectId).order("sort_order")],
+      ["DPRO STANDARD", () => state.supabase.from("cc_delivery_checks").select("*").eq("project_id", projectId)],
+    ];
+
+    const results = [];
+    for (const [label, makeRequest] of specs) {
+      const result = await withProjectTimeout(
+        makeRequest(),
+        8000,
+        `${label}の取得が8秒を超えました。`,
+      );
+      if (result?.error) throw result.error;
+      results.push(result?.data);
+    }
+
+    return {
+      project: results[0],
+      features: Array.isArray(results[1]) ? results[1] : [],
+      steps: Array.isArray(results[2]) ? results[2] : [],
+      checks: Array.isArray(results[3]) ? results[3] : [],
+    };
+  }
+
   async function openProject(projectId) {
-    setLoading("制作内容とDPRO標準を読み込んでいます…");
+    const overview = state.projects.find((p) => p.id === projectId);
+    if (!overview) {
+      toast("制作プロジェクトが見つかりません。", true);
+      return;
+    }
+
+    const openButton = Array.from(document.querySelectorAll("[data-open-project]"))
+      .find((button) => button.dataset.openProject === projectId);
+    const originalButtonText = openButton?.textContent || "";
+
+    if (openButton) {
+      openButton.disabled = true;
+      openButton.textContent = "読み込み中…";
+    }
+
+    showOnly("app");
+    toast("制作内容を読み込んでいます…");
+
     try {
-      const overview = state.projects.find((p) => p.id === projectId);
-      if (!overview) throw new Error("制作プロジェクトが見つかりません。");
+      let detail = null;
+      let usedFallback = false;
 
-      let detailTimer = null;
-      const detailTimeout = new Promise((_, reject) => {
-        detailTimer = setTimeout(() => {
-          reject(new Error("制作内容の取得が15秒を超えました。通信を確認してもう一度お試しください。"));
-        }, 15000);
-      });
+      try {
+        const rpcResult = await withProjectTimeout(
+          state.supabase.rpc("cc_center4_get_delivery_project_detail", { p_project_id: projectId }),
+          8000,
+          "専用詳細APIの取得が8秒を超えました。",
+        );
+        if (rpcResult?.error) throw rpcResult.error;
+        detail = rpcResult?.data;
+        if (!detail?.project) throw new Error("専用詳細APIから案件本体が返りませんでした。");
+      } catch (primaryError) {
+        console.warn("[DPRO delivery detail] primary RPC failed; fallback", primaryError);
+        usedFallback = true;
+        detail = await loadProjectDetailFallback(projectId);
+      }
 
-      const detailRequest = state.supabase
-        .rpc("cc_center4_get_delivery_project_detail", { p_project_id: projectId })
-        .then(({ data, error }) => {
-          if (error) throw error;
-          return data;
-        });
-
-      const detail = await Promise.race([detailRequest, detailTimeout]);
-      if (detailTimer) clearTimeout(detailTimer);
-      if (!detail?.project) throw new Error("制作プロジェクトの詳細を取得できませんでした。");
+      if (!detail?.project) {
+        throw new Error("制作プロジェクトの詳細を取得できませんでした。");
+      }
 
       state.currentProject = {
         overview,
@@ -832,12 +887,26 @@
         checks: Array.isArray(detail.checks) ? detail.checks : [],
       };
 
-      renderProjectDetail();
-      showOnly("app");
+      $("detailContent").innerHTML = '<div class="empty">制作内容を表示しています…</div>';
       $("detailModal").classList.remove("hidden");
+      $("detailModal").setAttribute("aria-hidden","false");
+      showOnly("app");
+
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      renderProjectDetail();
+
+      if (usedFallback) {
+        toast("制作内容を代替経路で読み込みました。");
+      }
     } catch (error) {
       showOnly("app");
-      toast(error.message || "制作内容を取得できませんでした。", true);
+      console.error("[DPRO delivery detail] failed", error);
+      toast(`制作内容を取得できませんでした：${error?.message || "不明なエラー"}`, true);
+    } finally {
+      if (openButton) {
+        openButton.disabled = false;
+        openButton.textContent = originalButtonText || "制作内容を開く";
+      }
     }
   }
 
