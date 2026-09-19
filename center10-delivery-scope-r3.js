@@ -387,13 +387,25 @@
     const detail = $("detailContent");
     if (!detail || !state.initialized) return;
 
-    detail.querySelector(".c10-r3-detail-banner")?.remove();
-
+    const existing = detail.querySelector(".c10-r3-detail-banner");
     const code = detail.querySelector(".project-code")?.textContent?.trim() || "";
-    if (!code) return;
+
+    if (!code) {
+      if (existing) existing.remove();
+      return;
+    }
 
     const project = projectByCode(code);
-    if (!project || !isDemoProject(project)) return;
+    const shouldShow = Boolean(project && isDemoProject(project));
+
+    if (!shouldShow) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    // Idempotent: once the DEMO banner exists, do not mutate the observed DOM again.
+    // This prevents MutationObserver -> remove/insert -> MutationObserver infinite loops.
+    if (existing) return;
 
     const header = detail.querySelector(".detail-title");
     if (!header) return;
