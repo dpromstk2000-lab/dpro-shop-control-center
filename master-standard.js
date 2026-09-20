@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const BUILD="DPRO-MASTER-STANDARD-R4-20260920";
+  const BUILD="DPRO-MASTER-STANDARD-R5-20260920";
   const CONFIG=window.DPRO_CONTROL_CENTER_CONFIG||{};
   const $=(id)=>document.getElementById(id);
   const $$=(s,root=document)=>Array.from(root.querySelectorAll(s));
@@ -49,10 +49,10 @@
   }
 
   function render(){
-    const snap=state.snapshot||{};const masterCount=state.registry.filter(x=>x.standard_code==="DPRO_MASTER_STANDARD").length;const promoted=state.candidates.filter(x=>x.status==="promoted").length;const pending=state.candidates.filter(x=>["candidate","review","approved"].includes(x.status)).length;
+    const snap=state.snapshot||{};const masterCount=state.registry.filter(x=>x.standard_code==="DPRO_MASTER_STANDARD").length;const masterVersion=(Array.isArray(snap.current_versions)?snap.current_versions.find(x=>x.standard_code==="DPRO_MASTER_STANDARD")?.version_code:"")||"—";const promoted=state.candidates.filter(x=>x.status==="promoted").length;const pending=state.candidates.filter(x=>["candidate","review","approved"].includes(x.status)).length;
     $("metrics").innerHTML=[
       [state.registry.length,"現行標準項目","legacy＋MASTER"],
-      [masterCount,"MASTER V2.0","今回追加された横断標準"],
+      [masterCount,`MASTER ${masterVersion}`,"横断標準"],
       [promoted,"昇格済み学習","次のFACTORY ZIPへ収録"],
       [pending,"レビュー待ち","承認前はMASTERへ入らない"],
       [(snap.master_standard_sha256||"—").slice(0,12),"MASTER SHA",snap.master_standard_sha256||"未取得"]
