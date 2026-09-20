@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>MASTER STANDARD｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
+  <link rel="stylesheet" href="master-standard.css?v=MASTER-STANDARD-R4-20260920">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-43-CENTER10-R7-R10-R1-FINAL-AUDIT"></script>
+  <script defer src="master-standard.js?v=MASTER-STANDARD-R4-20260920"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen"><div class="spinner"></div><strong>DPRO MASTER STANDARD</strong><p id="loadingText">最新基準と学習パターンを確認しています…</p></div>
+  <div id="authScreen" class="state-screen hidden"><div class="state-card"><span class="state-icon">鍵</span><h1>CONTROL CENTERへログインしてください</h1><p>MASTER STANDARDはDPROスタッフ専用です。</p><a class="btn primary" href="index.html">CONTROL CENTERへ</a></div></div>
+  <div id="errorScreen" class="state-screen hidden"><div class="state-card"><span class="state-icon error">!</span><h1>MASTER STANDARDを開けません</h1><p id="errorText">DB拡張と接続状態を確認してください。</p><div class="state-actions"><button id="retryButton" class="btn primary" type="button">再確認</button><a class="btn secondary" href="product-development.html">新規製品開発へ戻る</a></div></div></div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="product-development.html"><i>新</i>新規製品開発</a>
+        <a class="active" href="master-standard.html"><i>基</i>MASTER STANDARD</a>
+        <a href="factory-v2.html"><i>V2</i>FACTORY V2監査</a>
+        <a href="index.html#view-products"><i>製</i>製品・連動標準</a>
+      </nav>
+      <div class="sidebar-note"><strong>DPRO MASTER V2.0</strong><span>LEARN → REVIEW → PROMOTE</span><small>良い実装を次のFACTORY ZIPへ自動継承。</small></div>
+      <div class="version">MASTER-STANDARD-R4<br><span>2026-09-20</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar"><button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button><div><strong>DPRO MASTER STANDARD</strong><small>DPROの良い実装・ブラッシュアップ知見を蓄積し、次の製品へ継承</small></div><div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div></header>
+
+      <section class="content master-content">
+        <div class="page-head master-head"><div><p class="eyebrow">DPRO MASTER STANDARD / CONTINUOUS LEARNING</p><h1>作るほど、<br>DPROの基準が強くなる。</h1><p>完成済みシステム・ブラッシュアップ・新しい参考例から得た再利用可能な改善を候補として保存し、承認したものだけMASTERへ昇格。次のFACTORY開発ZIPへ自動収録します。</p></div><div class="head-actions"><button id="refreshButton" class="btn secondary" type="button">最新情報に更新</button><button id="downloadMasterButton" class="btn secondary" type="button">MASTER JSONを保存</button><a class="btn primary" href="product-development.html">新規製品開発へ</a></div></div>
+
+        <div id="metrics" class="master-metrics"></div>
+
+        <div class="master-principles">
+          <article><strong>基本構成</strong><span>HP＋LINE公式＋DPRO。HP＋DPRO / LINE＋DPROも同じ中核で成立。</span></article>
+          <article><strong>CONTACT HUB</strong><span>WEB・LINE・Instagram等を同じ問い合わせモデルで確認。</span></article>
+          <article><strong>UI標準</strong><span>設定は左インデックス、ON/OFFはスイッチ、役割別画面を同じデータで連動。</span></article>
+          <article><strong>学習ループ</strong><span>新しい改善は候補→レビュー→承認→MASTER昇格。旧ZIPは自動STALE。</span></article>
+        </div>
+
+        <section class="master-panel">
+          <div class="panel-head"><div><p class="eyebrow">CURRENT STANDARD</p><h2>現行DPRO基準</h2></div><div class="master-filters"><input id="standardSearch" type="search" placeholder="基準名・コード・説明を検索"><select id="layerFilter"><option value="all">すべての層</option><option value="core">CORE</option><option value="ux">UX</option><option value="integration">INTEGRATION</option><option value="learning">LEARNING</option><option value="legacy">既存標準</option></select></div></div>
+          <div id="standardList" class="standard-list"></div>
+        </section>
+
+        <section class="master-panel learning-panel">
+          <div class="panel-head"><div><p class="eyebrow">LEARNING RETURN</p><h2>新しい良い所を取り込む</h2><p>ChatGPT Return ZIPの <code>STANDARD_LEARNING_RETURN.json</code> を取り込みます。個人情報・Secret・顧客固有設定は候補に入れません。</p></div><div class="learning-import"><input id="learningFile" type="file" accept="application/json,.json"><button id="importLearningButton" class="btn primary" type="button">学習候補を取り込む</button></div></div>
+          <div class="learning-help">候補は自動でMASTERには入りません。レビュー → 承認 → MASTER昇格の順で進めます。昇格するとMASTER SHAが変わり、過去のFACTORY開発ZIPはSTALEになります。</div>
+          <div id="candidateFilters" class="candidate-filters"><button type="button" class="active" data-status="all">すべて</button><button type="button" data-status="review">レビュー待ち</button><button type="button" data-status="approved">承認済み</button><button type="button" data-status="promoted">昇格済み</button><button type="button" data-status="rejected">見送り</button></div>
+          <div id="candidateList" class="candidate-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
