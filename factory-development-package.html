@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>FACTORY開発ZIP｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
+  <link rel="stylesheet" href="factory-development-package.css?v=FACTORY-DEV-PACKAGE-R1-20260920">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script defer src="config.js?v=CONTROL-CENTER-43-CENTER10-R7-R10-R1-FINAL-AUDIT"></script>
+  <script defer src="factory-development-package.js?v=FACTORY-DEV-PACKAGE-R1-20260920"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>FACTORY開発ZIP</strong>
+    <p id="loadingText">管理センターの最新DPRO基準を読み込んでいます…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>FACTORY開発ZIPはDPROスタッフ専用です。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>FACTORY開発ZIPを作れません</h1>
+      <p id="errorText">DB拡張・製品状態・接続状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="product-development.html">新規製品開発へ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html">
+        <span>D</span>
+        <div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div>
+      </a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="product-development.html"><i>新</i>新規製品開発</a>
+        <a class="active" id="selfNav" href="factory-development-package.html"><i>ZIP</i>FACTORY開発ZIP</a>
+        <a id="factoryNav" href="factory-v2.html"><i>V2</i>FACTORY V2監査</a>
+        <a href="index.html#view-products"><i>製</i>製品・連動標準</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>FACTORY V2.0</strong>
+        <span>CONTROL CENTER = SOURCE OF TRUTH</span>
+        <small>現在のDPRO標準を1つのZIPに固定してChatGPTへ渡します。</small>
+      </div>
+      <div class="version">FACTORY-DEV-PACKAGE-R1<br><span>2026-09-20</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div><strong>FACTORY開発ZIP</strong><small>管理センターの最新基準を1つの開発開始ZIPにする</small></div>
+        <div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div>
+      </header>
+
+      <section class="content package-content">
+        <div class="page-head package-head">
+          <div>
+            <p class="eyebrow">DPRO FACTORY DEVELOPMENT HANDOFF</p>
+            <h1>DPRO基準を、<br>1つのZIPでChatGPTへ。</h1>
+            <p>人がPREBUILDを全部手入力するのではなく、CONTROL CENTERに保存された最新DPRO標準・参考製品・FACTORY V2固定基準をそのまま開発ZIPへ収録します。</p>
+          </div>
+          <div class="head-actions">
+            <a class="btn secondary" href="product-development.html">新規製品開発へ戻る</a>
+            <button id="reloadButton" class="btn secondary" type="button">最新情報に更新</button>
+          </div>
+        </div>
+
+        <div class="policy-grid package-policy">
+          <article><strong>DPRO標準を自動収録</strong><span>現行の標準項目・Feature・依存関係をDBから取得します。</span></article>
+          <article><strong>参考製品を自動収録</strong><span>製品台帳・GitHub Repository・実装Feature・READY情報を入れます。</span></article>
+          <article><strong>個人情報は入れない</strong><span>標準製品開発に不要な患者名・メール・電話・診療内容は収録しません。</span></article>
+          <article><strong>ZIPを1個渡すだけ</strong><span>新しいチャットへこのZIPだけアップロードすれば開発を再開できます。</span></article>
+        </div>
+
+        <section id="projectPanel" class="package-panel"></section>
+
+        <div id="metrics" class="package-metrics"></div>
+
+        <section class="package-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">ZIP CONTENTS</p>
+              <h2>このZIPに入るもの</h2>
+            </div>
+            <span id="fileCountBadge" class="pill blue">確認中</span>
+          </div>
+          <div id="fileList" class="file-list"></div>
+        </section>
+
+        <section class="package-panel action-panel">
+          <div>
+            <p class="eyebrow">ONE ACTION</p>
+            <h2>FACTORY開発ZIPを生成する</h2>
+            <p id="actionNote">生成時に最新データを再取得し、各ファイルSHA256とZIP全体SHA256を計算して管理センターへ記録します。</p>
+          </div>
+          <button id="generateButton" class="btn primary generate-button" type="button">FACTORY開発ZIPを生成・ダウンロード</button>
+        </section>
+
+        <section id="resultPanel" class="package-panel result-panel hidden">
+          <p class="eyebrow">PACKAGE READY</p>
+          <h2>開発ZIPを作成しました</h2>
+          <dl class="result-grid">
+            <div><dt>ファイル名</dt><dd id="resultFilename">—</dd></div>
+            <div><dt>ZIP SHA256</dt><dd id="resultSha">—</dd></div>
+            <div><dt>収録ファイル</dt><dd id="resultFiles">—</dd></div>
+            <div><dt>管理センター登録</dt><dd id="resultGate">—</dd></div>
+          </dl>
+          <div class="next-panel package-next">
+            <strong>次にすること</strong>
+            <span>ダウンロードしたZIPをChatGPTの新しいチャットへ1個アップロードし、「このZIPを唯一の開発開始基準として、現在のDPRO標準と参考製品を読み、新システム制作を続けて」と送ってください。</span>
+          </div>
+          <div class="package-result-actions">
+            <a class="btn secondary" href="product-development.html">新規製品開発へ戻る</a>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>

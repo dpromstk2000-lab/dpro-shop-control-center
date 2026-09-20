@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-PRODUCT-DEVELOPMENT-R2-PREBUILD-SPEC-20260919";
+  const BUILD = "DPRO-PRODUCT-DEVELOPMENT-R3-FACTORY-DEV-PACKAGE-20260920";
   const FACTORY_VERSION = "V2.0";
   const PACKAGE_SHA = "2e8b7cb07e33fe861b0c4829af197962560e2e62226bc6340d43436f254d2137";
   const LOCK_SHA = "ccf25b5f0bc7250e4080d8f561314a53338dcfaec44fb14c138da65b4b06ec59";
@@ -16,6 +16,7 @@
     products: [],
     projects: [],
     factory: [],
+    handoffs: [],
     selectedId: "",
     editingId: "",
   };
@@ -44,6 +45,7 @@
   const productByCode = (code) => state.products.find((p) => String(p.system_code || "").toUpperCase() === String(code || "").toUpperCase()) || null;
   const factoryByProject = (id) => state.factory.find((x) => x.project_id === id) || null;
   const selectedProject = () => state.projects.find((x) => x.id === state.selectedId) || null;
+  const handoffByProduct = (id) => state.handoffs.find((x) => x.product_dev_id === id) || null;
 
   function toast(message, error = false) {
     const el = $("toast");
@@ -146,16 +148,19 @@
 
   async function loadAll(keepSelection = false) {
     const selected = keepSelection ? state.selectedId : "";
-    const [products, projectsResult, factoryResult] = await Promise.all([
+    const [products, projectsResult, factoryResult, handoffResult] = await Promise.all([
       loadProducts(),
       state.supabase.from("cc_v_product_development_overview").select("*").order("updated_at", {ascending:false}),
       state.supabase.rpc("cc_factory_v2_list_overview"),
+      state.supabase.rpc("cc_product_dev_list_handoff_status"),
     ]);
     if (projectsResult.error) throw projectsResult.error;
     if (factoryResult.error) throw factoryResult.error;
+    if (handoffResult.error) throw handoffResult.error;
     state.products = products;
     state.projects = projectsResult.data || [];
     state.factory = Array.isArray(factoryResult.data) ? factoryResult.data : [];
+    state.handoffs = Array.isArray(handoffResult.data) ? handoffResult.data : [];
     prepareReferenceOptions();
     renderGrid();
     if (selected && state.projects.some((x) => x.id === selected)) {
@@ -192,15 +197,17 @@
 
   function renderCard(p) {
     const f = factoryByProject(p.delivery_project_id) || {};
+    const h = handoffByProduct(p.id) || {};
     const sm = statusMeta[p.status] || [p.status || "—", ""];
     const ref = productByCode(p.reference_product_system_code);
+    const zipState = p.status === "prebuild" ? (h.handoff_current ? "READY" : (h.handoff_exists ? "要再生成" : "未生成")) : (h.handoff_exists ? "発行済み" : "—");
     return `<article class="project-card">
       <div class="project-head">
         <div><span class="project-code">${esc(p.dev_code)} / ${esc(p.target_system_code)}</span><h2>${esc(p.product_name)}</h2><p>${esc(p.category || "カテゴリ未設定")}</p></div>
         ${pill(sm[0], sm[1])}
       </div>
       <div class="factory-grid">
-        <div><b>${Number(f.prebuild_done || 0)}/${Number(f.prebuild_total || 10)}</b><span>PREBUILD</span></div>
+        <div><b>${esc(zipState)}</b><span>FACTORY開発ZIP</span></div>
         <div><b>${Number(f.final_done || 0)}/${Number(f.final_total || 4)}</b><span>FINAL</span></div>
         <div><b>${Number(f.action_required || 0)}</b><span>要対応</span></div>
       </div>
@@ -298,10 +305,10 @@
 
   function closeDetail() { $("detailModal").classList.add("hidden"); state.selectedId = ""; }
 
-  function nextInstruction(p, f) {
-    if (p.status === "draft") return "製品定義を確認したらPREBUILDへ進みます。PREBUILDでは自由入力PASSではなく、構造化された設計仕様を完成させます。";
-    if (p.status === "prebuild" && !f?.prebuild_ready) return `PREBUILD設計を完成してください。現在 ${Number(f?.prebuild_done || 0)}/${Number(f?.prebuild_total || 10)}。FACTORY基準は自動確認、残りは仕様がDB検証されるまでPASSになりません。`;
-    if (p.status === "prebuild" && f?.prebuild_ready) return "PREBUILD 10/10です。「制作開始」へ進めます。";
+  function nextInstruction(p, f, h) {
+    if (p.status === "draft") return "製品定義を確認したらPREBUILDへ進みます。PREBUILDでは管理センターの最新DPRO基準からFACTORY開発ZIPを生成します。";
+    if (p.status === "prebuild" && !h?.handoff_current) return h?.handoff_exists ? "製品定義が更新されています。FACTORY開発ZIPを再生成してChatGPTへ渡してください。" : "FACTORY開発ZIPを生成してChatGPTへアップロードしてください。手作業で9項目を埋める必要はありません。";
+    if (p.status === "prebuild" && h?.handoff_current) return "FACTORY開発ZIP READYです。ZIPをChatGPTへアップロードし、この製品の制作を開始できます。";
     if (p.status === "building") return "標準製品本体を制作します。完成したらFINAL QAへ進みます。";
     if (p.status === "final_qa" && !f?.final_ready) return `FACTORY V2 FINALを完了してください。現在 ${Number(f?.final_done || 0)}/${Number(f?.final_total || 4)}。`;
     if (p.status === "final_qa" && f?.final_ready) return "FINAL 4/4です。製品台帳登録待ちへ進めます。";
@@ -310,10 +317,10 @@
     return "状態を確認してください。";
   }
 
-  function stageAction(p, f) {
+  function stageAction(p, f, h) {
     if (!canWrite() || ["cataloged","cancelled"].includes(p.status)) return "";
     if (p.status === "draft") return '<button class="btn primary" type="button" data-stage="prebuild">PREBUILDへ進む</button>';
-    if (p.status === "prebuild") return `<button class="btn primary" type="button" data-stage="building" ${f?.prebuild_ready ? "" : "disabled"}>制作開始</button>`;
+    if (p.status === "prebuild") return `<button class="btn primary" type="button" data-stage="building" ${h?.handoff_current ? "" : "disabled"}>制作開始</button>`;
     if (p.status === "building") return '<button class="btn primary" type="button" data-stage="final_qa">FINAL QAへ進む</button>';
     if (p.status === "final_qa") return `<button class="btn primary" type="button" data-stage="catalog_ready" ${f?.final_ready ? "" : "disabled"}>製品台帳登録待ちへ</button>`;
     if (p.status === "catalog_ready") return `<button class="btn primary" type="button" data-stage="cataloged" ${productByCode(p.target_system_code) ? "" : "disabled"}>製品化完了</button>`;
@@ -325,6 +332,7 @@
     const p = selectedProject();
     if (!p) return;
     const f = factoryByProject(p.delivery_project_id) || {};
+    const h = handoffByProduct(p.id) || {};
     const sm = statusMeta[p.status] || [p.status || "—", ""];
     const ref = productByCode(p.reference_product_system_code);
     const identityOk = String(p.factory_version || "") === FACTORY_VERSION && String(p.factory_package_sha256 || "") === PACKAGE_SHA && String(p.factory_lock_sha256 || "") === LOCK_SHA;
@@ -341,22 +349,22 @@
         <div class="definition"><dt>データ・安全設計</dt><dd>${esc(p.data_handling_notes)}</dd></div>
         <div class="definition"><dt>FACTORY制作シェル</dt><dd>${esc(p.delivery_project_code || "—")} / ${esc(p.delivery_project_status || "—")}</dd></div>
       </dl>
-      <section class="gate-panel"><h3>FACTORY V2.0 Gate</h3><div class="gate-grid">
-        <div class="gate-card"><b>${Number(f.prebuild_done || 0)}/${Number(f.prebuild_total || 10)}</b><span>PREBUILD ${f.prebuild_ready ? "PASS" : "確認中"}</span></div>
+      <section class="gate-panel"><h3>新規製品 開発開始Gate</h3><div class="gate-grid">
+        <div class="gate-card"><b>${p.status === "prebuild" ? (h.handoff_current ? "READY" : (h.handoff_exists ? "STALE" : "WAIT")) : (h.handoff_exists ? "ISSUED" : "—")}</b><span>FACTORY開発ZIP</span></div>
         <div class="gate-card"><b>${Number(f.final_done || 0)}/${Number(f.final_total || 4)}</b><span>FINAL ${f.final_ready ? "PASS" : "確認中"}</span></div>
-        <div class="gate-card"><b>${Number(f.action_required || 0)}</b><span>ACTION REQUIRED</span></div>
+        <div class="gate-card"><b>${identityOk ? "PASS" : "NG"}</b><span>FACTORY V2 IDENTITY</span></div>
       </div></section>
-      <div class="next-panel"><strong>次にすること</strong><span>${esc(nextInstruction(p,f))}</span></div>
+      <div class="next-panel"><strong>次にすること</strong><span>${esc(nextInstruction(p,f,h))}</span></div>
       <div class="detail-actions">
-        ${["draft","prebuild"].includes(p.status) ? `<a class="btn primary" href="factory-v2-prebuild.html?project=${encodeURIComponent(p.delivery_project_id)}">PREBUILD設計を開く</a>` : ""}
+        ${["prebuild"].includes(p.status) ? `<a class="btn primary" href="factory-development-package.html?productDev=${encodeURIComponent(p.id)}">FACTORY開発ZIPを作成</a>` : ""}
+        ${["draft"].includes(p.status) ? '<span class="btn secondary" aria-disabled="true">先にPREBUILDへ進む</span>' : ""}
+        ${["draft","prebuild"].includes(p.status) ? `<a class="btn secondary" href="factory-v2-prebuild.html?project=${encodeURIComponent(p.delivery_project_id)}">詳細PREBUILD設計（任意）</a>` : ""}
         <a class="btn secondary" href="factory-v2.html?project=${encodeURIComponent(p.delivery_project_id)}">FACTORY V2監査を開く</a>
-        <button class="btn secondary" type="button" id="copyHandoff">ChatGPT開発指示をコピー</button>
         ${canWrite() && !["cataloged","cancelled"].includes(p.status) ? '<button class="btn secondary" type="button" id="editDefinition">製品定義を編集</button>' : ""}
-        ${stageAction(p,f)}
+        ${stageAction(p,f,h)}
       </div>
       <div class="privacy-note">この台帳は標準製品開発用です。問い合わせ元の個人名、患者名、メール、電話番号、診療内容などの個人情報は保存しません。</div>`;
 
-    $("copyHandoff")?.addEventListener("click", () => copyHandoff(p,f));
     $("editDefinition")?.addEventListener("click", () => { closeDetail(); openEditor(p); });
     $$('[data-stage]', $("detailContent")).forEach((b) => b.addEventListener("click", () => setStage(b.dataset.stage, b)));
   }
@@ -406,8 +414,8 @@
       "【固定ルール】",
       "- FACTORY V2.0の固定IDENTITYは変更しない。",
       "- 参考製品を再利用し、証明された不具合がない完成済み機能を無条件に再開発しない。",
-      "- PREBUILD Gate完了前に本制作へ進まない。",
-      "- PREBUILDの設計項目はfactory-v2-prebuild.htmlで構造化仕様を完成させ、自由入力だけのPASS/N/Aは禁止する。",
+      "- FACTORY開発ZIPを唯一の開発開始パッケージとして読み、管理センターのDPRO標準を優先する。",
+      "- 参考製品の完成済み機能を再利用し、不足仕様はChatGPT側で標準・参考製品から整理する。",
       "- FINAL Gate完了前に製品台帳登録・販売可能判定へ進まない。",
       "- 個別顧客の本番テナント、患者情報、Secretは標準製品開発へ持ち込まない。",
       "- MutationObserver等の補助UIは冪等実装を必須とする。",
