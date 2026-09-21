@@ -9,10 +9,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
   <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
-  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO07B-DRY-RUN-UI-R1-20260921">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
-  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO07B-DRY-RUN-UI-R1-20260921"></script>
 </head>
 <body data-dpro-customer-workspace-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -59,7 +59,7 @@
         <span>MASTER V1.0</span>
         <small>契約 → 本番導入 → GO LIVE → 運用</small>
       </div>
-      <div class="version">CO-06<br><span>ONBOARDING + OPERATION</span></div>
+      <div class="version">CO-07<br><span>DRY RUN + OPERATION</span></div>
     </aside>
 
     <main class="main">
@@ -100,6 +100,7 @@
         <div class="workspace-tabs">
           <button class="workspace-tab is-active" type="button" data-workspace-tab="cases">導入・運用中</button>
           <button class="workspace-tab" type="button" data-workspace-tab="candidates">導入を開始</button>
+          <button class="workspace-tab" type="button" data-workspace-tab="dryrun">全工程DRY RUN</button>
         </div>
 
         <section id="casesPanel" class="workspace-panel">
@@ -124,6 +125,91 @@
             </div>
           </div>
           <div id="candidateGrid" class="candidate-grid"></div>
+        </section>
+
+        <section id="dryRunPanel" class="workspace-panel hidden">
+          <div class="dryrun-hero">
+            <div>
+              <p class="eyebrow">END-TO-END DRY RUN</p>
+              <h2>契約から運用まで、実データを書かずに通し確認</h2>
+              <p>PRODUCT RELEASEの実LOCK状態は本物を確認し、それ以外は「必要証跡が揃った場合に次工程へ進めるか」を安全にシミュレーションします。</p>
+            </div>
+            <div class="dryrun-safety">
+              <strong>本番データ書込 0</strong>
+              <span>顧客・契約・環境を作りません</span>
+              <strong>GO LIVEしない</strong>
+              <span>本番稼働処理は呼びません</span>
+            </div>
+          </div>
+
+          <form id="dryRunForm" class="dryrun-form">
+            <div class="dryrun-form-grid">
+              <label>
+                <span>検査する製品</span>
+                <select id="dryRunSystemCode" required></select>
+              </label>
+              <label>
+                <span>仮の顧客コード</span>
+                <input id="dryRunClientCode" value="DRYRUN-001" required>
+              </label>
+              <label class="wide">
+                <span>仮の顧客名</span>
+                <input id="dryRunClientName" value="DPRO DRY RUN CUSTOMER" required>
+              </label>
+            </div>
+
+            <div class="dryrun-requirements">
+              <strong>今回のDRY RUN構成</strong>
+              <div class="dryrun-check-grid">
+                <label><input id="dryRunOwner" type="checkbox" checked><span>Owner</span></label>
+                <label><input id="dryRunSupabase" type="checkbox" checked><span>Supabase</span></label>
+                <label><input id="dryRunGithub" type="checkbox" checked><span>GitHub</span></label>
+                <label><input id="dryRunWorker" type="checkbox" checked><span>Cloudflare Worker</span></label>
+                <label><input id="dryRunWebsite" type="checkbox" checked><span>Website</span></label>
+                <label><input id="dryRunLine" type="checkbox" checked><span>LINE公式</span></label>
+                <label><input id="dryRunCustomDomain" type="checkbox" checked><span>独自ドメイン</span></label>
+              </div>
+            </div>
+
+            <button id="runDryRunButton" class="btn primary" type="submit">8工程DRY RUNを実行</button>
+          </form>
+
+          <section id="dryRunResult" class="dryrun-result hidden">
+            <div id="dryRunSummary" class="dryrun-summary"></div>
+
+            <div class="dryrun-result-section">
+              <div class="dryrun-result-head">
+                <div>
+                  <p class="eyebrow">8 STEP JOURNEY</p>
+                  <h3>全工程の通過確認</h3>
+                </div>
+                <span class="dryrun-legend">REAL_PASS＝実DB証跡 / SIMULATED_PASS＝論理通過</span>
+              </div>
+              <div id="dryRunJourney" class="dryrun-journey"></div>
+            </div>
+
+            <div class="dryrun-result-section">
+              <div class="dryrun-result-head">
+                <div>
+                  <p class="eyebrow">NAME PLAN</p>
+                  <h3>本番導入時の名前候補</h3>
+                </div>
+              </div>
+              <div id="dryRunNamePlan" class="dryrun-name-plan"></div>
+            </div>
+
+            <div class="dryrun-result-section">
+              <div class="dryrun-result-head">
+                <div>
+                  <p class="eyebrow">LIMITS</p>
+                  <h3>このDRY RUNで実施していないこと</h3>
+                </div>
+              </div>
+              <ul id="dryRunLimitations" class="dryrun-limitations"></ul>
+            </div>
+
+            <p class="dryrun-footer-note">DRY RUNのPASSは実契約の本番承認ではありません。実契約ではOwner承認・実環境作成・HTTP実測・GO LIVE Gateを改めて通します。</p>
+          </section>
         </section>
 
         <section id="detailPanel" class="workspace-detail hidden">

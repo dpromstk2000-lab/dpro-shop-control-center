@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO07B-DRY-RUN-UI-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -23,6 +23,7 @@
     verification: null,
     goLiveGate: null,
     operationState: null,
+    dryRunResult: null,
   };
 
   const roleLabels = {
@@ -738,6 +739,181 @@
     }
   }
 
+  function eligibleDryRunReleases(){
+    return state.releases
+      .filter((r)=>r?.release_status==="complete" && r?.product_release_lock===true && r?.final_lock_verified===true)
+      .sort((a,b)=>String(a.product_name||a.system_code).localeCompare(String(b.product_name||b.system_code),"ja"));
+  }
+
+  function renderDryRunSetup(){
+    const select=$("dryRunSystemCode");
+    const button=$("runDryRunButton");
+    if (!select || !button) return;
+
+    const before=select.value;
+    const rows=eligibleDryRunReleases();
+    select.innerHTML=rows.length
+      ? rows.map((r)=>`<option value="${esc(r.system_code)}">${esc(r.product_name || r.system_code)}｜${esc(r.system_code)}</option>`).join("")
+      : '<option value="">PRODUCT RELEASE LOCK済み製品がありません</option>';
+
+    if (before && rows.some((r)=>r.system_code===before)) select.value=before;
+    button.disabled=!rows.length;
+  }
+
+  function syncDryRunDependencies(){
+    const website=$("dryRunWebsite");
+    const domain=$("dryRunCustomDomain");
+    if (!website || !domain) return;
+    if (!website.checked) {
+      domain.checked=false;
+      domain.disabled=true;
+    } else {
+      domain.disabled=false;
+    }
+  }
+
+  function dryRunStateClass(value){
+    const v=String(value||"").toLowerCase().replaceAll("_","-");
+    if (v==="real-pass") return "real-pass";
+    if (v==="simulated-pass") return "simulated-pass";
+    if (v==="blocked") return "blocked";
+    return "";
+  }
+
+  function dryRunStepDetail(step){
+    if (Array.isArray(step?.required_real_evidence) && step.required_real_evidence.length) {
+      return `実契約時：${step.required_real_evidence.join(" / ")}`;
+    }
+    if (step?.production_truth) return step.production_truth;
+    if (step?.source_of_truth) return `正本：${step.source_of_truth}`;
+    if (step?.real_evidence?.system_code) {
+      return `${step.real_evidence.system_code} / ${step.real_evidence.master || "LOCK evidence"}`;
+    }
+    if (step?.planned_names?.repository_full_name) {
+      return `Repo ${step.planned_names.repository_full_name}`;
+    }
+    return "工程の接続を確認";
+  }
+
+  function dryRunNameCard(label,value,collision=false){
+    return `<article class="dryrun-name-card">
+      <span>${esc(label)}</span>
+      <strong>${esc(value || "—")}</strong>
+      ${collision?'<small>重複を検知しsuffix適用済み</small>':""}
+    </article>`;
+  }
+
+  function renderDryRunResult(){
+    const r=state.dryRunResult;
+    const root=$("dryRunResult");
+    if (!root) return;
+    if (!r){
+      root.classList.add("hidden");
+      return;
+    }
+    root.classList.remove("hidden");
+
+    const pass=r.simulated_end_to_end_pass===true;
+    const realProductPass=r.product_release?.ready===true;
+    const implPass=r.implementation_pass===true;
+    const writeZero=Number(r.business_data_writes||0)===0;
+    const activationBlocked=r.actual_production_activation_allowed===false;
+
+    $("dryRunSummary").className=`dryrun-summary ${pass?"is-pass":"is-fail"}`;
+    $("dryRunSummary").innerHTML=`
+      <div class="dryrun-summary-badge">${pass?"DRY RUN PASS":"CHECK REQUIRED"}</div>
+      <div class="dryrun-summary-main">
+        <strong>${pass?"8工程を最後まで論理通過できます":"DRY RUNにBlockerがあります"}</strong>
+        <span>PRODUCT RELEASE ${realProductPass?"REAL PASS":"BLOCKED"} / 実装 ${implPass?"PASS":"FAIL"} / 本番書込 ${writeZero?"0":"要確認"} / GO LIVE実行 ${activationBlocked?"禁止":"要確認"}</span>
+      </div>
+      <div class="dryrun-summary-score">${esc(r.journey_step_count ?? 0)} STEP</div>`;
+
+    const journey=Array.isArray(r.journey)?r.journey:[];
+    $("dryRunJourney").innerHTML=journey.map((step)=>`
+      <article class="dryrun-step ${dryRunStateClass(step.state)}">
+        <span class="dryrun-step-number">STEP ${esc(step.step)}</span>
+        <strong>${esc(step.label || step.code)}</strong>
+        <span class="dryrun-step-state">${esc(step.state || "UNKNOWN")}</span>
+        <p>${esc(dryRunStepDetail(step))}</p>
+      </article>`).join("");
+
+    const n=r.naming_plan || {};
+    const collisions=n.collisions || {};
+    $("dryRunNamePlan").innerHTML=[
+      dryRunNameCard("facility_code",n.facility_code,collisions.facility_code),
+      dryRunNameCard("Supabase Project",n.supabase_project_name,false),
+      dryRunNameCard("schema",n.schema_name,false),
+      dryRunNameCard("tenant_code",n.tenant_code,false),
+      dryRunNameCard("GitHub Repository",n.repository_full_name,collisions.repository),
+      dryRunNameCard("GitHub Pages",n.pages_url,false),
+      dryRunNameCard("Cloudflare Worker",n.worker_name,collisions.worker),
+      dryRunNameCard("Worker URL",n.worker_url,collisions.worker),
+    ].join("");
+
+    const limits=Array.isArray(r.real_world_limitations)?r.real_world_limitations:[];
+    $("dryRunLimitations").innerHTML=limits.length
+      ? limits.map((x)=>`<li>${esc(x)}</li>`).join("")
+      : '<li>制限情報はありません。</li>';
+  }
+
+  async function runDryRun(event){
+    event.preventDefault();
+    const systemCode=inputValue("dryRunSystemCode");
+    const clientCode=inputValue("dryRunClientCode").toUpperCase();
+    const clientName=inputValue("dryRunClientName");
+
+    if (!systemCode) return toast("PRODUCT RELEASE LOCK済み製品を選択してください。",true);
+    if (!clientCode || !clientName) return toast("仮の顧客コードと顧客名を入力してください。",true);
+
+    const payload={
+      client_code:clientCode,
+      client_name:clientName,
+      system_code:systemCode,
+      owner_required:Boolean($("dryRunOwner")?.checked),
+      supabase_required:Boolean($("dryRunSupabase")?.checked),
+      github_required:Boolean($("dryRunGithub")?.checked),
+      worker_required:Boolean($("dryRunWorker")?.checked),
+      website_required:Boolean($("dryRunWebsite")?.checked),
+      line_required:Boolean($("dryRunLine")?.checked),
+      custom_domain_required:Boolean($("dryRunCustomDomain")?.checked),
+      github_owner:"dpromstk2000-lab",
+      workers_domain:"dpromstk2000.workers.dev",
+    };
+
+    const button=$("runDryRunButton");
+    const oldText=button.textContent;
+    button.disabled=true;
+    button.textContent="DRY RUN中…";
+
+    try{
+      const {data,error}=await state.supabase.rpc("cc_customer_onboarding_dry_run",{
+        p_payload:payload,
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("DRY RUN結果を取得できませんでした。");
+
+      state.dryRunResult=data;
+      renderDryRunResult();
+      $("dryRunResult").scrollIntoView({behavior:"smooth",block:"start"});
+
+      toast(data.simulated_end_to_end_pass
+        ?"DRY RUN PASS：本番データ書込0で8工程を確認しました。"
+        :"DRY RUNに確認項目があります。");
+    }catch(error){
+      console.error(BUILD,error);
+      const message=String(error?.message || "DRY RUNを実行できませんでした。");
+      toast(
+        message.includes("CO07_READ_AND_AAL2_REQUIRED")
+          ?"DRY RUNにはControl CenterのAAL2認証が必要です。再認証後に実行してください。"
+          :message,
+        true
+      );
+    }finally{
+      button.disabled=!eligibleDryRunReleases().length;
+      button.textContent=oldText;
+    }
+  }
+
   const operationStateLabels={
     pre_live:"PRE-LIVE",
     ok:"NORMAL",
@@ -1313,12 +1489,15 @@
     document.querySelectorAll("[data-workspace-tab]").forEach((b) => b.classList.toggle("is-active",b.dataset.workspaceTab===tab));
     $("casesPanel").classList.toggle("hidden",tab!=="cases");
     $("candidatesPanel").classList.toggle("hidden",tab!=="candidates");
+    $("dryRunPanel").classList.toggle("hidden",tab!=="dryrun");
   }
 
   function renderAll() {
     renderMetrics();
     renderCases();
     renderCandidates();
+    renderDryRunSetup();
+    renderDryRunResult();
     if (state.selectedCaseId) renderDetail();
   }
 
@@ -1341,6 +1520,9 @@
     });
     $("caseSearch")?.addEventListener("input",renderCases);
     $("caseFilter")?.addEventListener("change",renderCases);
+    $("dryRunForm")?.addEventListener("submit",runDryRun);
+    $("dryRunWebsite")?.addEventListener("change",syncDryRunDependencies);
+    syncDryRunDependencies();
     document.querySelectorAll("[data-workspace-tab]").forEach((b) => b.addEventListener("click",() => switchTab(b.dataset.workspaceTab)));
     $("closeDetailButton")?.addEventListener("click",() => {
       state.selectedCaseId=null;
