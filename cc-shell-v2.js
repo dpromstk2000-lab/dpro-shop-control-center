@@ -129,14 +129,72 @@
     return button;
   };
 
+  const sectionKeyForTitle = (title) => ({
+    "ホーム": "home",
+    "お客様": "customers",
+    "導入・運用": "delivery",
+    "DPRO製品": "products",
+    "品質・管理": "quality",
+    "その他": "advanced",
+  }[title] || title);
+
+  const currentSectionKey = () => {
+    const key = currentKey();
+    if (key === "home") return "home";
+    if (["clients","contracts","line","websites"].includes(key)) return "customers";
+    if (["start","setup","delivery","ready"].includes(key)) return "delivery";
+    if (["products","productDev","productRelease"].includes(key)) return "products";
+    if (["master","factory","check","monitor","artifacts"].includes(key)) return "quality";
+    return "";
+  };
+
   const makeSection = (title) => {
     const box = document.createElement("div");
     box.className = "ccv2-nav-section";
-    const head = document.createElement("div");
+    box.dataset.ccv2Section = sectionKeyForTitle(title);
+
+    if (title === "ホーム") {
+      box.classList.add("is-open", "is-home");
+      return box;
+    }
+
+    const head = document.createElement("button");
+    head.type = "button";
     head.className = "ccv2-nav-section-title";
-    head.textContent = title;
-    box.append(head);
+    head.innerHTML = `<span>${title}</span><b aria-hidden="true">⌄</b>`;
+    head.setAttribute("aria-expanded", "false");
+
+    const body = document.createElement("div");
+    body.className = "ccv2-nav-section-body";
+
+    head.addEventListener("click", () => {
+      const willOpen = !box.classList.contains("is-open");
+      box.parentElement?.querySelectorAll(".ccv2-nav-section.is-open:not(.is-home)").forEach((other) => {
+        if (other !== box) {
+          other.classList.remove("is-open");
+          other.querySelector(".ccv2-nav-section-title")?.setAttribute("aria-expanded", "false");
+        }
+      });
+      box.classList.toggle("is-open", willOpen);
+      head.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    });
+
+    box.append(head, body);
     return box;
+  };
+
+  const appendSectionItem = (box, node) => {
+    const body = box.querySelector(".ccv2-nav-section-body");
+    (body || box).append(node);
+  };
+
+  const openCurrentSection = (nav) => {
+    const key = currentSectionKey();
+    if (!key || key === "home") return;
+    const box = nav.querySelector(`[data-ccv2-section="${key}"]`);
+    if (!box) return;
+    box.classList.add("is-open");
+    box.querySelector(".ccv2-nav-section-title")?.setAttribute("aria-expanded", "true");
   };
 
   const makePriorityContact = () => {
@@ -179,7 +237,7 @@
       const box = makeSection(section.title);
       for (const key of section.items) {
         const node = keepMap[key] || makeStaticLink(key);
-        if (node) box.append(node);
+        if (node) appendSectionItem(box, node);
       }
       nav.append(box);
     }
@@ -202,10 +260,12 @@
         label.className = "ccv2-nav-label";
         label.textContent = labelText;
         button.append(label);
-        box.append(button);
+        appendSectionItem(box, button);
       }
       nav.append(box);
     }
+
+    openCurrentSection(nav);
   };
 
   const normalizeStaticNav = (nav) => {
@@ -214,9 +274,10 @@
     nav.append(makePriorityContact());
     for (const section of sections) {
       const box = makeSection(section.title);
-      for (const key of section.items) box.append(makeStaticLink(key));
+      for (const key of section.items) appendSectionItem(box, makeStaticLink(key));
       nav.append(box);
     }
+    openCurrentSection(nav);
   };
 
   const buildDrawer = () => {
@@ -238,9 +299,10 @@
     nav.append(makePriorityContact());
     for (const section of sections) {
       const box = makeSection(section.title);
-      for (const key of section.items) box.append(makeStaticLink(key));
+      for (const key of section.items) appendSectionItem(box, makeStaticLink(key));
       nav.append(box);
     }
+    openCurrentSection(nav);
     panel.append(nav);
     drawer.append(panel);
     drawer.addEventListener("click", (event) => {
@@ -405,9 +467,22 @@
     }
   };
 
+  const cleanLegacySidebarExtras = () => {
+    $$(".sidebar-note, .cc9-sidebar-note, .version, .cc9-version").forEach((el) => {
+      el.dataset.ccv2LegacyExtra = "true";
+    });
+    const sideBottom = $(".side-bottom");
+    if (sideBottom) {
+      const firstLink = sideBottom.querySelector("a");
+      if (firstLink?.getAttribute("href") === "system-check.html") firstLink.dataset.ccv2DuplicateCheck = "true";
+      sideBottom.querySelector("small")?.setAttribute("data-ccv2-version", "true");
+    }
+  };
+
   const boot = () => {
-    document.documentElement.dataset.ccUiV2 = "phase1";
+    document.documentElement.dataset.ccUiV2 = "phase1b";
     installNav();
+    cleanLegacySidebarExtras();
     installHeaderContact();
     installFallbackMenuButton();
     ensureDeepLink();

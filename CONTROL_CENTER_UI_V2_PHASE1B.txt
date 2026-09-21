@@ -1,0 +1,10 @@
+DPRO CONTROL CENTER UI V2 / PHASE 1B
+DATE: 2026-09-21
+- 顧客対応は常時固定
+- ホームは常時表示
+- お客様 / 導入・運用 / DPRO製品 / 品質・管理をaccordion化
+- 現在の領域だけ自動展開
+- 古いsidebar-note / versionを表側から整理
+- 重複した接続確認リンクを整理
+- ログアウトは維持
+- DPRO CONTACT PWA / DB / Workerは変更なし

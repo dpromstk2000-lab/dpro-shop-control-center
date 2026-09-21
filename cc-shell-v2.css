@@ -49,3 +49,72 @@
   .ccv2-header-contact:not(.has-unread)::before{content:"話";font-weight:900}
   .ccv2-header-contact-floating{right:10px;top:10px}.ccv2-fallback-menu{left:10px;top:10px}
 }
+
+/* PHASE 1-B / navigation usability brushup */
+html[data-cc-ui-v2="phase1b"] .sidebar,
+html[data-cc-ui-v2="phase1b"] .cc9-sidebar{
+  overflow:hidden!important;
+}
+html[data-cc-ui-v2="phase1b"] .side-nav,
+html[data-cc-ui-v2="phase1b"] #sidebar nav.ccv2-nav,
+html[data-cc-ui-v2="phase1b"] .sidebar nav.ccv2-nav,
+html[data-cc-ui-v2="phase1b"] .cc9-sidebar nav.ccv2-nav{
+  min-height:0!important;
+  flex:1 1 auto!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,.20) transparent;
+  padding-right:3px!important;
+}
+.ccv2-nav-section{gap:0!important}
+.ccv2-nav-section-title{
+  width:100%!important;
+  min-height:36px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  border:0!important;
+  background:transparent!important;
+  cursor:pointer!important;
+  text-align:left!important;
+}
+.ccv2-nav-section-title b{
+  font-size:14px!important;
+  font-weight:700!important;
+  transition:transform .16s ease;
+}
+.ccv2-nav-section.is-open .ccv2-nav-section-title b{transform:rotate(180deg)}
+.ccv2-nav-section-body{
+  display:grid;
+  grid-template-rows:0fr;
+  transition:grid-template-rows .16s ease;
+}
+.ccv2-nav-section-body > *{overflow:hidden}
+.ccv2-nav-section.is-open .ccv2-nav-section-body{grid-template-rows:1fr}
+.ccv2-nav-section.is-open .ccv2-nav-section-body > *{overflow:visible}
+.ccv2-nav-section.is-home .ccv2-nav-section-body{display:contents}
+.ccv2-nav-section.is-home > .ccv2-nav-link,
+.ccv2-nav-section.is-home > .nav-button{margin-bottom:2px!important}
+.ccv2-nav-link,.ccv2-nav .nav-button{min-height:40px!important;padding:7px 10px!important}
+.ccv2-contact-priority{
+  position:sticky!important;top:0!important;z-index:3!important;
+  backdrop-filter:blur(10px);
+  margin-bottom:4px!important;
+}
+[data-ccv2-legacy-extra="true"]{display:none!important}
+[data-ccv2-duplicate-check="true"]{display:none!important}
+[data-ccv2-version="true"]{display:none!important}
+.side-bottom{
+  margin-top:auto!important;
+  padding-top:8px!important;
+  border-top:1px solid rgba(255,255,255,.08)!important;
+}
+.side-bottom button[data-sign-out]{
+  min-height:40px!important;
+}
+@media(max-width:760px){
+  .ccv2-nav-section-title{min-height:42px!important}
+  .ccv2-nav-link,.ccv2-nav .nav-button{min-height:44px!important}
+}
