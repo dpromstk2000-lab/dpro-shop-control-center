@@ -40,564 +40,564 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/apply_history_guard.py <<'PY'
-from pathlib import Path
-import json, hashlib
-
-REVISION = "20260921-HISTORY-PRESERVATION-R1"
-MASTER_JS = Path("product-release-master-v1-2.js")
-PACKAGE_JS = Path("product-release-package.js")
-PACKAGE_HTML = Path("product-release-package.html")
-
-raw = MASTER_JS.read_text(encoding="utf-8")
-prefix = "window.DPRO_PRODUCT_RELEASE_MASTER_V12_OVERLAY = Object.freeze("
-if not raw.startswith(prefix) or not raw.rstrip().endswith(");"):
-    raise SystemExit("Unexpected product-release-master-v1-2.js format")
-body = raw[len(prefix):]
-body = body[:body.rfind(");")]
-overlay = json.loads(body)
-
-history_standard = '''DPRO CHAT / CONTACT HISTORY PRESERVATION QA STANDARD R1
-MASTER: DPRO PRODUCT RELEASE MASTER V1.2
-CONTROL CENTER REVISION: 20260921-HISTORY-PRESERVATION-R1
-
-============================================================
-0. PURPOSE
-============================================================
-顧客対応・問い合わせ・LINE・WEB・Instagram DM・チャット・メッセージ等、
-「過去のやり取りを継続して参照する」SYSTEMでは、商品化LOCK前に履歴保全を必ず評価する。
-
-PRODUCT RELEASE側はSYSTEMを勝手に修正しない。
-不具合が見つかった場合はSYSTEM_REOPEN_REQUIREDへ分離し、
-SYSTEM修正 → 対象QA再実施 → 商品化Gateへ戻る。
-
-============================================================
-1. APPLICABILITY ASSESSMENT
-============================================================
-REL-01で必ず history_preservation.assessed=true とする。
-
-applicable=true:
-- 会話・問い合わせ・メッセージ・DM等をDBへ永続保存する
-- 過去履歴を業務上参照する
-- 複数端末/複数担当者で同じ履歴を扱う
-のいずれかに該当。
-
-applicable=false:
-- 履歴を永続保存しない仕様である
-- 表示専用/一時通知のみで履歴機能を商品として持たない
-等、理由を必ず記録する。
-
-applicable未判定はLOCK不可。
-
-============================================================
-2. HARD GATES WHEN APPLICABLE
-============================================================
-HP-1 PERSISTENT STORE
-- thread/message等の永続テーブルまたは同等ストアを確認
-- 件数、最古、最新を証拠化
-- 表示だけでPASSにしない
-
-HP-2 THREAD IDENTITY CONTINUITY
-- channel/user/thread識別がVersion更新・設定変更で不意に変わらない
-- 同一顧客の旧threadが見えなくなる設計変更を禁止
-- ID変更が必要なら明示migrationと照合証拠が必要
-
-HP-3 NO DESTRUCTIVE RESET PATH
-- 通常deploy/upgradeに DELETE ALL / TRUNCATE / DROP+reseed を入れない
-- cascade deleteの対象範囲を確認
-- retention処理は仕様・対象・件数・条件を明示
-- 「自動整理」表示だけで削除仕様を曖昧にしない
-
-HP-4 UPGRADE / MIGRATION PRESERVATION
-- 更新前のthread/message件数を保存
-- 更新後に件数・代表ID・first/last timestampを再照合
-- 意図しない減少 = FAIL
-- migrationが無い場合も「migrationなし」を証拠化
-
-HP-5 STALE RESPONSE / SELECTION RACE GUARD
-- 非同期取得結果は request/thread identity を照合してから描画
-- 顧客Aの遅延レスポンスを顧客B画面へ描画しない
-- refresh/focus/pageshow/auto-syncと顧客切替の競合QAを行う
-
-HP-6 BEFORE / AFTER COUNT
-最低限：
-- thread count before / after
-- message count before / after
-- representative thread message count before / after
-- unexpected decrease = 0
-
-HP-7 MULTI-DEVICE CONSISTENCY
-対応SYSTEMのみ：
-- 新着 0→1 がPC/スマホ双方へ反映
-- 一方で既読化後 1→0 が双方へ反映
-非対応なら NOT_APPLICABLE と理由を記録。
-
-HP-8 BACKUP / EXPORT POLICY
-- 利用プランに応じた復旧手段を明示
-- 自動バックアップが無いプランでは「ある」と表現しない
-- 必要に応じ定期export/保全方針を定義
-- 復元不能範囲も運用資料へ記録
-
-============================================================
-3. REQUIRED EVIDENCE
-============================================================
-- persistent store verification
-- thread identity / key contract
-- destructive SQL/function/trigger/retention scan
-- migration/deploy diff
-- before/after count report
-- stale-response race QA result
-- cross-device result or NOT_APPLICABLE reason
-- backup/export policy
-- evidence_refs 1件以上
-
-============================================================
-4. HOLD / REOPEN
-============================================================
-HISTORY_PRESERVATION_HOLD:
-- assessedでない
-- applicable判定がない
-- 必須証拠不足
-- count減少
-- 同一顧客履歴の分断
-- 別顧客履歴の混在
-- destructive reset path存在
-- migration preservation未証明
-
-SYSTEM_REOPEN_REQUIRED:
-実SYSTEM/API/DB/Worker/UIの履歴契約に不具合がある場合。
-
-============================================================
-5. PROHIBITED
-============================================================
-- LINE等外部サービスから取得できない過去本文を推測で復元しない
-- screenshotだけでDB保全PASSにしない
-- FREE plan等に存在しないバックアップ機能を「復元可能」と表現しない
-- 既知の履歴不具合をmedium扱いに落としてLOCKしない
-- Version更新時に履歴件数照合なしでFINAL LOCKしない
-
-============================================================
-6. LOCK CONDITION
-============================================================
-applicable=true:
-assessed=true
-pass=true
-HP-1〜HP-8の必要項目PASS
-evidence_refs>=1
-
-applicable=false:
-assessed=true
-applicable=false
-pass=true
-reason必須
-
-上記を満たさない限りPRODUCT RELEASE LOCK不可。
-'''
-overlay["26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt"] = history_standard.strip() + "\n"
-
-def append_once(key, marker, appendix):
-    value = overlay.get(key, "")
-    if marker not in value:
-        overlay[key] = value.rstrip() + "\n\n" + appendix.strip() + "\n"
-
-append_once(
-    "10_PUBLIC_QA_STANDARD.txt",
-    "HISTORY PRESERVATION / CONDITIONAL HARD GATE",
-    '''============================================================
-HISTORY PRESERVATION / CONDITIONAL HARD GATE
-============================================================
-REL-01で全製品について適用可否を判定する。
-チャット/問い合わせ/メッセージ履歴を永続保存する製品は
-26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt を必須Gateとする。
-
-applicable=trueの場合、以下が揃わなければPUBLIC/PRODUCT RELEASE LOCK不可。
-- persistent store verification
-- thread identity continuity
-- destructive reset path = 0
-- migration/deploy before-after count
-- stale response / selection race guard
-- cross-device PASS または NOT_APPLICABLE
-- backup/export policy
-- evidence_refs
-
-実SYSTEM不具合なら商品化側で隠さずSYSTEM_REOPEN_REQUIREDへ戻す。'''
-)
-
-append_once(
-    "13_PRODUCT_RELEASE_STATE_MACHINE.txt",
-    "HISTORY PRESERVATION GATE R1",
-    '''============================================================
-HISTORY PRESERVATION GATE R1
-============================================================
-REL-01:
-history_preservation.assessed を必須化。
-applicable true/falseを理由付きで固定。
-
-REL-B4 / REL-F4:
-applicable=trueなら履歴保全証拠を再確認。
-
-HOLD:
-HISTORY_PRESERVATION_HOLD
-
-SYSTEM/API/DB/UIの履歴契約不具合:
-SYSTEM_REOPEN_REQUIRED
-
-このGateはBRUSHUPを5/5へ増やさない。
-BRUSHUP 4/4とは別のcross-cutting hard gateとしてLOCK前に必須。'''
-)
-
-append_once(
-    "14_FINAL_CHECKLIST.txt",
-    "[HISTORY PRESERVATION / CONDITIONAL HARD GATE]",
-    '''[HISTORY PRESERVATION / CONDITIONAL HARD GATE]
-[ ] assessed = true
-[ ] applicable = true/false を理由付きで確定
-[ ] applicable=false の場合 reason記録 + pass=true
-[ ] applicable=true の場合 persistent store verified
-[ ] thread identity stable
-[ ] destructive reset path 0
-[ ] upgrade/migration preserves history
-[ ] before/after thread/message count verified
-[ ] stale-response / selection race guard verified
-[ ] cross-device = PASS or NOT_APPLICABLE
-[ ] backup/export policy recorded
-[ ] evidence_refs >= 1
-[ ] HISTORY_PRESERVATION_HOLD = 0
-[ ] SYSTEM_REOPEN_REQUIRED issue = 0'''
-)
-
-append_once(
-    "14_RELEASE_BRUSHUP_STANDARD.txt",
-    "12. HISTORY PRESERVATION CROSS-CUTTING GATE",
-    '''============================================================
-12. HISTORY PRESERVATION CROSS-CUTTING GATE
-============================================================
-チャット/問い合わせ/メッセージ履歴を持つ製品では、
-BRUSHUP 4/4とは別に履歴保全Gateを必須とする。
-
-BRUSHUP-4で確認：
-- deploy前後件数
-- representative thread count
-- destructive reset scan
-- stale response race QA
-- multi-device result
-- backup/export policy
-
-FINAL RELEASE 4/4がPASSでも、このGateがFAILならLOCK不可。'''
-)
-
-append_once(
-    "11_SUCCESS_FAILURE_LESSONS.txt",
-    "[F17 CONTACT履歴の誤表示・保全調査]",
-    '''[F17 CONTACT履歴の誤表示・保全調査]
-顧客対応画面で、選択顧客の見出しと別通信の会話内容が組み合わさり得る非同期競合を発見。
-DB調査では通常DELETE/TRUNCATEの証拠が無いケースでも、
-UI上は「履歴が消えた/別履歴が見えた」と認識され得る。
-
-→ thread ID + request sequenceを描画直前に再照合。
-→ refresh/focus/pageshow/auto-syncと顧客切替を競合QA。
-→ DB保全とUI整合を別々に証明。
-→ Version更新時はbefore/after件数を必須証拠化。
-→ バックアップが無いプランでは復元可能と断定しない。'''
-)
-
-append_once(
-    "24_PRODUCT_RELEASE_DEFECT_FLOW_STANDARD.txt",
-    "HISTORY / DATA INTEGRITY ROUTE",
-    '''============================================================
-HISTORY / DATA INTEGRITY ROUTE
-============================================================
-症状：
-- 過去履歴が見えない
-- 同一顧客が別threadへ分裂
-- 別顧客の履歴が混在
-- deploy/migration後に件数減少
-
-TRIAGE:
-1. 表示競合だけか
-2. DB行が存在するか
-3. thread identityが変わったか
-4. DELETE/TRUNCATE/retention/migrationの痕跡
-5. backup/exportから復旧可能か
-
-UIだけの不具合でもSYSTEM実装ならSYSTEM_REOPEN_REQUIRED。
-証拠なしで「復元済み」「消えていない」と断定しない。
-open blocker/high defectとしてLOCKを止める。'''
-)
-
-rt = json.loads(overlay["23_PRODUCT_RELEASE_RETURN_TEMPLATE.json"])
-rt["release_master_revision"] = REVISION
-rt["history_preservation"] = {
-    "assessed": False,
-    "applicable": None,
-    "reason": "",
-    "pass": False,
-    "evidence": {
-        "persistent_store_verified": False,
-        "thread_identity_stable": False,
-        "no_destructive_reset_path": False,
-        "upgrade_migration_preserves_history": False,
-        "stale_response_guard": False,
-        "before_after_count_verified": False,
-        "cross_device_consistency_result": "pending",
-        "backup_or_export_policy": "",
-        "evidence_refs": []
-    }
-}
-overlay["23_PRODUCT_RELEASE_RETURN_TEMPLATE.json"] = json.dumps(rt, ensure_ascii=False, indent=2) + "\n"
-
-st = json.loads(overlay["16_PRODUCT_RELEASE_START_ZIP_TEMPLATE.json"])
-st["master_revision"] = REVISION
-st.setdefault("release_gates", {})["history_preservation"] = "ASSESS_REQUIRED"
-overlay["16_PRODUCT_RELEASE_START_ZIP_TEMPLATE.json"] = json.dumps(st, ensure_ascii=False, indent=2) + "\n"
-
-req = json.loads(overlay["25_CONTROL_CENTER_GUARD_REQUIREMENTS.json"])
-ids = {x.get("id") for x in req.get("requirements", [])}
-if "CC-PR-018" not in ids:
-    req.setdefault("requirements", []).append({
-        "id": "CC-PR-018",
-        "title": "Chat / Contact履歴保全QAをLOCK前必須化",
-        "problem_solved": "Version更新・非同期競合・thread identity変更・destructive resetにより、過去履歴が消失または別顧客履歴として見えるリスク。",
-        "trigger_stage": "REL-01 / final_release",
-        "priority": "blocker",
-        "automation": "assisted+auto",
-        "required_input": [
-            "history_preservation applicability",
-            "thread/message persistent store",
-            "migration/deploy history",
-            "retention/destructive SQL scan",
-            "multi-device capability"
-        ],
-        "required_evidence": [
-            "before/after thread count",
-            "before/after message count",
-            "thread identity evidence",
-            "destructive reset scan",
-            "stale response race QA",
-            "cross-device PASS or NOT_APPLICABLE",
-            "backup/export policy",
-            "evidence_refs"
-        ],
-        "pass_condition": "全製品assessed=true。applicable=falseは理由必須。applicable=trueは26_CHAT_HISTORY_PRESERVATION_QA_STANDARDのhard gate全PASS。",
-        "fail_behavior": "history_preservation_hold / system_reopen_required",
-        "ui_location": "商品化・掲載 > History Preservation",
-        "master_files_to_update": [
-            "26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt",
-            "PRODUCT_RELEASE_RETURN_TEMPLATE.json",
-            "CONTROL_CENTER"
-        ]
-    })
-overlay["25_CONTROL_CENTER_GUARD_REQUIREMENTS.json"] = json.dumps(req, ensure_ascii=False, indent=2) + "\n"
-
-audit = json.loads(overlay["AUDIT_INTEGRATION_SUMMARY.json"])
-audit["post_audit_history_preservation_r1"] = {
-    "date": "2026-09-21",
-    "incident": "DPRO CONTACTで過去履歴が消えたように見える事象を調査",
-    "confirmed_findings": [
-        "非同期顧客切替でstale responseが別顧客画面へ描画され得る競合を修正",
-        "PC/スマホ新着同期と既読同期を実機PASS",
-        "通常DELETE/TRUNCATEによる履歴削除証拠は確認されず",
-        "バックアップの有無は利用プランに依存するため復元可能性を推測しない"
-    ],
-    "control_center_guard": "CC-PR-018"
-}
-overlay["AUDIT_INTEGRATION_SUMMARY.json"] = json.dumps(audit, ensure_ascii=False, indent=2) + "\n"
-
-mm = json.loads(overlay["MASTER_MANIFEST.json"])
-mm["revision"] = REVISION
-mm["chat_history_preservation"] = {
-    "required_assessment": True,
-    "conditional_hard_gate": True,
-    "control_center_requirement": "CC-PR-018"
-}
-overlay["MASTER_MANIFEST.json"] = json.dumps(mm, ensure_ascii=False, indent=2) + "\n"
-
-canonical_overlay = json.dumps(overlay, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-revision_sha = hashlib.sha256(canonical_overlay.encode("utf-8")).hexdigest()
-
-MASTER_JS.write_text(
-    prefix + json.dumps(overlay, ensure_ascii=False, separators=(",", ":")) + ");\n",
-    encoding="utf-8",
-    newline="\n"
-)
-
-s = PACKAGE_JS.read_text(encoding="utf-8")
-
-old_build = 'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R2-20260921";'
-if old_build not in s:
-    raise SystemExit("PACKAGE BUILD baseline not found")
-s = s.replace(old_build, 'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921";', 1)
-
-sha_line = 'const RELEASE_MASTER_SHA256 = "802ba7dd0de6e53fb5c3dc9adea028e81697140716cc67f044fc9b43fff8d718";'
-if sha_line not in s:
-    raise SystemExit("MASTER SHA baseline not found")
-s = s.replace(
-    sha_line,
-    sha_line + f'\n  const RELEASE_MASTER_REVISION = "{REVISION}";\n  const RELEASE_MASTER_REVISION_SHA256 = "{revision_sha}";',
-    1
-)
-
-helper_anchor = '''  function humanAccepted(r){
-    return returnPayload(r)?.human_acceptance?.pass===true;
-  }'''
-helper_new = '''  function humanAccepted(r){
-    return returnPayload(r)?.human_acceptance?.pass===true;
-  }
-
-  function historyPreservationGate(r){
-    const payload=returnPayload(r);
-    const hp=payload?.history_preservation;
-    const revised=payload?.release_master_revision===RELEASE_MASTER_REVISION;
-
-    if(!hp){
-      return revised
-        ? {value:"WAIT",note:"履歴保全QA未評価",ok:false}
-        : {value:"—",note:"次回STARTから必須",ok:true};
-    }
-
-    if(hp.assessed!==true) return {value:"WAIT",note:"適用可否の評価待ち",ok:false};
-    if(hp.applicable===false){
-      return hp.pass===true && String(hp.reason||"").trim()
-        ? {value:"N/A",note:"非対象理由を記録済み",ok:true}
-        : {value:"FAIL",note:"非対象理由またはPASS記録不足",ok:false};
-    }
-    if(hp.applicable===true){
-      return hp.pass===true
-        ? {value:"PASS",note:"履歴保全証拠PASS",ok:true}
-        : {value:"FAIL",note:"履歴保全QAにFAILあり",ok:false};
-    }
-    return {value:"WAIT",note:"applicable未確定",ok:false};
-  }'''
-if helper_anchor not in s:
-    raise SystemExit("history helper anchor not found")
-s = s.replace(helper_anchor, helper_new, 1)
-
-anchor = '''    const legacy=isLegacyLocked(r);
-    const human=humanAccepted(r);
-    const currentV12Lock='''
-repl = '''    const legacy=isLegacyLocked(r);
-    const human=humanAccepted(r);
-    const historyGate=historyPreservationGate(r);
-    const currentV12Lock='''
-if anchor not in s:
-    raise SystemExit("renderDetail history anchor not found")
-s = s.replace(anchor, repl, 1)
-
-cards_anchor = '''      [human?"PASS":"WAIT","HUMAN ACCEPTANCE",human?"実画面承認済み":"見た目・写真・販売導線を人が確認"],
-      [`${f}/4`,"FINAL RELEASE",f===4?"全PASS":"最終4/4"],'''
-cards_repl = '''      [human?"PASS":"WAIT","HUMAN ACCEPTANCE",human?"実画面承認済み":"見た目・写真・販売導線を人が確認"],
-      [historyGate.value,"履歴保全QA",historyGate.note],
-      [`${f}/4`,"FINAL RELEASE",f===4?"全PASS":"最終4/4"],'''
-if cards_anchor not in s:
-    raise SystemExit("progress card anchor not found")
-s = s.replace(cards_anchor, cards_repl, 1)
-
-s = s.replace(
-    'release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256},',
-    'release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256},',
-    1
-)
-
-old_gates = 'required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},'
-new_gates = 'required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,history_preservation_assessment:true,history_preservation_if_applicable:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},'
-if old_gates not in s:
-    raise SystemExit("required_gates baseline not found")
-s = s.replace(old_gates, new_gates, 1)
-
-master_anchor = '''      name:"DPRO PRODUCT RELEASE MASTER",version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,date:"2026-09-21",
-      defect_audit_integrated:true,'''
-master_repl = '''      name:"DPRO PRODUCT RELEASE MASTER",version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,date:"2026-09-21",
-      revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256,
-      defect_audit_integrated:true,history_preservation_guard_required:true,'''
-if master_anchor not in s:
-    raise SystemExit("masterId baseline not found")
-s = s.replace(master_anchor, master_repl, 1)
-
-return_anchor = 'product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,'
-return_repl = 'product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,release_master_revision:RELEASE_MASTER_REVISION,'
-if return_anchor not in s:
-    raise SystemExit("return template baseline not found")
-s = s.replace(return_anchor, return_repl, 1)
-
-history_object = '''      history_preservation:{
-        assessed:false,
-        applicable:null,
-        reason:"",
-        pass:false,
-        evidence:{
-          persistent_store_verified:false,
-          thread_identity_stable:false,
-          no_destructive_reset_path:false,
-          upgrade_migration_preserves_history:false,
-          stale_response_guard:false,
-          before_after_count_verified:false,
-          cross_device_consistency_result:"pending",
-          backup_or_export_policy:"",
-          evidence_refs:[]
-        }
-      },
-'''
-insert_before = '      final_release:{\n'
-if insert_before not in s:
-    raise SystemExit("final_release insert anchor not found")
-s = s.replace(insert_before, history_object + insert_before, 1)
-
-start_bullet = '"- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。"'
-start_repl = '"- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 全製品で履歴保全QAの適用可否をREL-01で判定する。","- applicable=trueならDB件数・thread identity・destructive reset・migration・race guard・cross-device・backup/exportを証明する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。"'
-if start_bullet not in s:
-    raise SystemExit("startHere bullet baseline not found")
-s = s.replace(start_bullet, start_repl, 1)
-
-return_rule = '"- human_acceptance.pass = true + approver + approved_at","- public_surface_matrix.pass = true"'
-return_rule_repl = '"- human_acceptance.pass = true + approver + approved_at","- history_preservation.assessed = true","- applicable=falseはreason必須 + pass=true","- applicable=trueはHISTORY PRESERVATION evidence全PASS","- public_surface_matrix.pass = true"'
-if return_rule not in s:
-    raise SystemExit("return requirements baseline not found")
-s = s.replace(return_rule, return_rule_repl, 1)
-
-manifest_anchor = '`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Generated: ${new Date().toISOString()}`'
-manifest_repl = '`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Release Master Revision: ${RELEASE_MASTER_REVISION}`,`Revision SHA256: ${RELEASE_MASTER_REVISION_SHA256}`,`Generated: ${new Date().toISOString()}`'
-if manifest_anchor not in s:
-    raise SystemExit("manifest baseline not found")
-s = s.replace(manifest_anchor, manifest_repl, 1)
-
-val_old = ' / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}'
-val_new = ' / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / HISTORY=${v.history_preservation_required?(v.history_preservation_ok?"PASS":"WAIT"):"LEGACY"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}'
-if val_old not in s:
-    raise SystemExit("validator message baseline not found")
-s = s.replace(val_old, val_new, 1)
-
-PACKAGE_JS.write_text(s, encoding="utf-8", newline="\n")
-
-h = PACKAGE_HTML.read_text(encoding="utf-8")
-h = h.replace(
-    'product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-20260921',
-    'product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-HISTORY-R1-20260921'
-)
-h = h.replace(
-    'product-release-package.js?v=PRODUCT-RELEASE-CC-R2-20260921',
-    'product-release-package.js?v=PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921'
-)
-h = h.replace(
-    '<strong>PRODUCT RELEASE V1.2</strong><span>SYSTEM FINAL LOCKとは分離</span><small>初回公開→BRUSHUP 4/4→人の確認→FINAL 4/4→LOCK</small>',
-    '<strong>PRODUCT RELEASE V1.2</strong><span>+ HISTORY PRESERVATION R1</span><small>初回公開→BRUSHUP 4/4→履歴保全→人の確認→FINAL 4/4→LOCK</small>'
-)
-h = h.replace(
-    '<div class="version">PRODUCT-RELEASE-CC-R1<br><span>MASTER V1.2</span></div>',
-    '<div class="version">PRODUCT-RELEASE-CC-R3<br><span>MASTER V1.2 / HISTORY R1</span></div>'
-)
-
-policy_marker = '<article><strong>BRUSHUP 4/4</strong><span>事実・販売導線・見た目/印刷・公開実物を横断して再点検します。</span></article>'
-if policy_marker not in h:
-    raise SystemExit("policy marker not found")
-if "履歴保全QA" not in h:
-    h = h.replace(
-        policy_marker,
-        policy_marker + '\n          <article><strong>履歴保全QA</strong><span>会話・問い合わせ履歴を持つSYSTEMは、件数・thread identity・移行・競合・復旧方針を証明してからLOCKします。</span></article>',
-        1
-    )
-PACKAGE_HTML.write_text(h, encoding="utf-8", newline="\n")
-
-print("revision_sha256=" + revision_sha)
-
+          from pathlib import Path
+          import json, hashlib
+          
+          REVISION = "20260921-HISTORY-PRESERVATION-R1"
+          MASTER_JS = Path("product-release-master-v1-2.js")
+          PACKAGE_JS = Path("product-release-package.js")
+          PACKAGE_HTML = Path("product-release-package.html")
+          
+          raw = MASTER_JS.read_text(encoding="utf-8")
+          prefix = "window.DPRO_PRODUCT_RELEASE_MASTER_V12_OVERLAY = Object.freeze("
+          if not raw.startswith(prefix) or not raw.rstrip().endswith(");"):
+              raise SystemExit("Unexpected product-release-master-v1-2.js format")
+          body = raw[len(prefix):]
+          body = body[:body.rfind(");")]
+          overlay = json.loads(body)
+          
+          history_standard = '''DPRO CHAT / CONTACT HISTORY PRESERVATION QA STANDARD R1
+          MASTER: DPRO PRODUCT RELEASE MASTER V1.2
+          CONTROL CENTER REVISION: 20260921-HISTORY-PRESERVATION-R1
+          
+          ============================================================
+          0. PURPOSE
+          ============================================================
+          顧客対応・問い合わせ・LINE・WEB・Instagram DM・チャット・メッセージ等、
+          「過去のやり取りを継続して参照する」SYSTEMでは、商品化LOCK前に履歴保全を必ず評価する。
+          
+          PRODUCT RELEASE側はSYSTEMを勝手に修正しない。
+          不具合が見つかった場合はSYSTEM_REOPEN_REQUIREDへ分離し、
+          SYSTEM修正 → 対象QA再実施 → 商品化Gateへ戻る。
+          
+          ============================================================
+          1. APPLICABILITY ASSESSMENT
+          ============================================================
+          REL-01で必ず history_preservation.assessed=true とする。
+          
+          applicable=true:
+          - 会話・問い合わせ・メッセージ・DM等をDBへ永続保存する
+          - 過去履歴を業務上参照する
+          - 複数端末/複数担当者で同じ履歴を扱う
+          のいずれかに該当。
+          
+          applicable=false:
+          - 履歴を永続保存しない仕様である
+          - 表示専用/一時通知のみで履歴機能を商品として持たない
+          等、理由を必ず記録する。
+          
+          applicable未判定はLOCK不可。
+          
+          ============================================================
+          2. HARD GATES WHEN APPLICABLE
+          ============================================================
+          HP-1 PERSISTENT STORE
+          - thread/message等の永続テーブルまたは同等ストアを確認
+          - 件数、最古、最新を証拠化
+          - 表示だけでPASSにしない
+          
+          HP-2 THREAD IDENTITY CONTINUITY
+          - channel/user/thread識別がVersion更新・設定変更で不意に変わらない
+          - 同一顧客の旧threadが見えなくなる設計変更を禁止
+          - ID変更が必要なら明示migrationと照合証拠が必要
+          
+          HP-3 NO DESTRUCTIVE RESET PATH
+          - 通常deploy/upgradeに DELETE ALL / TRUNCATE / DROP+reseed を入れない
+          - cascade deleteの対象範囲を確認
+          - retention処理は仕様・対象・件数・条件を明示
+          - 「自動整理」表示だけで削除仕様を曖昧にしない
+          
+          HP-4 UPGRADE / MIGRATION PRESERVATION
+          - 更新前のthread/message件数を保存
+          - 更新後に件数・代表ID・first/last timestampを再照合
+          - 意図しない減少 = FAIL
+          - migrationが無い場合も「migrationなし」を証拠化
+          
+          HP-5 STALE RESPONSE / SELECTION RACE GUARD
+          - 非同期取得結果は request/thread identity を照合してから描画
+          - 顧客Aの遅延レスポンスを顧客B画面へ描画しない
+          - refresh/focus/pageshow/auto-syncと顧客切替の競合QAを行う
+          
+          HP-6 BEFORE / AFTER COUNT
+          最低限：
+          - thread count before / after
+          - message count before / after
+          - representative thread message count before / after
+          - unexpected decrease = 0
+          
+          HP-7 MULTI-DEVICE CONSISTENCY
+          対応SYSTEMのみ：
+          - 新着 0→1 がPC/スマホ双方へ反映
+          - 一方で既読化後 1→0 が双方へ反映
+          非対応なら NOT_APPLICABLE と理由を記録。
+          
+          HP-8 BACKUP / EXPORT POLICY
+          - 利用プランに応じた復旧手段を明示
+          - 自動バックアップが無いプランでは「ある」と表現しない
+          - 必要に応じ定期export/保全方針を定義
+          - 復元不能範囲も運用資料へ記録
+          
+          ============================================================
+          3. REQUIRED EVIDENCE
+          ============================================================
+          - persistent store verification
+          - thread identity / key contract
+          - destructive SQL/function/trigger/retention scan
+          - migration/deploy diff
+          - before/after count report
+          - stale-response race QA result
+          - cross-device result or NOT_APPLICABLE reason
+          - backup/export policy
+          - evidence_refs 1件以上
+          
+          ============================================================
+          4. HOLD / REOPEN
+          ============================================================
+          HISTORY_PRESERVATION_HOLD:
+          - assessedでない
+          - applicable判定がない
+          - 必須証拠不足
+          - count減少
+          - 同一顧客履歴の分断
+          - 別顧客履歴の混在
+          - destructive reset path存在
+          - migration preservation未証明
+          
+          SYSTEM_REOPEN_REQUIRED:
+          実SYSTEM/API/DB/Worker/UIの履歴契約に不具合がある場合。
+          
+          ============================================================
+          5. PROHIBITED
+          ============================================================
+          - LINE等外部サービスから取得できない過去本文を推測で復元しない
+          - screenshotだけでDB保全PASSにしない
+          - FREE plan等に存在しないバックアップ機能を「復元可能」と表現しない
+          - 既知の履歴不具合をmedium扱いに落としてLOCKしない
+          - Version更新時に履歴件数照合なしでFINAL LOCKしない
+          
+          ============================================================
+          6. LOCK CONDITION
+          ============================================================
+          applicable=true:
+          assessed=true
+          pass=true
+          HP-1〜HP-8の必要項目PASS
+          evidence_refs>=1
+          
+          applicable=false:
+          assessed=true
+          applicable=false
+          pass=true
+          reason必須
+          
+          上記を満たさない限りPRODUCT RELEASE LOCK不可。
+          '''
+          overlay["26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt"] = history_standard.strip() + "\n"
+          
+          def append_once(key, marker, appendix):
+              value = overlay.get(key, "")
+              if marker not in value:
+                  overlay[key] = value.rstrip() + "\n\n" + appendix.strip() + "\n"
+          
+          append_once(
+              "10_PUBLIC_QA_STANDARD.txt",
+              "HISTORY PRESERVATION / CONDITIONAL HARD GATE",
+              '''============================================================
+          HISTORY PRESERVATION / CONDITIONAL HARD GATE
+          ============================================================
+          REL-01で全製品について適用可否を判定する。
+          チャット/問い合わせ/メッセージ履歴を永続保存する製品は
+          26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt を必須Gateとする。
+          
+          applicable=trueの場合、以下が揃わなければPUBLIC/PRODUCT RELEASE LOCK不可。
+          - persistent store verification
+          - thread identity continuity
+          - destructive reset path = 0
+          - migration/deploy before-after count
+          - stale response / selection race guard
+          - cross-device PASS または NOT_APPLICABLE
+          - backup/export policy
+          - evidence_refs
+          
+          実SYSTEM不具合なら商品化側で隠さずSYSTEM_REOPEN_REQUIREDへ戻す。'''
+          )
+          
+          append_once(
+              "13_PRODUCT_RELEASE_STATE_MACHINE.txt",
+              "HISTORY PRESERVATION GATE R1",
+              '''============================================================
+          HISTORY PRESERVATION GATE R1
+          ============================================================
+          REL-01:
+          history_preservation.assessed を必須化。
+          applicable true/falseを理由付きで固定。
+          
+          REL-B4 / REL-F4:
+          applicable=trueなら履歴保全証拠を再確認。
+          
+          HOLD:
+          HISTORY_PRESERVATION_HOLD
+          
+          SYSTEM/API/DB/UIの履歴契約不具合:
+          SYSTEM_REOPEN_REQUIRED
+          
+          このGateはBRUSHUPを5/5へ増やさない。
+          BRUSHUP 4/4とは別のcross-cutting hard gateとしてLOCK前に必須。'''
+          )
+          
+          append_once(
+              "14_FINAL_CHECKLIST.txt",
+              "[HISTORY PRESERVATION / CONDITIONAL HARD GATE]",
+              '''[HISTORY PRESERVATION / CONDITIONAL HARD GATE]
+          [ ] assessed = true
+          [ ] applicable = true/false を理由付きで確定
+          [ ] applicable=false の場合 reason記録 + pass=true
+          [ ] applicable=true の場合 persistent store verified
+          [ ] thread identity stable
+          [ ] destructive reset path 0
+          [ ] upgrade/migration preserves history
+          [ ] before/after thread/message count verified
+          [ ] stale-response / selection race guard verified
+          [ ] cross-device = PASS or NOT_APPLICABLE
+          [ ] backup/export policy recorded
+          [ ] evidence_refs >= 1
+          [ ] HISTORY_PRESERVATION_HOLD = 0
+          [ ] SYSTEM_REOPEN_REQUIRED issue = 0'''
+          )
+          
+          append_once(
+              "14_RELEASE_BRUSHUP_STANDARD.txt",
+              "12. HISTORY PRESERVATION CROSS-CUTTING GATE",
+              '''============================================================
+          12. HISTORY PRESERVATION CROSS-CUTTING GATE
+          ============================================================
+          チャット/問い合わせ/メッセージ履歴を持つ製品では、
+          BRUSHUP 4/4とは別に履歴保全Gateを必須とする。
+          
+          BRUSHUP-4で確認：
+          - deploy前後件数
+          - representative thread count
+          - destructive reset scan
+          - stale response race QA
+          - multi-device result
+          - backup/export policy
+          
+          FINAL RELEASE 4/4がPASSでも、このGateがFAILならLOCK不可。'''
+          )
+          
+          append_once(
+              "11_SUCCESS_FAILURE_LESSONS.txt",
+              "[F17 CONTACT履歴の誤表示・保全調査]",
+              '''[F17 CONTACT履歴の誤表示・保全調査]
+          顧客対応画面で、選択顧客の見出しと別通信の会話内容が組み合わさり得る非同期競合を発見。
+          DB調査では通常DELETE/TRUNCATEの証拠が無いケースでも、
+          UI上は「履歴が消えた/別履歴が見えた」と認識され得る。
+          
+          → thread ID + request sequenceを描画直前に再照合。
+          → refresh/focus/pageshow/auto-syncと顧客切替を競合QA。
+          → DB保全とUI整合を別々に証明。
+          → Version更新時はbefore/after件数を必須証拠化。
+          → バックアップが無いプランでは復元可能と断定しない。'''
+          )
+          
+          append_once(
+              "24_PRODUCT_RELEASE_DEFECT_FLOW_STANDARD.txt",
+              "HISTORY / DATA INTEGRITY ROUTE",
+              '''============================================================
+          HISTORY / DATA INTEGRITY ROUTE
+          ============================================================
+          症状：
+          - 過去履歴が見えない
+          - 同一顧客が別threadへ分裂
+          - 別顧客の履歴が混在
+          - deploy/migration後に件数減少
+          
+          TRIAGE:
+          1. 表示競合だけか
+          2. DB行が存在するか
+          3. thread identityが変わったか
+          4. DELETE/TRUNCATE/retention/migrationの痕跡
+          5. backup/exportから復旧可能か
+          
+          UIだけの不具合でもSYSTEM実装ならSYSTEM_REOPEN_REQUIRED。
+          証拠なしで「復元済み」「消えていない」と断定しない。
+          open blocker/high defectとしてLOCKを止める。'''
+          )
+          
+          rt = json.loads(overlay["23_PRODUCT_RELEASE_RETURN_TEMPLATE.json"])
+          rt["release_master_revision"] = REVISION
+          rt["history_preservation"] = {
+              "assessed": False,
+              "applicable": None,
+              "reason": "",
+              "pass": False,
+              "evidence": {
+                  "persistent_store_verified": False,
+                  "thread_identity_stable": False,
+                  "no_destructive_reset_path": False,
+                  "upgrade_migration_preserves_history": False,
+                  "stale_response_guard": False,
+                  "before_after_count_verified": False,
+                  "cross_device_consistency_result": "pending",
+                  "backup_or_export_policy": "",
+                  "evidence_refs": []
+              }
+          }
+          overlay["23_PRODUCT_RELEASE_RETURN_TEMPLATE.json"] = json.dumps(rt, ensure_ascii=False, indent=2) + "\n"
+          
+          st = json.loads(overlay["16_PRODUCT_RELEASE_START_ZIP_TEMPLATE.json"])
+          st["master_revision"] = REVISION
+          st.setdefault("release_gates", {})["history_preservation"] = "ASSESS_REQUIRED"
+          overlay["16_PRODUCT_RELEASE_START_ZIP_TEMPLATE.json"] = json.dumps(st, ensure_ascii=False, indent=2) + "\n"
+          
+          req = json.loads(overlay["25_CONTROL_CENTER_GUARD_REQUIREMENTS.json"])
+          ids = {x.get("id") for x in req.get("requirements", [])}
+          if "CC-PR-018" not in ids:
+              req.setdefault("requirements", []).append({
+                  "id": "CC-PR-018",
+                  "title": "Chat / Contact履歴保全QAをLOCK前必須化",
+                  "problem_solved": "Version更新・非同期競合・thread identity変更・destructive resetにより、過去履歴が消失または別顧客履歴として見えるリスク。",
+                  "trigger_stage": "REL-01 / final_release",
+                  "priority": "blocker",
+                  "automation": "assisted+auto",
+                  "required_input": [
+                      "history_preservation applicability",
+                      "thread/message persistent store",
+                      "migration/deploy history",
+                      "retention/destructive SQL scan",
+                      "multi-device capability"
+                  ],
+                  "required_evidence": [
+                      "before/after thread count",
+                      "before/after message count",
+                      "thread identity evidence",
+                      "destructive reset scan",
+                      "stale response race QA",
+                      "cross-device PASS or NOT_APPLICABLE",
+                      "backup/export policy",
+                      "evidence_refs"
+                  ],
+                  "pass_condition": "全製品assessed=true。applicable=falseは理由必須。applicable=trueは26_CHAT_HISTORY_PRESERVATION_QA_STANDARDのhard gate全PASS。",
+                  "fail_behavior": "history_preservation_hold / system_reopen_required",
+                  "ui_location": "商品化・掲載 > History Preservation",
+                  "master_files_to_update": [
+                      "26_CHAT_HISTORY_PRESERVATION_QA_STANDARD.txt",
+                      "PRODUCT_RELEASE_RETURN_TEMPLATE.json",
+                      "CONTROL_CENTER"
+                  ]
+              })
+          overlay["25_CONTROL_CENTER_GUARD_REQUIREMENTS.json"] = json.dumps(req, ensure_ascii=False, indent=2) + "\n"
+          
+          audit = json.loads(overlay["AUDIT_INTEGRATION_SUMMARY.json"])
+          audit["post_audit_history_preservation_r1"] = {
+              "date": "2026-09-21",
+              "incident": "DPRO CONTACTで過去履歴が消えたように見える事象を調査",
+              "confirmed_findings": [
+                  "非同期顧客切替でstale responseが別顧客画面へ描画され得る競合を修正",
+                  "PC/スマホ新着同期と既読同期を実機PASS",
+                  "通常DELETE/TRUNCATEによる履歴削除証拠は確認されず",
+                  "バックアップの有無は利用プランに依存するため復元可能性を推測しない"
+              ],
+              "control_center_guard": "CC-PR-018"
+          }
+          overlay["AUDIT_INTEGRATION_SUMMARY.json"] = json.dumps(audit, ensure_ascii=False, indent=2) + "\n"
+          
+          mm = json.loads(overlay["MASTER_MANIFEST.json"])
+          mm["revision"] = REVISION
+          mm["chat_history_preservation"] = {
+              "required_assessment": True,
+              "conditional_hard_gate": True,
+              "control_center_requirement": "CC-PR-018"
+          }
+          overlay["MASTER_MANIFEST.json"] = json.dumps(mm, ensure_ascii=False, indent=2) + "\n"
+          
+          canonical_overlay = json.dumps(overlay, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+          revision_sha = hashlib.sha256(canonical_overlay.encode("utf-8")).hexdigest()
+          
+          MASTER_JS.write_text(
+              prefix + json.dumps(overlay, ensure_ascii=False, separators=(",", ":")) + ");\n",
+              encoding="utf-8",
+              newline="\n"
+          )
+          
+          s = PACKAGE_JS.read_text(encoding="utf-8")
+          
+          old_build = 'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R2-20260921";'
+          if old_build not in s:
+              raise SystemExit("PACKAGE BUILD baseline not found")
+          s = s.replace(old_build, 'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921";', 1)
+          
+          sha_line = 'const RELEASE_MASTER_SHA256 = "802ba7dd0de6e53fb5c3dc9adea028e81697140716cc67f044fc9b43fff8d718";'
+          if sha_line not in s:
+              raise SystemExit("MASTER SHA baseline not found")
+          s = s.replace(
+              sha_line,
+              sha_line + f'\n  const RELEASE_MASTER_REVISION = "{REVISION}";\n  const RELEASE_MASTER_REVISION_SHA256 = "{revision_sha}";',
+              1
+          )
+          
+          helper_anchor = '''  function humanAccepted(r){
+              return returnPayload(r)?.human_acceptance?.pass===true;
+            }'''
+          helper_new = '''  function humanAccepted(r){
+              return returnPayload(r)?.human_acceptance?.pass===true;
+            }
+          
+            function historyPreservationGate(r){
+              const payload=returnPayload(r);
+              const hp=payload?.history_preservation;
+              const revised=payload?.release_master_revision===RELEASE_MASTER_REVISION;
+          
+              if(!hp){
+                return revised
+                  ? {value:"WAIT",note:"履歴保全QA未評価",ok:false}
+                  : {value:"—",note:"次回STARTから必須",ok:true};
+              }
+          
+              if(hp.assessed!==true) return {value:"WAIT",note:"適用可否の評価待ち",ok:false};
+              if(hp.applicable===false){
+                return hp.pass===true && String(hp.reason||"").trim()
+                  ? {value:"N/A",note:"非対象理由を記録済み",ok:true}
+                  : {value:"FAIL",note:"非対象理由またはPASS記録不足",ok:false};
+              }
+              if(hp.applicable===true){
+                return hp.pass===true
+                  ? {value:"PASS",note:"履歴保全証拠PASS",ok:true}
+                  : {value:"FAIL",note:"履歴保全QAにFAILあり",ok:false};
+              }
+              return {value:"WAIT",note:"applicable未確定",ok:false};
+            }'''
+          if helper_anchor not in s:
+              raise SystemExit("history helper anchor not found")
+          s = s.replace(helper_anchor, helper_new, 1)
+          
+          anchor = '''    const legacy=isLegacyLocked(r);
+              const human=humanAccepted(r);
+              const currentV12Lock='''
+          repl = '''    const legacy=isLegacyLocked(r);
+              const human=humanAccepted(r);
+              const historyGate=historyPreservationGate(r);
+              const currentV12Lock='''
+          if anchor not in s:
+              raise SystemExit("renderDetail history anchor not found")
+          s = s.replace(anchor, repl, 1)
+          
+          cards_anchor = '''      [human?"PASS":"WAIT","HUMAN ACCEPTANCE",human?"実画面承認済み":"見た目・写真・販売導線を人が確認"],
+                [`${f}/4`,"FINAL RELEASE",f===4?"全PASS":"最終4/4"],'''
+          cards_repl = '''      [human?"PASS":"WAIT","HUMAN ACCEPTANCE",human?"実画面承認済み":"見た目・写真・販売導線を人が確認"],
+                [historyGate.value,"履歴保全QA",historyGate.note],
+                [`${f}/4`,"FINAL RELEASE",f===4?"全PASS":"最終4/4"],'''
+          if cards_anchor not in s:
+              raise SystemExit("progress card anchor not found")
+          s = s.replace(cards_anchor, cards_repl, 1)
+          
+          s = s.replace(
+              'release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256},',
+              'release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256},',
+              1
+          )
+          
+          old_gates = 'required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},'
+          new_gates = 'required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,history_preservation_assessment:true,history_preservation_if_applicable:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},'
+          if old_gates not in s:
+              raise SystemExit("required_gates baseline not found")
+          s = s.replace(old_gates, new_gates, 1)
+          
+          master_anchor = '''      name:"DPRO PRODUCT RELEASE MASTER",version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,date:"2026-09-21",
+                defect_audit_integrated:true,'''
+          master_repl = '''      name:"DPRO PRODUCT RELEASE MASTER",version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,date:"2026-09-21",
+                revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256,
+                defect_audit_integrated:true,history_preservation_guard_required:true,'''
+          if master_anchor not in s:
+              raise SystemExit("masterId baseline not found")
+          s = s.replace(master_anchor, master_repl, 1)
+          
+          return_anchor = 'product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,'
+          return_repl = 'product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,release_master_revision:RELEASE_MASTER_REVISION,'
+          if return_anchor not in s:
+              raise SystemExit("return template baseline not found")
+          s = s.replace(return_anchor, return_repl, 1)
+          
+          history_object = '''      history_preservation:{
+                  assessed:false,
+                  applicable:null,
+                  reason:"",
+                  pass:false,
+                  evidence:{
+                    persistent_store_verified:false,
+                    thread_identity_stable:false,
+                    no_destructive_reset_path:false,
+                    upgrade_migration_preserves_history:false,
+                    stale_response_guard:false,
+                    before_after_count_verified:false,
+                    cross_device_consistency_result:"pending",
+                    backup_or_export_policy:"",
+                    evidence_refs:[]
+                  }
+                },
+          '''
+          insert_before = '      final_release:{\n'
+          if insert_before not in s:
+              raise SystemExit("final_release insert anchor not found")
+          s = s.replace(insert_before, history_object + insert_before, 1)
+          
+          start_bullet = '"- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。"'
+          start_repl = '"- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 全製品で履歴保全QAの適用可否をREL-01で判定する。","- applicable=trueならDB件数・thread identity・destructive reset・migration・race guard・cross-device・backup/exportを証明する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。"'
+          if start_bullet not in s:
+              raise SystemExit("startHere bullet baseline not found")
+          s = s.replace(start_bullet, start_repl, 1)
+          
+          return_rule = '"- human_acceptance.pass = true + approver + approved_at","- public_surface_matrix.pass = true"'
+          return_rule_repl = '"- human_acceptance.pass = true + approver + approved_at","- history_preservation.assessed = true","- applicable=falseはreason必須 + pass=true","- applicable=trueはHISTORY PRESERVATION evidence全PASS","- public_surface_matrix.pass = true"'
+          if return_rule not in s:
+              raise SystemExit("return requirements baseline not found")
+          s = s.replace(return_rule, return_rule_repl, 1)
+          
+          manifest_anchor = '`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Generated: ${new Date().toISOString()}`'
+          manifest_repl = '`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Release Master Revision: ${RELEASE_MASTER_REVISION}`,`Revision SHA256: ${RELEASE_MASTER_REVISION_SHA256}`,`Generated: ${new Date().toISOString()}`'
+          if manifest_anchor not in s:
+              raise SystemExit("manifest baseline not found")
+          s = s.replace(manifest_anchor, manifest_repl, 1)
+          
+          val_old = ' / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}'
+          val_new = ' / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / HISTORY=${v.history_preservation_required?(v.history_preservation_ok?"PASS":"WAIT"):"LEGACY"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}'
+          if val_old not in s:
+              raise SystemExit("validator message baseline not found")
+          s = s.replace(val_old, val_new, 1)
+          
+          PACKAGE_JS.write_text(s, encoding="utf-8", newline="\n")
+          
+          h = PACKAGE_HTML.read_text(encoding="utf-8")
+          h = h.replace(
+              'product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-20260921',
+              'product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-HISTORY-R1-20260921'
+          )
+          h = h.replace(
+              'product-release-package.js?v=PRODUCT-RELEASE-CC-R2-20260921',
+              'product-release-package.js?v=PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921'
+          )
+          h = h.replace(
+              '<strong>PRODUCT RELEASE V1.2</strong><span>SYSTEM FINAL LOCKとは分離</span><small>初回公開→BRUSHUP 4/4→人の確認→FINAL 4/4→LOCK</small>',
+              '<strong>PRODUCT RELEASE V1.2</strong><span>+ HISTORY PRESERVATION R1</span><small>初回公開→BRUSHUP 4/4→履歴保全→人の確認→FINAL 4/4→LOCK</small>'
+          )
+          h = h.replace(
+              '<div class="version">PRODUCT-RELEASE-CC-R1<br><span>MASTER V1.2</span></div>',
+              '<div class="version">PRODUCT-RELEASE-CC-R3<br><span>MASTER V1.2 / HISTORY R1</span></div>'
+          )
+          
+          policy_marker = '<article><strong>BRUSHUP 4/4</strong><span>事実・販売導線・見た目/印刷・公開実物を横断して再点検します。</span></article>'
+          if policy_marker not in h:
+              raise SystemExit("policy marker not found")
+          if "履歴保全QA" not in h:
+              h = h.replace(
+                  policy_marker,
+                  policy_marker + '\n          <article><strong>履歴保全QA</strong><span>会話・問い合わせ履歴を持つSYSTEMは、件数・thread identity・移行・競合・復旧方針を証明してからLOCKします。</span></article>',
+                  1
+              )
+          PACKAGE_HTML.write_text(h, encoding="utf-8", newline="\n")
+          
+          print("revision_sha256=" + revision_sha)
+          
           PY
           python /tmp/apply_history_guard.py
 
