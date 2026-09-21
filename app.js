@@ -348,16 +348,49 @@
     `).join("") : '<div class="empty-state">今日、対応が必要な仕事はありません。</div>';
   }
 
+  function dashboardClientNeedsAttention(client) {
+    const openTasks = Number(client.open_task_count || 0);
+    const openSupport = Number(client.open_support_case_count || 0);
+    const response = String(client.owner_response_status || "").toLowerCase();
+    return openTasks > 0 || openSupport > 0 || ["waiting", "overdue"].includes(response);
+  }
+
+  function dashboardClientPriority(client) {
+    const response = String(client.owner_response_status || "").toLowerCase();
+    const openSupport = Number(client.open_support_case_count || 0);
+    const openTasks = Number(client.open_task_count || 0);
+    return (response === "overdue" ? 1000 : 0)
+      + (response === "waiting" ? 500 : 0)
+      + (openSupport * 50)
+      + openTasks;
+  }
+
+  function dashboardClientReason(client) {
+    const response = String(client.owner_response_status || "").toLowerCase();
+    const reasons = [];
+    if (response === "overdue") reasons.push("回答期限超過");
+    else if (response === "waiting") reasons.push("オーナー回答待ち");
+
+    const openSupport = Number(client.open_support_case_count || 0);
+    const openTasks = Number(client.open_task_count || 0);
+    if (openSupport > 0) reasons.push(`サポート ${openSupport}件`);
+    if (openTasks > 0) reasons.push(`未完了タスク ${openTasks}件`);
+    return reasons.join("・") || "確認事項あり";
+  }
+
   function renderDashboardClients() {
     const clients = [...state.clients]
-      .sort((a, b) => ((b.open_task_count || 0) + (b.owner_response_status === "waiting" ? 5 : 0)) - ((a.open_task_count || 0) + (a.owner_response_status === "waiting" ? 5 : 0)))
+      .filter(dashboardClientNeedsAttention)
+      .sort((a, b) => dashboardClientPriority(b) - dashboardClientPriority(a))
       .slice(0, 6);
+
     $("dashboardClients").innerHTML = clients.length ? clients.map((client) => `
       <button class="list-item" type="button" data-open-client="${client.id}">
-        <div class="list-item-main"><strong>${escapeHtml(client.display_name)}</strong><p>${escapeHtml(client.client_code)}・未完了 ${client.open_task_count || 0}件</p></div>
-        <div class="list-item-meta">${pill(ownerResponseLabels[client.owner_response_status] || client.owner_response_status, statusTone(client.owner_response_status))}</div>
+        <div class="list-item-main"><strong>${escapeHtml(client.display_name)}</strong><p>${escapeHtml(client.client_code)}・${escapeHtml(dashboardClientReason(client))}</p></div>
+        <div class="list-item-meta">${["waiting", "overdue"].includes(String(client.owner_response_status || "").toLowerCase()) ? pill(ownerResponseLabels[client.owner_response_status] || client.owner_response_status, statusTone(client.owner_response_status)) : pill("要確認", "amber")}</div>
       </button>
-    `).join("") : '<div class="empty-state">顧客が登録されていません。</div>';
+    `).join("") : '<div class="empty-state">現在、確認が必要なお客様はいません。</div>';
+
     bindClientOpenButtons($("dashboardClients"));
   }
 
