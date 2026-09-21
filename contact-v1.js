@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED";
+  const VERSION = "DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -15,6 +15,8 @@
     messages: [],
     refreshTimer: null,
     loading: false,
+    selectionEpoch: 0,
+    messageRequestSeq: 0,
     pendingWebReply: null,
     pendingAttachmentReply: null,
     selectedFiles: [],
@@ -433,8 +435,10 @@
     if (state.loading) return;
     state.loading = true;
 
+    const selectionEpochAtStart = state.selectionEpoch;
+    const selectedId = keepSelection ? state.selectedThread?.id : null;
+
     try {
-      const selectedId = keepSelection ? state.selectedThread?.id : null;
       const [summary, threadData] = await Promise.all([
         contactApi("/api/contact/summary"),
         contactApi(buildThreadPath()),
@@ -448,7 +452,11 @@
       state.threads = Array.isArray(threadData.threads) ? threadData.threads : [];
       renderThreads();
 
-      if (selectedId) {
+      const selectionUnchanged =
+        state.selectionEpoch === selectionEpochAtStart &&
+        state.selectedThread?.id === selectedId;
+
+      if (selectedId && selectionUnchanged) {
         const same = state.threads.find((t) => t.id === selectedId);
         if (same) {
           state.selectedThread = same;
@@ -524,6 +532,10 @@
   }
 
   async function selectThread(thread) {
+    if (!thread?.id) return;
+
+    state.selectionEpoch += 1;
+    state.messageRequestSeq += 1;
     state.selectedThread = thread;
     state.pendingWebReply = null;
     state.pendingAttachmentReply = null;
@@ -539,7 +551,10 @@
 
   async function loadSelectedMessages({ markRead = true } = {}) {
     const thread = state.selectedThread;
-    if (!thread) return;
+    const threadId = text(thread?.id);
+    if (!thread || !threadId) return;
+
+    const requestSeq = ++state.messageRequestSeq;
 
     $("emptyConversation")?.classList.add("dc-hidden");
     $("conversation")?.classList.remove("dc-hidden");
@@ -554,23 +569,47 @@
     setText("statusButton", thread.status === "closed" ? "対応を再開" : "対応完了にする");
     applyComposerMode(thread);
 
-    const data = await contactApi(`/api/contact/threads/${encodeURIComponent(thread.id)}/messages`);
+    const data = await contactApi(`/api/contact/threads/${encodeURIComponent(threadId)}/messages`);
+
+    if (
+      requestSeq !== state.messageRequestSeq ||
+      state.selectedThread?.id !== threadId
+    ) {
+      return;
+    }
+
     state.messages = Array.isArray(data.messages) ? data.messages : [];
     renderMessages();
 
     if (markRead && num(thread.unreadCount) > 0) {
-      await contactApi(`/api/contact/threads/${encodeURIComponent(thread.id)}/read`, {
+      await contactApi(`/api/contact/threads/${encodeURIComponent(threadId)}/read`, {
         method: "POST",
         body: "{}",
       });
+
+      if (
+        requestSeq !== state.messageRequestSeq ||
+        state.selectedThread?.id !== threadId
+      ) {
+        return;
+      }
+
       thread.unreadCount = 0;
       renderThreads();
       const summary = await contactApi("/api/contact/summary");
-      setText("metricUnread", summary.unread ?? 0);
+
+      if (
+        requestSeq === state.messageRequestSeq &&
+        state.selectedThread?.id === threadId
+      ) {
+        setText("metricUnread", summary.unread ?? 0);
+      }
     }
   }
 
   function clearConversation() {
+    state.selectionEpoch += 1;
+    state.messageRequestSeq += 1;
     state.selectedThread = null;
     state.messages = [];
     state.pendingWebReply = null;
