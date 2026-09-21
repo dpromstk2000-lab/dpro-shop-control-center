@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CC-UI-V2-PHASE1-R1-20260921";
+  const VERSION = "DPRO-CC-UI-V2-CO02-CUSTOMER-WORKSPACE-R1-20260921";
   const CONTACT_URL = "contact-v1.html";
   const SESSION_KEY = "dpro-control-center-auth-v1";
   const REFRESH_MS = 8000;
@@ -44,6 +44,7 @@
     line: { href: "index.html#view-line", icon: "LINE", label: "LINE公式運用", view: "line" },
     websites: { href: "index.html#view-websites", icon: "WEB", label: "ホームページ", view: "websites" },
 
+    workspace: { href: "customer-workspace.html", icon: "導", label: "お客様導入・運用", sub: "WORKSPACE" },
     start: { href: "start.html", icon: "始", label: "契約開始" },
     setup: { href: "setup.html", icon: "設", label: "契約セットアップ" },
     delivery: { href: "delivery.html", icon: "納", label: "制作・納品" },
@@ -63,13 +64,14 @@
   const sections = [
     { title: "ホーム", items: ["home"] },
     { title: "お客様", items: ["clients", "contracts", "line", "websites"] },
-    { title: "導入・運用", items: ["start", "setup", "delivery", "ready"] },
+    { title: "導入・運用", items: ["workspace", "start", "setup", "delivery", "ready"] },
     { title: "DPRO製品", items: ["products", "productDev", "productRelease"] },
     { title: "品質・管理", items: ["master", "factory", "check", "monitor", "artifacts"] },
   ];
 
   const currentKey = () => {
     const p = pageName();
+    if (p === "customer-workspace.html") return "workspace";
     if (p === "start.html") return "start";
     if (p === "setup.html") return "setup";
     if (p === "delivery.html") return "delivery";
@@ -142,7 +144,7 @@
     const key = currentKey();
     if (key === "home") return "home";
     if (["clients","contracts","line","websites"].includes(key)) return "customers";
-    if (["start","setup","delivery","ready"].includes(key)) return "delivery";
+    if (["workspace","start","setup","delivery","ready"].includes(key)) return "delivery";
     if (["products","productDev","productRelease"].includes(key)) return "products";
     if (["master","factory","check","monitor","artifacts"].includes(key)) return "quality";
     return "";

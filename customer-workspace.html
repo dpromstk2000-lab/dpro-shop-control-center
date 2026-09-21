@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
+</head>
+<body data-dpro-customer-workspace-page="true">
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>DPRO CUSTOMER WORKSPACE</strong>
+    <p id="loadingText">契約・Owner・本番環境・次の作業を確認しています…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>お客様導入・運用はDPROスタッフ専用です。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>お客様導入・運用を開けません</h1>
+      <p id="errorText">CO-01 DBとログイン状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="index.html">CONTROL CENTERへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html">
+        <span>D</span>
+        <div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div>
+      </a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ホーム</a>
+        <a class="active" href="customer-workspace.html"><i>導</i>お客様導入・運用</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="ready-control-center.html"><i>準</i>本番準備</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>CUSTOMER WORKSPACE</strong>
+        <span>MASTER V1.0</span>
+        <small>契約 → 本番導入 → GO LIVE → 運用</small>
+      </div>
+      <div class="version">CO-02<br><span>CUSTOMER WORKSPACE R1</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div>
+          <strong>お客様導入・運用</strong>
+          <small>契約後は、ここを見れば次に何をするか分かる</small>
+        </div>
+        <div class="staff-chip">
+          <span id="staffInitial">D</span>
+          <div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div>
+        </div>
+      </header>
+
+      <section class="content customer-content">
+        <div class="page-head customer-head">
+          <div>
+            <p class="eyebrow">DPRO CUSTOMER WORKSPACE</p>
+            <h1>契約後は、<br>ここだけ見れば進められる。</h1>
+            <p>Owner・Supabase・GitHub・Cloudflare・LINE・公開URL・GO LIVEを顧客単位で束ね、今やることを1件に絞ります。</p>
+          </div>
+          <div class="head-actions">
+            <button id="reloadButton" class="btn secondary" type="button">最新情報に更新</button>
+            <a class="btn secondary" href="delivery.html">制作・納品を開く</a>
+          </div>
+        </div>
+
+        <div class="policy-grid customer-policy">
+          <article><strong>次にすることを1件</strong><span>何を・誰が・どこでするかまで表示します。</span></article>
+          <article><strong>環境情報を探さない</strong><span>Supabase / Repo / Worker / URLを顧客画面へ集約します。</span></article>
+          <article><strong>Ownerを迷わない</strong><span>Owner連絡先・Auth・初回ログイン・承認状態を追います。</span></article>
+          <article><strong>完成LOCKを壊さない</strong><span>SYSTEM FINAL LOCK / PRODUCT RELEASE LOCKは本番導入で開きません。</span></article>
+        </div>
+
+        <div id="metricGrid" class="customer-metrics"></div>
+
+        <div class="workspace-tabs">
+          <button class="workspace-tab is-active" type="button" data-workspace-tab="cases">導入・運用中</button>
+          <button class="workspace-tab" type="button" data-workspace-tab="candidates">導入を開始</button>
+        </div>
+
+        <section id="casesPanel" class="workspace-panel">
+          <div class="toolbar customer-toolbar">
+            <input id="caseSearch" type="search" placeholder="顧客名・SYSTEM CODE・契約コードで検索">
+            <select id="caseFilter">
+              <option value="all">すべて</option>
+              <option value="active">導入中</option>
+              <option value="hold">HOLD</option>
+              <option value="live">本番・運用</option>
+            </select>
+            <span id="caseCount" class="result-count"></span>
+          </div>
+          <div id="caseGrid" class="customer-grid"></div>
+        </section>
+
+        <section id="candidatesPanel" class="workspace-panel hidden">
+          <div class="section-head customer-section-head">
+            <div>
+              <h2>契約案件から導入を開始</h2>
+              <p>PRODUCT RELEASE COMPLETE済み製品だけ開始できます。条件不足は理由を表示します。</p>
+            </div>
+          </div>
+          <div id="candidateGrid" class="candidate-grid"></div>
+        </section>
+
+        <section id="detailPanel" class="workspace-detail hidden">
+          <div class="detail-head">
+            <div>
+              <p class="eyebrow">CUSTOMER WORKSPACE</p>
+              <h2 id="detailTitle">—</h2>
+              <p id="detailMeta">—</p>
+            </div>
+            <button id="closeDetailButton" class="btn secondary" type="button">閉じる</button>
+          </div>
+
+          <article id="nextActionCard" class="next-action-card"></article>
+
+          <div id="statusGrid" class="status-grid"></div>
+
+          <div class="workspace-detail-grid">
+            <section class="workspace-block">
+              <div class="workspace-block-head">
+                <div><p class="eyebrow">ENVIRONMENT</p><h3>本番環境</h3></div>
+                <span class="mini-note">secretは保存しません</span>
+              </div>
+              <div id="infraGrid" class="infra-grid"></div>
+            </section>
+
+            <section class="workspace-block">
+              <div class="workspace-block-head">
+                <div><p class="eyebrow">OWNER</p><h3>Owner・承認</h3></div>
+              </div>
+              <div id="ownerSummary" class="owner-summary"></div>
+            </section>
+          </div>
+
+          <section class="workspace-block">
+            <div class="workspace-block-head">
+              <div><p class="eyebrow">ONBOARDING SCOPE</p><h3>今回導入する構成</h3></div>
+              <span id="requirementsState" class="pill"></span>
+            </div>
+            <form id="requirementsForm" class="requirements-grid">
+              <label><input type="checkbox" data-requirement="system_required" checked disabled><span>DPRO SYSTEM</span><small>必須</small></label>
+              <label><input type="checkbox" data-requirement="owner_account_required"><span>Ownerアカウント</span><small>本番Owner</small></label>
+              <label><input type="checkbox" data-requirement="supabase_required"><span>Supabase</span><small>顧客本番DB</small></label>
+              <label><input type="checkbox" data-requirement="github_required"><span>GitHub</span><small>本番Repository</small></label>
+              <label><input type="checkbox" data-requirement="worker_required"><span>Cloudflare</span><small>Worker</small></label>
+              <label><input type="checkbox" data-requirement="website_required"><span>ホームページ</span><small>契約時のみ</small></label>
+              <label><input type="checkbox" data-requirement="line_required"><span>LINE公式</span><small>契約時のみ</small></label>
+              <label><input type="checkbox" data-requirement="custom_domain_required"><span>独自ドメイン</span><small>契約時のみ</small></label>
+              <button id="confirmRequirementsButton" class="btn primary requirements-save" type="submit">この構成で確定</button>
+            </form>
+          </section>
+
+          <section class="workspace-block">
+            <div class="workspace-block-head">
+              <div><p class="eyebrow">CONTROL</p><h3>HOLD・既存工程</h3></div>
+            </div>
+            <div class="control-grid">
+              <div class="hold-control">
+                <input id="holdCode" maxlength="60" placeholder="HOLDコード（例：OWNER_WAIT）">
+                <input id="holdReason" maxlength="240" placeholder="HOLD理由">
+                <button id="setHoldButton" class="btn secondary" type="button">HOLDにする</button>
+                <button id="clearHoldButton" class="btn secondary hidden" type="button">HOLD解除</button>
+              </div>
+              <div class="legacy-links">
+                <a class="btn secondary" href="start.html">契約開始</a>
+                <a class="btn secondary" href="setup.html">契約セットアップ</a>
+                <a class="btn secondary" href="delivery.html">制作・納品</a>
+                <a class="btn secondary" href="ready-control-center.html">READY本番準備</a>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
