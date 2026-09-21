@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -22,6 +22,7 @@
     setupStep: "owner",
     verification: null,
     goLiveGate: null,
+    operationState: null,
   };
 
   const roleLabels = {
@@ -366,6 +367,7 @@
     state.setupStep = "owner";
     state.verification = null;
     state.goLiveGate = null;
+    state.operationState = null;
     renderDetail();
     $("detailPanel").classList.remove("hidden");
     $("detailPanel").scrollIntoView({behavior:"smooth",block:"start"});
@@ -374,15 +376,17 @@
         loadSetupNamePlan(caseId),
         loadEnvironmentVerification(caseId),
         loadGoLiveGate(caseId),
+        loadOperationState(caseId),
       ]);
       const w=workspaceFor(caseId);
       state.setupStep=chooseSetupStep(w);
       renderSetupWizard();
       renderEnvironmentVerification();
       renderGoLiveGate();
+      renderOperationState();
     } catch (error) {
       console.error(BUILD,error);
-      toast(error?.message || "名前候補を生成できませんでした。",true);
+      toast(error?.message || "Customer Workspace詳細を読み込めませんでした。",true);
     }
   }
 
@@ -490,6 +494,7 @@
     renderSetupWizard();
     renderEnvironmentVerification();
     renderGoLiveGate();
+    renderOperationState();
   }
 
 
@@ -720,15 +725,217 @@
       await Promise.all([
         loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
         loadGoLiveGate(state.selectedCaseId,{silent:true}),
+        loadOperationState(state.selectedCaseId,{silent:true}),
       ]);
       renderDetail();
-      toast("GO LIVEを確定しました。");
+      toast("GO LIVEを確定しました。保守・運用管理を開始できます。");
     }catch(error){
       console.error(BUILD,error);
       toast(error?.message || "本番開始を確定できませんでした。",true);
     }finally{
       button.textContent=oldText;
       renderGoLiveGate();
+    }
+  }
+
+  const operationStateLabels={
+    pre_live:"PRE-LIVE",
+    ok:"NORMAL",
+    due_soon:"DUE SOON",
+    overdue:"OVERDUE",
+    attention:"ATTENTION",
+    support_open:"SUPPORT",
+  };
+
+  function operationDate(value){
+    if (!value) return "未設定";
+    return String(value).slice(0,10).replaceAll("-","/");
+  }
+
+  function operationDefaultNextDate(){
+    const d=new Date();
+    d.setMonth(d.getMonth()+1);
+    const p=(n)=>String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+
+  function operationTomorrow(){
+    const d=new Date();
+    d.setDate(d.getDate()+1);
+    const p=(n)=>String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+
+  async function loadOperationState(caseId,{silent=false}={}){
+    if (!caseId) return;
+    if (!silent) {
+      $("operationSummary").innerHTML='<span>保守・運用情報を読み込んでいます…</span>';
+      $("operationMetrics").innerHTML="";
+    }
+    const {data,error}=await state.supabase.rpc("cc_customer_onboarding_operation_state",{
+      p_case_id:caseId,
+    });
+    if (error) throw error;
+    state.operationState=data || null;
+  }
+
+  function enabledMaintenanceFeature(code){
+    const rows=state.operationState?.maintenance?.enabled_features || [];
+    if (code==="photo") {
+      return rows.some((x)=>["photo","customer_photo_share","before_after_photo"].includes(x?.feature_code));
+    }
+    return rows.some((x)=>x?.feature_code===code);
+  }
+
+  function operationMetric(label,value){
+    return `<article class="operation-metric"><span>${esc(label)}</span><strong>${esc(value ?? "—")}</strong></article>`;
+  }
+
+  function renderOperationState(){
+    const block=$("operationBlock");
+    if (!block) return;
+    const op=state.operationState;
+
+    if (!op){
+      $("operationSummary").className="operation-summary is-pre-live";
+      $("operationSummary").innerHTML='<div class="operation-status">WAIT</div><div class="operation-summary-main"><strong>運用情報を読み込んでください</strong><span>CENTER-9の情報をこの顧客画面へ表示します。</span></div>';
+      $("operationMetrics").innerHTML="";
+      $("operationSupportList").innerHTML="";
+      $("operationHistoryList").innerHTML="";
+      $("maintenanceForm").classList.add("hidden");
+      return;
+    }
+
+    const live=op.live===true;
+    const stateValue=op.operation_state || "pre_live";
+    const next=op.next_action || {};
+    const item=op.maintenance?.item || {};
+    const support=op.support || {};
+    const history=Array.isArray(op.maintenance?.history)?op.maintenance.history:[];
+    const supportItems=Array.isArray(support.items)?support.items:[];
+
+    $("operationSummary").className=`operation-summary is-${stateValue.replaceAll("_","-")}`;
+    $("operationSummary").innerHTML=`
+      <div class="operation-status">${esc(operationStateLabels[stateValue] || stateValue.toUpperCase())}</div>
+      <div class="operation-summary-main">
+        <strong>${esc(next.label || (live?"運用状況を確認":"GO LIVE後に運用開始"))}</strong>
+        <span>${esc(next.detail || "CENTER-9の状態を確認します")}</span>
+      </div>
+      <div class="operation-summary-side">${live?"CENTER-9 LIVE":"GO LIVE前"}</div>`;
+
+    const versionText=[
+      item.worker_version?`Worker ${item.worker_version}`:null,
+      item.database_version?`DB ${item.database_version}`:null,
+      item.frontend_version?`Front ${item.frontend_version}`:null,
+    ].filter(Boolean).join(" / ") || "未登録";
+
+    $("operationMetrics").innerHTML=[
+      operationMetric("次回保守",live?operationDate(item.next_maintenance_date || op.go_live?.next_maintenance_date):"GO LIVE後"),
+      operationMetric("Health",live?(item.last_health_status || "unknown"):"—"),
+      operationMetric("Version",live?versionText:"—"),
+      operationMetric("未完了対応",String(Number(support.open_count || 0))),
+      operationMetric("緊急",String(Number(support.urgent_count || 0))),
+    ].join("");
+
+    $("operationSupportList").innerHTML=supportItems.length
+      ? supportItems.slice(0,5).map((x)=>`
+          <div class="operation-list-row">
+            <div>
+              <strong>${esc(x.case_code || "SUPPORT")}｜${esc(x.subject || "顧客対応")}</strong>
+              <span>${esc(x.category || "other")} / ${esc(x.status || "new")}</span>
+            </div>
+            <small>${esc((x.priority || "normal").toUpperCase())}</small>
+          </div>`).join("")
+      : '<div class="operation-list-empty">未完了の顧客対応はありません。</div>';
+
+    $("operationHistoryList").innerHTML=history.length
+      ? history.slice(0,5).map((x)=>`
+          <div class="operation-list-row">
+            <div>
+              <strong>${esc(operationDate(x.completed_at))}｜${esc(x.maintenance_type || "regular")}</strong>
+              <span>${esc(x.note || "保守記録")}</span>
+            </div>
+            <small>${esc((x.result_status || "ok").toUpperCase())}</small>
+          </div>`).join("")
+      : '<div class="operation-list-empty">保守履歴はまだありません。</div>';
+
+    const form=$("maintenanceForm");
+    form.classList.toggle("hidden",!live);
+
+    for (const code of ["reservation","business_calendar","line","website","photo"]) {
+      document.querySelector(`[data-operation-feature="${code}"]`)?.classList.toggle("hidden",!enabledMaintenanceFeature(code));
+    }
+
+    if (live) {
+      const nextInput=$("maintenanceNextDate");
+      nextInput.min=operationTomorrow();
+      if (!nextInput.value || nextInput.value < nextInput.min) nextInput.value=operationDefaultNextDate();
+      $("completeMaintenanceButton").disabled=!canWrite();
+      $("completeMaintenanceButton").title=canWrite()
+        ?"CENTER-9へ保守結果を記録します"
+        :"保守記録は管理責任者 / 技術管理者 / サポートのみ実行できます";
+    }
+  }
+
+  async function completeCustomerMaintenance(event){
+    event.preventDefault();
+    if (!state.selectedCaseId || !state.operationState?.live) return;
+    if (!canWrite()) return toast("保守記録の権限がありません。",true);
+
+    const result=inputValue("maintenanceResult");
+    const note=inputValue("maintenanceNote");
+    const nextDate=inputValue("maintenanceNextDate");
+
+    if (!nextDate) return toast("次回保守日を入力してください。",true);
+    if (result!=="ok" && !note) return toast("要フォロー・問題ありの場合は保守メモが必要です。",true);
+
+    const payload={
+      maintenance_type:inputValue("maintenanceType") || "regular",
+      result_status:result || "ok",
+      next_maintenance_date:nextDate,
+      note:note || null,
+      check_results:{
+        owner_access:Boolean($("maintOwnerAccess")?.checked),
+        public_flow:Boolean($("maintPublicFlow")?.checked),
+        recent_error_review:Boolean($("maintRecentErrors")?.checked),
+        reservation_flow:Boolean($("maintReservation")?.checked),
+        business_calendar:Boolean($("maintCalendar")?.checked),
+        line_flow:Boolean($("maintLine")?.checked),
+        website_flow:Boolean($("maintWebsite")?.checked),
+        photo_flow:Boolean($("maintPhoto")?.checked),
+      },
+    };
+
+    const button=$("completeMaintenanceButton");
+    const oldText=button.textContent;
+    button.disabled=true;
+    button.textContent="記録しています…";
+
+    try{
+      const {data,error}=await state.supabase.rpc("cc_customer_onboarding_complete_maintenance",{
+        p_case_id:state.selectedCaseId,
+        p_payload:payload,
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("保守記録を完了できませんでした。");
+
+      await loadAll(true);
+      await loadOperationState(state.selectedCaseId,{silent:true});
+      renderDetail();
+
+      document.querySelectorAll("#maintenanceChecks input[type=checkbox]").forEach((x)=>x.checked=false);
+      $("maintenanceNote").value="";
+      $("maintenanceResult").value="ok";
+      $("maintenanceType").value="regular";
+      $("maintenanceNextDate").value=operationDefaultNextDate();
+
+      toast("保守確認をCENTER-9へ記録しました。");
+    }catch(error){
+      console.error(BUILD,error);
+      toast(error?.message || "保守確認を記録できませんでした。",true);
+    }finally{
+      button.textContent=oldText;
+      renderOperationState();
     }
   }
 
@@ -933,6 +1140,7 @@
       loadSetupNamePlan(state.selectedCaseId,{silent:true}),
       loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
       loadGoLiveGate(state.selectedCaseId,{silent:true}),
+      loadOperationState(state.selectedCaseId,{silent:true}),
     ]);
     renderDetail();
     toast(message);
@@ -1123,6 +1331,7 @@
           await Promise.all([
             loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
             loadGoLiveGate(state.selectedCaseId,{silent:true}),
+            loadOperationState(state.selectedCaseId,{silent:true}),
           ]);
           renderDetail();
         }
@@ -1140,6 +1349,26 @@
     $("requirementsForm")?.addEventListener("submit",confirmRequirements);
     $("setHoldButton")?.addEventListener("click",setHold);
     $("clearHoldButton")?.addEventListener("click",clearHold);
+    $("refreshOperationButton")?.addEventListener("click",async()=>{
+      if (!state.selectedCaseId) return;
+      const button=$("refreshOperationButton");
+      const oldText=button.textContent;
+      button.disabled=true;
+      button.textContent="更新中…";
+      try{
+        await loadOperationState(state.selectedCaseId,{silent:true});
+        renderOperationState();
+        toast("保守・運用情報を更新しました。");
+      }catch(error){
+        console.error(BUILD,error);
+        toast(error?.message || "保守・運用情報を更新できませんでした。",true);
+      }finally{
+        button.disabled=false;
+        button.textContent=oldText;
+      }
+    });
+    $("maintenanceForm")?.addEventListener("submit",completeCustomerMaintenance);
+
     $("refreshGoLiveGateButton")?.addEventListener("click",async()=>{
       if (!state.selectedCaseId) return;
       const button=$("refreshGoLiveGateButton");
@@ -1172,6 +1401,7 @@
         await Promise.all([
           loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
           loadGoLiveGate(state.selectedCaseId,{silent:true}),
+          loadOperationState(state.selectedCaseId,{silent:true}),
         ]);
         renderDetail();
         const attempted=Object.values(result.checks||{}).filter((x)=>x?.attempted).length;

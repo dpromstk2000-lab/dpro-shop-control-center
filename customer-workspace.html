@@ -9,10 +9,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
   <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
-  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
-  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO06B-OPERATION-UI-R1-20260921"></script>
 </head>
 <body data-dpro-customer-workspace-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -59,7 +59,7 @@
         <span>MASTER V1.0</span>
         <small>契約 → 本番導入 → GO LIVE → 運用</small>
       </div>
-      <div class="version">CO-02<br><span>CUSTOMER WORKSPACE R1</span></div>
+      <div class="version">CO-06<br><span>ONBOARDING + OPERATION</span></div>
     </aside>
 
     <main class="main">
@@ -176,6 +176,88 @@
               <button id="activateGoLiveButton" class="btn primary" type="button" disabled>本番開始を確定</button>
             </div>
             <p class="go-live-gate-note">「本番開始を確定」は最終GateがPASSした実契約だけ有効になります。SYSTEM FINAL LOCK / PRODUCT RELEASE LOCKは開きません。</p>
+          </section>
+          <section id="operationBlock" class="workspace-block operation-block">
+            <div class="workspace-block-head">
+              <div>
+                <p class="eyebrow">POST GO LIVE OPERATION</p>
+                <h3>導入後の保守・運用</h3>
+                <p class="operation-lead">CENTER-9を正本として、次回保守・Health・Version・問い合わせ・履歴をこの顧客画面へ集約します。</p>
+              </div>
+              <button id="refreshOperationButton" class="btn secondary" type="button">運用情報を更新</button>
+            </div>
+
+            <div id="operationSummary" class="operation-summary"></div>
+            <div id="operationMetrics" class="operation-metrics"></div>
+
+            <div class="operation-two-column">
+              <section class="operation-subblock">
+                <div class="operation-subhead">
+                  <strong>未完了の顧客対応</strong>
+                  <a class="mini-link" href="contact-v1.html">DPRO CONTACTを開く</a>
+                </div>
+                <div id="operationSupportList" class="operation-list"></div>
+              </section>
+
+              <section class="operation-subblock">
+                <div class="operation-subhead">
+                  <strong>保守履歴</strong>
+                  <a class="mini-link" href="delivery.html">CENTER-9を開く</a>
+                </div>
+                <div id="operationHistoryList" class="operation-list"></div>
+              </section>
+            </div>
+
+            <form id="maintenanceForm" class="maintenance-form hidden">
+              <div class="operation-subhead">
+                <strong>今回の保守確認を記録</strong>
+                <span>AAL2必須 / CENTER-9へ記録</span>
+              </div>
+
+              <div class="maintenance-form-grid">
+                <label>
+                  <span>保守種別</span>
+                  <select id="maintenanceType">
+                    <option value="regular">定期保守</option>
+                    <option value="version_update">Version更新</option>
+                    <option value="incident">障害対応</option>
+                    <option value="follow_up">フォロー</option>
+                  </select>
+                </label>
+                <label>
+                  <span>結果</span>
+                  <select id="maintenanceResult">
+                    <option value="ok">問題なし</option>
+                    <option value="follow_up">要フォロー</option>
+                    <option value="issue">問題あり</option>
+                  </select>
+                </label>
+                <label>
+                  <span>次回保守日</span>
+                  <input id="maintenanceNextDate" type="date" required>
+                </label>
+              </div>
+
+              <div id="maintenanceChecks" class="maintenance-checks">
+                <label><input id="maintOwnerAccess" type="checkbox"><span>Owner画面・ログイン確認</span></label>
+                <label><input id="maintPublicFlow" type="checkbox"><span>公開側の主要導線確認</span></label>
+                <label><input id="maintRecentErrors" type="checkbox"><span>直近エラー・異常確認</span></label>
+                <label data-operation-feature="reservation" class="hidden"><input id="maintReservation" type="checkbox"><span>予約フロー確認</span></label>
+                <label data-operation-feature="business_calendar" class="hidden"><input id="maintCalendar" type="checkbox"><span>営業日・カレンダー確認</span></label>
+                <label data-operation-feature="line" class="hidden"><input id="maintLine" type="checkbox"><span>LINE導線確認</span></label>
+                <label data-operation-feature="website" class="hidden"><input id="maintWebsite" type="checkbox"><span>ホームページ導線確認</span></label>
+                <label data-operation-feature="photo" class="hidden"><input id="maintPhoto" type="checkbox"><span>写真機能確認</span></label>
+              </div>
+
+              <label class="maintenance-note-field">
+                <span>保守メモ</span>
+                <textarea id="maintenanceNote" placeholder="問題なしの場合は任意。要フォロー・問題ありの場合は対応内容を記入してください。"></textarea>
+              </label>
+
+              <button id="completeMaintenanceButton" class="btn primary" type="submit">保守確認を完了</button>
+            </form>
+
+            <p class="operation-note">保守データは既存CENTER-9へ記録します。別台帳へ二重登録しません。SYSTEM FINAL LOCK / PRODUCT RELEASE LOCKも変更しません。</p>
           </section>
           <section id="setupWizardBlock" class="workspace-block setup-wizard-block">
             <div class="workspace-block-head">
