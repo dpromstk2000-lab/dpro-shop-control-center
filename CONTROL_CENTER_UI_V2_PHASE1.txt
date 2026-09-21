@@ -1,0 +1,22 @@
+DPRO CONTROL CENTER UI V2 / PHASE 1 R1
+DATE: 2026-09-21
+
+Scope:
+- 共通ナビゲーションの第1段階
+- 顧客対応を最優先固定入口へ
+- PCヘッダーに顧客対応ショートカット
+- CONTROL CENTER画面でサーバー未読状態を表示
+- 既存index SPAの主要ボタンを再利用
+- sidebarが無い特殊画面は安全なdrawer入口
+- DPRO CONTACT PWA本体は変更しない
+- DB/RPC/Workerは変更しない
+
+Protected:
+contact-v1.html
+contact-v1.webmanifest
+contact-v1-sw.js
+contact-v1.js
+contact-v1-notification-r1.js
+
+Next:
+実機QA後、cross-device read syncを別工程で実装する。

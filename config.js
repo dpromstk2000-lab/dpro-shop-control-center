@@ -7,6 +7,26 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   displayName: "DPRO SHOP 統合管理",
   supportName: "DPRO SHOP",
 });
+// DPRO CONTROL CENTER UI V2 / PHASE 1
+// Navigation + contact priority only. DPRO CONTACT PWA does not load config.js.
+window.DPRO_CC_SHELL_V2_ACTIVE = true;
+(() => {
+  const cssHref = "./cc-shell-v2.css?v=DPRO-CC-UI-V2-PHASE1-R1-20260921";
+  if (!document.querySelector('link[data-dpro-cc-shell-v2="true"]')) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = cssHref;
+    link.dataset.dproCcShellV2 = "true";
+    document.head.appendChild(link);
+  }
+  if (!document.querySelector('script[data-dpro-cc-shell-v2="true"]')) {
+    const script = document.createElement("script");
+    script.src = "./cc-shell-v2.js?v=DPRO-CC-UI-V2-PHASE1-R1-20260921";
+    script.defer = true;
+    script.dataset.dproCcShellV2 = "true";
+    document.head.appendChild(script);
+  }
+})();
 
 (() => {
   "use strict";
@@ -298,6 +318,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
   };
 
   const installLinks = () => {
+    if (window.DPRO_CC_SHELL_V2_ACTIVE) return true;
     const nav = document.querySelector(".side-nav");
     if (!nav) return false;
     ensureStyle();

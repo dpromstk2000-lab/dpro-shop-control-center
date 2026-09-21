@@ -1,38 +1,3 @@
-name: DPRO Control Center UI V2 Phase 1 R1
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/dpro-control-center-ui-v2-phase1-r1.yml"
-
-permissions:
-  contents: write
-
-jobs:
-  apply:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Guard audited baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f config.js
-          grep -F 'version: "CONTROL-CENTER-45-CENTER10-UI-1-R2-GLOBAL-READABILITY-20260810"' config.js
-          grep -F 'contactApiBaseUrl: "https://dpro-shop-contact-api.dpromstk2000.workers.dev"' config.js
-          test ! -f cc-shell-v2.js
-          test ! -f cc-shell-v2.css
-
-      - name: Write UI V2 Phase 1 files
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > cc-shell-v2.js <<'EOF_JS'
 (() => {
   "use strict";
 
@@ -354,9 +319,18 @@ jobs:
     if (pageName() !== "index.html") return;
     const view = location.hash.replace(/^#view-/, "");
     if (!view) return;
-    const button = document.querySelector(`.nav-button[data-view="${CSS.escape(view)}"]`);
-    if (!button) return;
-    setTimeout(() => button.click(), 150);
+
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const button = document.querySelector(`.nav-button[data-view="${CSS.escape(view)}"]`);
+      if (button) {
+        button.click();
+        clearInterval(timer);
+        return;
+      }
+      if (tries >= 50) clearInterval(timer);
+    }, 100);
   };
 
   const updateUnread = (count) => {
@@ -446,163 +420,3 @@ jobs:
     boot();
   }
 })();
-
-EOF_JS
-
-          cat > cc-shell-v2.css <<'EOF_CSS'
-/* DPRO CONTROL CENTER UI V2 / PHASE 1
-   Navigation + contact priority only.
-   DPRO CONTACT PWA is intentionally excluded. */
-:root{
-  --ccv2-green:#0b5f49;--ccv2-green-dark:#064638;--ccv2-green-soft:#e8f5ef;
-  --ccv2-border:#d8e5df;--ccv2-alert:#cf2f2f;--ccv2-alert-soft:#fff0f0;
-}
-.ccv2-nav{display:flex!important;flex-direction:column!important;gap:8px!important}
-.ccv2-contact-priority{
-  display:flex!important;align-items:center!important;gap:10px!important;min-height:58px!important;
-  padding:10px 12px!important;margin:0 0 8px!important;border-radius:14px!important;text-decoration:none!important;
-  background:rgba(255,255,255,.11)!important;color:#fff!important;border:1px solid rgba(255,255,255,.12)!important
-}
-.ccv2-contact-priority:hover{background:rgba(255,255,255,.17)!important}
-.ccv2-contact-priority.has-unread{background:#fff!important;color:var(--ccv2-green-dark)!important;border-color:#fff!important}
-.ccv2-contact-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(159,227,189,.22);font-weight:900;flex:0 0 auto}
-.ccv2-contact-copy{display:flex;flex-direction:column;min-width:0;line-height:1.2}
-.ccv2-contact-copy strong{font-size:14px}.ccv2-contact-copy small{font-size:10px;opacity:.72;margin-top:3px}
-.ccv2-contact-badge{margin-left:auto;min-width:24px;height:24px;padding:0 7px;border-radius:999px;display:grid;place-items:center;background:var(--ccv2-alert);color:#fff;font-size:12px;font-weight:900}
-.ccv2-contact-badge[hidden]{display:none!important}
-.ccv2-nav-section{display:flex!important;flex-direction:column!important;gap:3px!important;padding:0!important}
-.ccv2-nav-section-title{padding:11px 10px 5px!important;font-size:10px!important;font-weight:900!important;letter-spacing:.12em!important;color:rgba(255,255,255,.55)!important}
-.ccv2-nav-link,.ccv2-nav .nav-button{
-  width:100%!important;min-height:42px!important;display:flex!important;align-items:center!important;gap:9px!important;
-  padding:8px 10px!important;border:0!important;border-radius:10px!important;text-decoration:none!important;
-  background:transparent!important;color:rgba(255,255,255,.88)!important;font:inherit!important;font-size:13px!important;
-  font-weight:750!important;text-align:left!important;cursor:pointer!important
-}
-.ccv2-nav-link:hover,.ccv2-nav .nav-button:hover{background:rgba(255,255,255,.08)!important;color:#fff!important}
-.ccv2-nav-link.is-active,.ccv2-nav .nav-button.active{background:rgba(255,255,255,.14)!important;color:#fff!important}
-.ccv2-nav-icon{width:28px!important;height:28px!important;min-width:28px!important;display:grid!important;place-items:center!important;border-radius:8px!important;background:rgba(255,255,255,.08)!important;font-size:10px!important;font-weight:900!important}
-.ccv2-nav-label{min-width:0;flex:1}.ccv2-nav-link small{font-size:9px;opacity:.62}
-.ccv2-advanced{margin-top:2px;border-top:1px solid rgba(255,255,255,.08);padding-top:3px!important}
-.ccv2-header-contact{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 11px;border-radius:999px;text-decoration:none;border:1px solid var(--ccv2-border);background:#fff;color:var(--ccv2-green-dark);font-size:12px;font-weight:900;white-space:nowrap}
-.ccv2-header-contact:hover{background:var(--ccv2-green-soft)}
-.ccv2-header-contact b{min-width:22px;height:22px;padding:0 6px;border-radius:999px;display:grid;place-items:center;background:var(--ccv2-alert);color:#fff;font-size:11px}
-.ccv2-header-contact b[hidden]{display:none!important}
-.ccv2-header-contact.has-unread{border-color:#f0b3b3;background:var(--ccv2-alert-soft);color:#962323}
-.ccv2-header-contact-floating{position:fixed;right:16px;top:16px;z-index:9997;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-.ccv2-fallback-menu{position:fixed;left:16px;top:16px;z-index:9997;display:flex;align-items:center;gap:7px;min-height:42px;padding:7px 12px;border:0;border-radius:12px;background:var(--ccv2-green);color:#fff;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.15);cursor:pointer}
-.ccv2-fallback-menu span{width:28px;height:28px;border-radius:8px;background:#fff;color:var(--ccv2-green);display:grid;place-items:center}
-.ccv2-drawer{position:fixed;inset:0;z-index:10020;background:rgba(4,25,20,.44);opacity:0;pointer-events:none;transition:opacity .18s ease}
-.ccv2-drawer.is-open{opacity:1;pointer-events:auto}.ccv2-drawer-panel{width:min(320px,88vw);height:100%;overflow:auto;padding:16px;background:var(--ccv2-green-dark);color:#fff;transform:translateX(-102%);transition:transform .18s ease}
-.ccv2-drawer.is-open .ccv2-drawer-panel{transform:translateX(0)}
-.ccv2-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 16px}
-.ccv2-drawer-head button{width:40px;height:40px;border:0;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-size:24px;cursor:pointer}
-@media(max-width:760px){
-  .ccv2-header-contact span{display:none}.ccv2-header-contact{padding:7px 9px;min-width:40px;justify-content:center}
-  .ccv2-header-contact:not(.has-unread)::before{content:"話";font-weight:900}
-  .ccv2-header-contact-floating{right:10px;top:10px}.ccv2-fallback-menu{left:10px;top:10px}
-}
-
-EOF_CSS
-
-          cat > CONTROL_CENTER_UI_V2_PHASE1.txt <<'EOF_NOTE'
-DPRO CONTROL CENTER UI V2 / PHASE 1 R1
-DATE: 2026-09-21
-
-Scope:
-- 共通ナビゲーションの第1段階
-- 顧客対応を最優先固定入口へ
-- PCヘッダーに顧客対応ショートカット
-- CONTROL CENTER画面でサーバー未読状態を表示
-- 既存index SPAの主要ボタンを再利用
-- sidebarが無い特殊画面は安全なdrawer入口
-- DPRO CONTACT PWA本体は変更しない
-- DB/RPC/Workerは変更しない
-
-Protected:
-contact-v1.html
-contact-v1.webmanifest
-contact-v1-sw.js
-contact-v1.js
-contact-v1-notification-r1.js
-
-Next:
-実機QA後、cross-device read syncを別工程で実装する。
-
-EOF_NOTE
-
-      - name: Enable shared shell from config
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("config.js")
-          s = p.read_text(encoding="utf-8")
-          needle = '\n\n(() => {\n  "use strict";'
-          if needle not in s:
-              raise SystemExit("CONFIG_INSERT_POINT_NOT_FOUND")
-          if "DPRO_CC_SHELL_V2_ACTIVE" in s:
-              raise SystemExit("UI_V2_SHELL_ALREADY_PRESENT")
-
-          loader = '''
-          // DPRO CONTROL CENTER UI V2 / PHASE 1
-          // Navigation + contact priority only. DPRO CONTACT PWA does not load config.js.
-          window.DPRO_CC_SHELL_V2_ACTIVE = true;
-          (() => {
-            const cssHref = "./cc-shell-v2.css?v=DPRO-CC-UI-V2-PHASE1-R1-20260921";
-            if (!document.querySelector('link[data-dpro-cc-shell-v2="true"]')) {
-              const link = document.createElement("link");
-              link.rel = "stylesheet";
-              link.href = cssHref;
-              link.dataset.dproCcShellV2 = "true";
-              document.head.appendChild(link);
-            }
-            if (!document.querySelector('script[data-dpro-cc-shell-v2="true"]')) {
-              const script = document.createElement("script");
-              script.src = "./cc-shell-v2.js?v=DPRO-CC-UI-V2-PHASE1-R1-20260921";
-              script.defer = true;
-              script.dataset.dproCcShellV2 = "true";
-              document.head.appendChild(script);
-            }
-          })();
-          '''
-          s = s.replace(needle, "\n" + loader.strip("\n") + needle, 1)
-
-          old = '  const installLinks = () => {\n    const nav = document.querySelector(".side-nav");'
-          new = '  const installLinks = () => {\n    if (window.DPRO_CC_SHELL_V2_ACTIVE) return true;\n    const nav = document.querySelector(".side-nav");'
-          if old not in s:
-              raise SystemExit("LEGACY_LINK_GUARD_NOT_FOUND")
-          s = s.replace(old, new, 1)
-          p.write_text(s, encoding="utf-8")
-          PY
-
-      - name: Static validation
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --check config.js
-          node --check cc-shell-v2.js
-          grep -F 'window.DPRO_CC_SHELL_V2_ACTIVE = true;' config.js
-          grep -F 'cc-shell-v2.js?v=DPRO-CC-UI-V2-PHASE1-R1-20260921' config.js
-          grep -F 'if (window.DPRO_CC_SHELL_V2_ACTIVE) return true;' config.js
-          grep -F 'REFRESH_MS = 30000' cc-shell-v2.js
-
-          if git diff --name-only | grep -E '^contact-v1(\.|-)|^dpro-contact-' >/dev/null; then
-            echo "Protected DPRO CONTACT PWA file changed."
-            exit 1
-          fi
-
-      - name: Remove one-shot workflow
-        shell: bash
-        run: |
-          rm -f .github/workflows/dpro-control-center-ui-v2-phase1-r1.yml
-
-      - name: Commit Phase 1
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "DPRO Factory Bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add config.js cc-shell-v2.js cc-shell-v2.css CONTROL_CENTER_UI_V2_PHASE1.txt .github/workflows/dpro-control-center-ui-v2-phase1-r1.yml
-          git commit -m "Add Control Center UI V2 phase 1"
-          git push
