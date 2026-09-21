@@ -1,0 +1,276 @@
+name: DPRO Contact Thread Race Guard R3B R1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dpro-contact-thread-race-guard-r3b-r1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f contact-v1.js
+          test -f contact-v1.html
+          grep -F 'const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED";' contact-v1.js
+          grep -F 'async function loadAll({ keepSelection = true, silent = false } = {}) {' contact-v1.js
+          grep -F 'async function selectThread(thread) {' contact-v1.js
+          grep -F 'async function loadSelectedMessages({ markRead = true } = {}) {' contact-v1.js
+          grep -F 'contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED' contact-v1.html
+
+      - name: Apply thread selection race guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/dpro_contact_r3b_patch.py <<'PY'
+          from pathlib import Path
+
+          JS = Path("contact-v1.js")
+          HTML = Path("contact-v1.html")
+
+          s = JS.read_text(encoding="utf-8")
+
+          old_version = 'const VERSION = "DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED";'
+          new_version = 'const VERSION = "DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921";'
+          if s.count(old_version) != 1:
+              raise SystemExit(f"VERSION baseline expected once, got {s.count(old_version)}")
+          s = s.replace(old_version, new_version, 1)
+
+          old_state = "    loading: false,\n    pendingWebReply: null,"
+          new_state = "    loading: false,\n    selectionEpoch: 0,\n    messageRequestSeq: 0,\n    pendingWebReply: null,"
+          if s.count(old_state) != 1:
+              raise SystemExit("state baseline not found exactly once")
+          s = s.replace(old_state, new_state, 1)
+
+          def replace_section(src: str, start_marker: str, end_marker: str, replacement: str) -> str:
+              start = src.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f"start marker not found: {start_marker}")
+              end = src.find(end_marker, start)
+              if end < 0:
+                  raise SystemExit(f"end marker not found: {end_marker}")
+              return src[:start] + replacement.rstrip() + "\n\n  " + src[end:]
+
+          load_all_new = r'''async function loadAll({ keepSelection = true, silent = false } = {}) {
+              if (state.loading) return;
+              state.loading = true;
+
+              const selectionEpochAtStart = state.selectionEpoch;
+              const selectedId = keepSelection ? state.selectedThread?.id : null;
+
+              try {
+                const [summary, threadData] = await Promise.all([
+                  contactApi("/api/contact/summary"),
+                  contactApi(buildThreadPath()),
+                ]);
+
+                setText("metricUnread", summary.unread ?? 0);
+                setText("metricOpen", summary.openThreads ?? 0);
+                setText("metricToday", summary.todayThreads ?? 0);
+                setText("metricClosed", summary.closedThreads ?? 0);
+
+                state.threads = Array.isArray(threadData.threads) ? threadData.threads : [];
+                renderThreads();
+
+                const selectionUnchanged =
+                  state.selectionEpoch === selectionEpochAtStart &&
+                  state.selectedThread?.id === selectedId;
+
+                if (selectedId && selectionUnchanged) {
+                  const same = state.threads.find((t) => t.id === selectedId);
+                  if (same) {
+                    state.selectedThread = same;
+                    await loadSelectedMessages({ markRead: false });
+                  } else {
+                    clearConversation();
+                  }
+                }
+
+                if (!silent) setText("topbarDescription", text(branding().topbarDescription, "LINE・WEB問い合わせを一元確認"));
+              } finally {
+                state.loading = false;
+              }
+            }'''
+
+          s = replace_section(
+              s,
+              'async function loadAll({ keepSelection = true, silent = false } = {}) {',
+              'function buildThreadPath() {',
+              load_all_new,
+          )
+
+          selection_new = r'''async function selectThread(thread) {
+              if (!thread?.id) return;
+
+              state.selectionEpoch += 1;
+              state.messageRequestSeq += 1;
+              state.selectedThread = thread;
+              state.pendingWebReply = null;
+              state.pendingAttachmentReply = null;
+              clearSelectedFiles();
+              renderThreads();
+
+              if (window.innerWidth <= 760) {
+                document.body.classList.add("dc-mobile-conversation");
+              }
+
+              await loadSelectedMessages({ markRead: true });
+            }
+
+            async function loadSelectedMessages({ markRead = true } = {}) {
+              const thread = state.selectedThread;
+              const threadId = text(thread?.id);
+              if (!thread || !threadId) return;
+
+              const requestSeq = ++state.messageRequestSeq;
+
+              $("emptyConversation")?.classList.add("dc-hidden");
+              $("conversation")?.classList.remove("dc-hidden");
+
+              const name = text(thread.displayName, threadFallbackName(thread));
+              const channel = threadChannelLabel(thread);
+              setText("conversationName", name);
+              setText(
+                "conversationMeta",
+                `${channel} / ${thread.status === "closed" ? "対応完了" : "対応中"} / 最終更新 ${formatDate(thread.lastMessageAt)}`
+              );
+              setText("statusButton", thread.status === "closed" ? "対応を再開" : "対応完了にする");
+              applyComposerMode(thread);
+
+              const data = await contactApi(`/api/contact/threads/${encodeURIComponent(threadId)}/messages`);
+
+              if (
+                requestSeq !== state.messageRequestSeq ||
+                state.selectedThread?.id !== threadId
+              ) {
+                return;
+              }
+
+              state.messages = Array.isArray(data.messages) ? data.messages : [];
+              renderMessages();
+
+              if (markRead && num(thread.unreadCount) > 0) {
+                await contactApi(`/api/contact/threads/${encodeURIComponent(threadId)}/read`, {
+                  method: "POST",
+                  body: "{}",
+                });
+
+                if (
+                  requestSeq !== state.messageRequestSeq ||
+                  state.selectedThread?.id !== threadId
+                ) {
+                  return;
+                }
+
+                thread.unreadCount = 0;
+                renderThreads();
+                const summary = await contactApi("/api/contact/summary");
+
+                if (
+                  requestSeq === state.messageRequestSeq &&
+                  state.selectedThread?.id === threadId
+                ) {
+                  setText("metricUnread", summary.unread ?? 0);
+                }
+              }
+            }
+
+            function clearConversation() {
+              state.selectionEpoch += 1;
+              state.messageRequestSeq += 1;
+              state.selectedThread = null;
+              state.messages = [];
+              state.pendingWebReply = null;
+              state.pendingAttachmentReply = null;
+              clearSelectedFiles();
+              $("conversation")?.classList.add("dc-hidden");
+              $("emptyConversation")?.classList.remove("dc-hidden");
+              document.body.classList.remove("dc-mobile-conversation");
+              renderThreads();
+            }'''
+
+          s = replace_section(
+              s,
+              'async function selectThread(thread) {',
+              'function formatBytes(value) {',
+              selection_new,
+          )
+
+          required_markers = [
+              'selectionEpoch: 0',
+              'messageRequestSeq: 0',
+              'state.selectionEpoch === selectionEpochAtStart',
+              'requestSeq !== state.messageRequestSeq',
+              'state.selectedThread?.id !== threadId',
+              'DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921',
+          ]
+          for marker in required_markers:
+              if marker not in s:
+                  raise SystemExit(f"missing guard marker: {marker}")
+
+          JS.write_text(s, encoding="utf-8", newline="\n")
+
+          h = HTML.read_text(encoding="utf-8")
+          old_loader = 'contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-LINE-WEB-EMAIL-ATTACHMENTS-20260815-R4-STAGED'
+          new_loader = 'contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921'
+          if h.count(old_loader) != 1:
+              raise SystemExit(f"HTML loader baseline expected once, got {h.count(old_loader)}")
+          h = h.replace(old_loader, new_loader, 1)
+          HTML.write_text(h, encoding="utf-8", newline="\n")
+          PY
+
+          python /tmp/dpro_contact_r3b_patch.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check contact-v1.js
+          grep -F 'DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921' contact-v1.js
+          grep -F 'selectionEpoch: 0' contact-v1.js
+          grep -F 'messageRequestSeq: 0' contact-v1.js
+          grep -F 'state.selectionEpoch === selectionEpochAtStart' contact-v1.js
+          grep -F 'requestSeq !== state.messageRequestSeq' contact-v1.js
+          grep -F 'state.selectedThread?.id !== threadId' contact-v1.js
+          grep -F 'contact-v1.js?v=DPRO-CONTACT-1-FRONTEND-R3B-THREAD-RACE-GUARD-20260921' contact-v1.html
+
+          unexpected="$(git diff --name-only | grep -Ev '^(contact-v1\.js|contact-v1\.html|\.github/workflows/dpro-contact-thread-race-guard-r3b-r1\.yml)$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected files changed:"
+            echo "$unexpected"
+            exit 1
+          fi
+
+          if git diff --name-only | grep -E 'contact-onboarding.*worker|contact-mail-gateway.*worker|\.sql$' >/dev/null; then
+            echo "Worker or DB change detected. STOP."
+            exit 1
+          fi
+
+      - name: Remove one-shot workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/dpro-contact-thread-race-guard-r3b-r1.yml
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DPRO Factory Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Guard DPRO Contact thread selection races"
+          git push
