@@ -135,7 +135,7 @@
     "導入・運用": "delivery",
     "DPRO製品": "products",
     "品質・管理": "quality",
-    "その他": "advanced",
+    "管理ツール": "advanced",
   }[title] || title);
 
   const currentSectionKey = () => {
@@ -243,7 +243,7 @@
     }
 
     if (advanced.length) {
-      const box = makeSection("その他");
+      const box = makeSection("管理ツール");
       box.classList.add("ccv2-advanced");
       for (const button of advanced) {
         const view = button.dataset.view;
@@ -410,6 +410,17 @@
       link.classList.toggle("has-unread", n > 0);
       link.setAttribute("aria-label", n > 0 ? `顧客対応、先方から返信 ${n}件` : "顧客対応を開く");
     });
+    const homeAlert = $("#ccv2ContactAlert");
+    if (homeAlert) {
+      homeAlert.hidden = n <= 0;
+      homeAlert.setAttribute("aria-label", n > 0 ? `先方から返信 ${n}件。顧客対応を開く` : "顧客対応を開く");
+    }
+    $$("[data-ccv2-home-contact-count]").forEach((el) => {
+      el.textContent = String(n);
+    });
+    const homeContact = $(".ccv2-home-action.is-contact");
+    if (homeContact) homeContact.classList.toggle("has-unread", n > 0);
+
     const base = state.originalTitle.replace(/^\(\d+\)\s*/, "");
     document.title = n > 0 ? `(${n}) ${base}` : base;
   };

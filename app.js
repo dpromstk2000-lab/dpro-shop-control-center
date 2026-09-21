@@ -345,7 +345,7 @@
         <div class="list-item-main"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.client_name || "DPRO内部")}・${escapeHtml(task.task_code)}</p></div>
         <div class="list-item-meta">${pill(taskStatusLabels[task.status] || task.status, statusTone(task.status))}<p>${task.due_at ? formatDate(task.due_at, true) : "期限なし"}</p></div>
       </article>
-    `).join("") : '<div class="empty-state">現在、未完了タスクはありません。</div>';
+    `).join("") : '<div class="empty-state">今日、対応が必要な仕事はありません。</div>';
   }
 
   function renderDashboardClients() {
@@ -1388,7 +1388,7 @@
   }
 
   const viewMeta = {
-    dashboard: ["ダッシュボード", "全顧客と運用状況を確認します"],
+    dashboard: ["ホーム", "今日やることから始めます"],
     clients: ["全顧客", "LINE公式運用のみを含む全契約先"],
     "client-detail": ["顧客詳細", "契約・接続・対応状況を確認します"],
     contracts: ["契約・サービス", "契約内容の確認"],

@@ -248,3 +248,68 @@ html[data-cc-ui-v2="phase1b"] .cc9-sidebar nav.ccv2-nav{
   .ccv2-home-action{min-height:72px}
   .ccv2-overview-details #metricGrid{grid-template-columns:1fr 1fr}
 }
+
+/* PHASE 2-B / home finish */
+.ccv2-contact-alert[hidden]{display:none!important}
+.ccv2-contact-alert{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+  min-height:72px;
+  margin:0 0 14px;
+  padding:13px 15px;
+  border:1px solid #e5c77b;
+  border-radius:15px;
+  background:#fff9e9;
+  color:#173a31;
+  text-decoration:none;
+  box-shadow:0 7px 20px rgba(92,72,20,.06);
+}
+.ccv2-contact-alert-mark{
+  min-width:66px;
+  padding:7px 9px;
+  border-radius:999px;
+  background:#f3e5b8;
+  color:#6d5510;
+  text-align:center;
+  font-size:11px;
+  font-weight:900;
+}
+.ccv2-contact-alert-copy strong{
+  display:block;
+  font-size:15px;
+  line-height:1.4;
+}
+.ccv2-contact-alert-copy strong b{
+  font-size:18px;
+  color:#755a0b;
+}
+.ccv2-contact-alert-copy small{
+  display:block;
+  margin-top:2px;
+  color:#756c50;
+  font-size:11px;
+}
+.ccv2-contact-alert-action{
+  font-size:12px;
+  font-weight:900;
+  color:#67500d;
+  white-space:nowrap;
+}
+.ccv2-home-action.is-contact.has-unread{
+  border-color:#e5c77b;
+  background:#fffaf0;
+}
+#view-dashboard .empty-state{
+  min-height:76px!important;
+  padding:16px 18px!important;
+}
+@media(max-width:560px){
+  .ccv2-contact-alert{
+    grid-template-columns:auto 1fr;
+  }
+  .ccv2-contact-alert-action{
+    grid-column:2;
+  }
+}
