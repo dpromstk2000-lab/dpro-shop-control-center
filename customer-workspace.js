@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO08C-START-ZIP-UI-R1-20260922";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO08D3-START-ZIP-DRY-RUN-UI-R1-20260922";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -985,15 +985,130 @@
     </article>`;
   }
 
+  function dryRunZipPayload(simulateProductGap=false){
+    return {
+      dry_run:true,
+      client_code:inputValue("dryRunClientCode").toUpperCase() || "DRYRUN-ZIP-001",
+      client_name:inputValue("dryRunClientName") || "DPRO START ZIP DRY RUN",
+      system_code:inputValue("dryRunSystemCode") || "CLINIC_SHUTTLE",
+      simulate_product_gap:Boolean(simulateProductGap),
+      github_owner:"dpromstk2000-lab",
+      workers_domain:"dpromstk2000.workers.dev",
+      requirements:{
+        owner_required:Boolean($("dryRunOwner")?.checked),
+        supabase_required:Boolean($("dryRunSupabase")?.checked),
+        github_required:Boolean($("dryRunGithub")?.checked),
+        worker_required:Boolean($("dryRunWorker")?.checked),
+        website_required:Boolean($("dryRunWebsite")?.checked),
+        line_required:Boolean($("dryRunLine")?.checked),
+        custom_domain_required:Boolean($("dryRunCustomDomain")?.checked),
+      },
+    };
+  }
+
+  function updateDryRunZipButtons(){
+    const passed=state.dryRunResult?.simulated_end_to_end_pass===true;
+    const ready=$("downloadDryRunReadyZipButton");
+    const brushup=$("downloadDryRunBrushupZipButton");
+    if (ready) ready.disabled=!passed;
+    if (brushup) brushup.disabled=!passed;
+    if ($("dryRunZipHint")) {
+      $("dryRunZipHint").textContent=passed
+        ?"8工程PASS済みです。READY ZIPとBRUSHUP ZIPを順番に生成し、両方をChatGPTへアップロードして確認します。"
+        :"8工程DRY RUNをPASSするとSTART ZIP検査を実行できます。";
+    }
+  }
+
+  async function downloadDryRunStartZip(simulateProductGap=false){
+    if (state.dryRunResult?.simulated_end_to_end_pass!==true) {
+      return toast("先に8工程DRY RUNをPASSさせてください。",true);
+    }
+    const button=simulateProductGap
+      ? $("downloadDryRunBrushupZipButton")
+      : $("downloadDryRunReadyZipButton");
+    const oldText=button?.textContent||"";
+    if (button) {
+      button.disabled=true;
+      button.textContent="ZIP生成中…";
+    }
+
+    try{
+      const sessionResult=await state.supabase.auth.getSession();
+      const accessToken=sessionResult?.data?.session?.access_token;
+      if (!accessToken) throw new Error("CONTROL CENTERへ再ログインしてください。");
+
+      const cfg=state.publicConfig||{};
+      const supabaseUrl=String(cfg.supabaseUrl||"").replace(/\/$/,"");
+      const apiKey=cfg.supabasePublishableKey||cfg.supabaseAnonKey;
+      if (!supabaseUrl || !apiKey) throw new Error("Supabase公開設定を確認できません。");
+
+      const response=await fetch(`${supabaseUrl}/functions/v1/dpro-customer-start-package`,{
+        method:"POST",
+        headers:{
+          "Authorization":`Bearer ${accessToken}`,
+          "apikey":apiKey,
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify(dryRunZipPayload(simulateProductGap)),
+        cache:"no-store",
+      });
+
+      if (!response.ok){
+        const errorBody=await response.json().catch(()=>({}));
+        const message=errorBody?.message||errorBody?.error||`HTTP ${response.status}`;
+        if (String(message).includes("AAL2") || response.status===401) {
+          throw new Error("START ZIP DRY RUNにはAAL2再認証が必要です。再認証後にもう一度実行してください。");
+        }
+        throw new Error(message);
+      }
+
+      const dryHeader=response.headers.get("X-DPRO-Dry-Run");
+      if (dryHeader!=="true") throw new Error("DRY RUN ZIPとして確認できませんでした。");
+      const expectedStatus=simulateProductGap?"BRUSHUP_REQUIRED":"READY_FOR_ONBOARDING";
+      const actualStatus=response.headers.get("X-DPRO-Package-Status")||"UNKNOWN";
+      if (actualStatus!==expectedStatus) {
+        throw new Error(`START ZIP判定不一致: ${actualStatus}`);
+      }
+
+      const blob=await response.blob();
+      if (!blob.size) throw new Error("START ZIPが空です。");
+      const fallback=simulateProductGap
+        ?"DPRO_DRYRUN_BRUSHUP_CUSTOMER_START.zip"
+        :"DPRO_DRYRUN_READY_CUSTOMER_START.zip";
+      const filename=parseDownloadName(response.headers.get("Content-Disposition"),fallback);
+
+      const href=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=href;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(href),2000);
+
+      toast(simulateProductGap
+        ?"BRUSHUP_REQUIRED START ZIPを生成しました。次にこのZIPをChatGPTへアップロードします。"
+        :"READY_FOR_ONBOARDING START ZIPを生成しました。次にこのZIPをChatGPTへアップロードします。");
+    }catch(error){
+      console.error(BUILD,error);
+      toast(error?.message||"START ZIP DRY RUNを実行できませんでした。",true);
+    }finally{
+      updateDryRunZipButtons();
+      if (button) button.textContent=oldText;
+    }
+  }
+
   function renderDryRunResult(){
     const r=state.dryRunResult;
     const root=$("dryRunResult");
     if (!root) return;
     if (!r){
       root.classList.add("hidden");
+      updateDryRunZipButtons();
       return;
     }
     root.classList.remove("hidden");
+    updateDryRunZipButtons();
 
     const pass=r.simulated_end_to_end_pass===true;
     const realProductPass=r.product_release?.ready===true;
@@ -1704,7 +1819,10 @@
     $("caseFilter")?.addEventListener("change",renderCases);
     $("dryRunForm")?.addEventListener("submit",runDryRun);
     $("dryRunWebsite")?.addEventListener("change",syncDryRunDependencies);
+    $("downloadDryRunReadyZipButton")?.addEventListener("click",()=>downloadDryRunStartZip(false));
+    $("downloadDryRunBrushupZipButton")?.addEventListener("click",()=>downloadDryRunStartZip(true));
     syncDryRunDependencies();
+    updateDryRunZipButtons();
     document.querySelectorAll("[data-workspace-tab]").forEach((b) => b.addEventListener("click",() => switchTab(b.dataset.workspaceTab)));
     $("closeDetailButton")?.addEventListener("click",() => {
       state.selectedCaseId=null;

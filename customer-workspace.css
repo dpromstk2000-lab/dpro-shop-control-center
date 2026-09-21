@@ -162,6 +162,15 @@
 .btn.start-zip{background:#e5f4ed;color:#075d46;border-color:#afd4c5}
 .btn.start-zip:hover{background:#d9eee5}
 @media(max-width:720px){.customer-card-actions.start-flow-actions{grid-template-columns:1fr}}
+.dryrun-zip-test{margin-top:12px;border:1px solid #cfe0da;border-radius:15px;background:#f7fbf9;padding:14px}
+.dryrun-zip-test-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.dryrun-zip-test-head h3{margin:2px 0 4px;color:var(--cw-green-dark);font-size:15px}
+.dryrun-zip-test-head p{margin:0;color:var(--cw-muted);font-size:10px;line-height:1.55}
+.dryrun-zip-test-head>span{display:inline-flex;white-space:nowrap;border-radius:999px;background:#e7f3ee;color:#0a6b50;padding:6px 9px;font-size:9px;font-weight:900}
+.dryrun-zip-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.dryrun-zip-actions .btn{width:100%}
+.dryrun-zip-hint{margin:8px 0 0;color:var(--cw-muted);font-size:9px;line-height:1.5}
+@media(max-width:720px){.dryrun-zip-test-head{display:grid}.dryrun-zip-actions{grid-template-columns:1fr}}
 .dryrun-hero{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:stretch;border:1px solid #cfe0da;border-radius:18px;background:linear-gradient(135deg,#f4fbf8 0%,#fff 58%);padding:20px}
 .dryrun-hero h2{margin:6px 0 8px;color:var(--cw-green-dark);font-size:24px;line-height:1.25}
 .dryrun-hero p{margin:0;color:var(--cw-muted);font-size:12px;line-height:1.7}
