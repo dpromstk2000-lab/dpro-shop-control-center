@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R1-20260921";
+  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R1.1-20260921";
   const PACKAGE_VERSION = "PRODUCT-RELEASE-START-R1";
   const RELEASE_MASTER_VERSION = "DPRO_PRODUCT_RELEASE_MASTER_V1.1";
   const RELEASE_MASTER_SHA256 = "12b2d52879946eafae66fd7e24500ebe1c329a2363ff43295462430887c32401";
@@ -107,7 +107,7 @@
       if(filter==="not_imported" && r?.final_lock_verified) return false;
       if(filter==="final_lock_imported" && (!r?.final_lock_verified || r.package_sha256)) return false;
       if(filter==="package_ready" && !r?.package_sha256) return false;
-      if(filter==="active" && !r || ["complete","final_lock_imported","package_ready"].includes(r.release_status)) return false;
+      if(filter==="active" && (!r || ["complete","final_lock_imported","package_ready"].includes(r.release_status))) return false;
       if(filter==="complete" && r?.release_status!=="complete") return false;
       if(q && !`${p.dev_code||""} ${p.product_name||""} ${p.target_system_code||""} ${p.category||""}`.toLowerCase().includes(q)) return false;
       return true;
