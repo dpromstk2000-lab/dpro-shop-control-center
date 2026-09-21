@@ -154,6 +154,14 @@
 .go-live-gate-note{margin:10px 0 0;padding:9px 11px;border-radius:10px;background:#f5f8f7;color:var(--cw-muted);font-size:10px;line-height:1.55}
 @media(max-width:1050px){.go-live-gate-checks{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.go-live-gate-summary{grid-template-columns:1fr}.go-live-gate-checks{grid-template-columns:1fr}.go-live-gate-score{white-space:normal}}
+.customer-start-flow{margin-top:11px;padding:11px 12px;border:1px solid #cfe0d9;border-radius:11px;background:#f5fbf8}
+.customer-start-flow strong{display:block;font-size:10px;color:#0b5f49}
+.customer-start-flow span{display:block;margin-top:3px;font-size:9px;line-height:1.55;color:#65766f}
+.customer-card-actions.start-flow-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.customer-card-actions.start-flow-actions .btn{width:100%}
+.btn.start-zip{background:#e5f4ed;color:#075d46;border-color:#afd4c5}
+.btn.start-zip:hover{background:#d9eee5}
+@media(max-width:720px){.customer-card-actions.start-flow-actions{grid-template-columns:1fr}}
 .dryrun-hero{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:stretch;border:1px solid #cfe0da;border-radius:18px;background:linear-gradient(135deg,#f4fbf8 0%,#fff 58%);padding:20px}
 .dryrun-hero h2{margin:6px 0 8px;color:var(--cw-green-dark);font-size:24px;line-height:1.25}
 .dryrun-hero p{margin:0;color:var(--cw-muted);font-size:12px;line-height:1.7}

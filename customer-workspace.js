@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO07B-DRY-RUN-UI-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO08C-START-ZIP-UI-R1-20260922";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -16,6 +16,9 @@
     clients: [],
     contacts: [],
     releases: [],
+    contractItems: [],
+    services: [],
+    publicConfig: null,
     selectedCaseId: null,
     currentTab: "cases",
     namePlan: null,
@@ -88,6 +91,7 @@
 
   async function initializeSupabase() {
     const cfg = await fetchPublicConfig();
+    state.publicConfig = cfg;
     if (!window.supabase?.createClient) throw new Error("Supabaseライブラリを読み込めませんでした。");
     state.supabase = window.supabase.createClient(
       cfg.supabaseUrl,
@@ -144,6 +148,8 @@
       clientResult,
       contactResult,
       releaseResult,
+      contractItemResult,
+      serviceResult,
     ] = await Promise.all([
       state.supabase.from("cc_v_customer_workspace").select("*").order("onboarding_updated_at",{ascending:false}),
       state.supabase.from("cc_v_customer_next_action").select("*").order("priority_rank",{ascending:true}),
@@ -152,6 +158,8 @@
       state.supabase.from("cc_clients").select("id,client_code,display_name,status,is_demo,archived_at"),
       state.supabase.from("cc_contacts").select("id,client_id,contact_type,display_name,email,status,is_primary"),
       state.supabase.rpc("cc_product_release_list"),
+      state.supabase.from("cc_contract_items").select("id,contract_id,service_id,status,config,metadata"),
+      state.supabase.from("cc_service_catalog").select("id,service_code,category,service_name,is_active"),
     ]);
 
     state.workspaces = must(workspaceResult,"Customer Workspace");
@@ -161,6 +169,8 @@
     state.clients = must(clientResult,"顧客");
     state.contacts = must(contactResult,"Owner");
     state.releases = must(releaseResult,"PRODUCT RELEASE");
+    state.contractItems = must(contractItemResult,"契約サービス");
+    state.services = must(serviceResult,"サービス台帳");
 
     renderAll();
     showOnly("app");
@@ -180,6 +190,166 @@
 
   function clientFor(id) {
     return state.clients.find((x) => x.id === id) || null;
+  }
+
+  const CURRENT_PRODUCT_RELEASE_MASTER = "DPRO_PRODUCT_RELEASE_MASTER_V1.2";
+
+  function productReleaseCustomerAudit(code) {
+    const key=String(code||"").toUpperCase();
+    const rows=state.releases
+      .filter((r)=>String(r?.system_code||"").toUpperCase()===key)
+      .sort((a,b)=>String(b?.updated_at||"").localeCompare(String(a?.updated_at||"")));
+    const release=rows[0]||null;
+    const gaps=[];
+    if (!release) return {release:null,gaps:["PRODUCT RELEASE登録なし"],ready:false};
+
+    if (release.release_status!=="complete") gaps.push("PRODUCT RELEASE未完了");
+    if (release.final_lock_verified!==true) gaps.push("SYSTEM FINAL LOCK未確認");
+    if (release.product_release_lock!==true || !release.release_locked_at) gaps.push("PRODUCT RELEASE LOCKなし");
+    if (release.release_master_version!==CURRENT_PRODUCT_RELEASE_MASTER) gaps.push("PRODUCT RELEASE MASTERが現行基準ではない");
+
+    const b=release.brushup||{};
+    if (b.b1_fact_copy_consistency!==true) gaps.push("BRUSHUP B1未完了");
+    if (b.b2_sales_journey_ux!==true) gaps.push("BRUSHUP B2未完了");
+    if (b.b3_visual_mobile_print!==true) gaps.push("BRUSHUP B3未完了");
+    if (b.b4_live_public_evidence!==true) gaps.push("BRUSHUP B4未完了");
+
+    const f=release.final_release||{};
+    if (f["1_fact_scope"]!==true) gaps.push("FINAL RELEASE 1/4未完了");
+    if (f["2_web_sales_journey"]!==true) gaps.push("FINAL RELEASE 2/4未完了");
+    if (f["3_print_operation_support"]!==true) gaps.push("FINAL RELEASE 3/4未完了");
+    if (f["4_public_deploy_evidence"]!==true) gaps.push("FINAL RELEASE 4/4未完了");
+
+    if (Array.isArray(release.blockers) && release.blockers.length) gaps.push("PRODUCT RELEASE Blockerあり");
+    return {release,gaps,ready:gaps.length===0};
+  }
+
+  function contractScopeForProject(project) {
+    const items=state.contractItems.filter((x)=>
+      x.contract_id===project.contract_id
+      && ["active","preparing","onboarding"].includes(String(x.status||""))
+    );
+
+    const services=items.map((item)=>{
+      const service=state.services.find((s)=>s.id===item.service_id)||{};
+      return {item,service};
+    });
+
+    const website=services.some(({service})=>
+      String(service.category||"").toLowerCase()==="website"
+      || ["WEBSITE","WEBSITE_MAINTENANCE","DPRO_WEB_SYNC"].includes(String(service.service_code||"").toUpperCase())
+    );
+    const line=services.some(({service})=>
+      String(service.category||"").toLowerCase()==="line"
+      || String(service.service_code||"").toUpperCase().startsWith("LINE_")
+    );
+    const customDomain=services.some(({item})=>
+      item?.config?.custom_domain_required===true
+      || item?.metadata?.custom_domain_required===true
+      || Boolean(item?.config?.custom_domain)
+      || Boolean(item?.metadata?.custom_domain)
+    );
+
+    return {
+      system_required:true,
+      owner_account_required:true,
+      supabase_required:true,
+      github_required:true,
+      worker_required:true,
+      website_required:website,
+      line_required:line,
+      custom_domain_required:website && customDomain,
+    };
+  }
+
+  function parseDownloadName(header,fallback) {
+    const raw=String(header||"");
+    const utf=raw.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf) {
+      try { return decodeURIComponent(utf[1]); } catch {}
+    }
+    const normal=raw.match(/filename="?([^";]+)"?/i);
+    return (normal?.[1]||fallback||"DPRO_CUSTOMER_START.zip").trim();
+  }
+
+  async function downloadCustomerStartZip(projectId) {
+    const project=state.projects.find((p)=>p.id===projectId);
+    if (!project) return toast("制作案件を確認できませんでした。",true);
+    if (!canWrite()) return toast("START ZIPを生成する権限がありません。",true);
+
+    const button=document.querySelector(`[data-start-zip="${CSS.escape(projectId)}"]`);
+    const old=button?.textContent||"";
+    if (button) {
+      button.disabled=true;
+      button.textContent="START ZIP生成中…";
+    }
+
+    try {
+      const sessionResult=await state.supabase.auth.getSession();
+      const accessToken=sessionResult?.data?.session?.access_token;
+      if (!accessToken) throw new Error("CONTROL CENTERへ再ログインしてください。");
+
+      const cfg=state.publicConfig||{};
+      const supabaseUrl=String(cfg.supabaseUrl||"").replace(/\/$/,"");
+      const apiKey=cfg.supabasePublishableKey||cfg.supabaseAnonKey;
+      if (!supabaseUrl || !apiKey) throw new Error("Supabase公開設定を確認できません。");
+
+      const response=await fetch(`${supabaseUrl}/functions/v1/dpro-customer-start-package`,{
+        method:"POST",
+        headers:{
+          "Authorization":`Bearer ${accessToken}`,
+          "apikey":apiKey,
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({
+          delivery_project_id:projectId,
+          requirements:contractScopeForProject(project),
+        }),
+        cache:"no-store",
+      });
+
+      if (!response.ok) {
+        const errorBody=await response.json().catch(()=>({}));
+        const message=errorBody?.message||errorBody?.error||`HTTP ${response.status}`;
+        if (String(message).includes("AAL2") || response.status===401) {
+          throw new Error("START ZIP生成にはAAL2再認証が必要です。再認証後にもう一度実行してください。");
+        }
+        throw new Error(message);
+      }
+
+      const blob=await response.blob();
+      if (!blob.size) throw new Error("START ZIPが空です。");
+      const status=response.headers.get("X-DPRO-Package-Status")||"UNKNOWN";
+      const code=project.effective_system_code||project.product_system_code||project.system_code||"SYSTEM";
+      const client=clientFor(project.client_id);
+      const fallback=`DPRO_${client?.client_code||"CUSTOMER"}_${code}_CUSTOMER_START.zip`;
+      const filename=parseDownloadName(response.headers.get("Content-Disposition"),fallback);
+
+      const href=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=href;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(href),2000);
+
+      if (status==="BRUSHUP_REQUIRED") {
+        toast("START ZIPを生成しました。PRODUCTブラッシュアップが先です。このZIPをChatGPTへ渡してください。");
+      } else if (status==="CONTRACT_HOLD") {
+        toast("START ZIPを生成しました。契約条件の確認が先です。このZIPをChatGPTへ渡してください。");
+      } else {
+        toast("ChatGPT START ZIPを生成しました。最初にこのZIPをChatGPTへ渡してください。");
+      }
+    } catch(error) {
+      console.error(BUILD,error);
+      toast(error?.message||"ChatGPT START ZIPを生成できませんでした。",true);
+    } finally {
+      if (button) {
+        button.disabled=false;
+        button.textContent=old;
+      }
+    }
   }
 
   function releaseForSystem(code) {
@@ -289,7 +459,11 @@
     if (contract && !contract.starts_on) reasons.push("契約開始日が未確定です");
     if (contract && !contract.owner_confirmed_at) reasons.push("オーナー確認が未完了です");
     if (!code) reasons.push("SYSTEM CODEがありません");
-    if (code && !release) reasons.push("PRODUCT RELEASE COMPLETEではありません");
+    if (code) {
+      const audit=productReleaseCustomerAudit(code);
+      if (!audit.release) reasons.push("PRODUCT RELEASE登録がありません");
+      else if (!audit.ready) reasons.push(`最新DPRO基準未達：${audit.gaps[0]}`);
+    }
     if (state.workspaces.some((w) => w.delivery_project_id === p.id && !["cancelled","closed"].includes(w.onboarding_status))) reasons.push("Customer Workspace登録済みです");
 
     return reasons;
@@ -330,17 +504,25 @@
           ${pill(`契約 ${contract?.status || "—"}`,contract?.status==="active"?"green":"amber")}
           ${pill(contract?.starts_on?`開始 ${contract.starts_on}`:"開始日未確定",contract?.starts_on?"green":"amber")}
           ${pill(contract?.owner_confirmed_at?"Owner確認済":"Owner確認待ち",contract?.owner_confirmed_at?"green":"amber")}
-          ${pill(releaseForSystem(code)?"商品化LOCK":"商品化未完了",releaseForSystem(code)?"green":"amber")}
+          ${pill(productReleaseCustomerAudit(code).ready?"DPRO最新基準READY":"BRUSHUP判定対象",productReleaseCustomerAudit(code).ready?"green":"amber")}
         </div>
         ${reasons.length?`<ul class="blocker-list">${reasons.map((r)=>`<li>${esc(r)}</li>`).join("")}</ul>`:""}
-        <div class="customer-card-actions" style="margin-top:12px">
-          <button class="btn primary" type="button" data-start-project="${esc(p.id)}" ${ready?"":"disabled"}>Customer Workspaceを開始</button>
+        <div class="customer-start-flow">
+          <strong>契約後の最初の作業</strong>
+          <span>① ChatGPT START ZIPを先に生成してChatGPTへ渡します。ZIPがBRUSHUP_REQUIREDなら②へ進まず、PRODUCT側を先に最新DPRO基準へ揃えます。</span>
+        </div>
+        <div class="customer-card-actions start-flow-actions" style="margin-top:12px">
+          <button class="btn start-zip" type="button" data-start-zip="${esc(p.id)}" ${canWrite()?"":"disabled"}>① ChatGPT START ZIP</button>
+          <button class="btn primary" type="button" data-start-project="${esc(p.id)}" ${ready?"":"disabled"}>② Customer Workspaceを開始</button>
         </div>
       </article>`;
     }).join("");
 
     document.querySelectorAll("[data-start-project]").forEach((button) => {
       button.addEventListener("click",() => startOnboarding(button.dataset.startProject));
+    });
+    document.querySelectorAll("[data-start-zip]").forEach((button) => {
+      button.addEventListener("click",() => downloadCustomerStartZip(button.dataset.startZip));
     });
   }
 
