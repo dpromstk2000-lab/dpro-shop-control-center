@@ -1,0 +1,75 @@
+name: DPRO Control Center UI V2 Phase 2D Cache Guard R1 FIX
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dpro-control-center-ui-v2-phase2d-cache-guard-r1-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard safe retry state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app.js
+          test -f index.html
+          test -f config.js
+          grep -F 'function dashboardClientNeedsAttention(client)' app.js
+          grep -F '現在、確認が必要なお客様はいません。' app.js
+          grep -F 'app.js?v=DPRO-CC-UI-V2-PHASE2D-R1-20260921' index.html
+          test ! -f app-ui-v2-phase2d-r1.js
+          test -f .github/workflows/dpro-control-center-ui-v2-phase2d-cache-guard-r1.yml
+
+      - name: Apply cache guard fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAoKQlVJTEQgPSAiRFBSTy1DQy1VSS1WMi1QSEFTRTJELVIxLTIwMjYwOTIxIgpBUFBfRklMRSA9ICJhcHAtdWktdjItcGhhc2UyZC1yMS5qcyIKCnNvdXJjZSA9IFBhdGgoImFwcC5qcyIpLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQppZiAiZnVuY3Rpb24gZGFzaGJvYXJkQ2xpZW50TmVlZHNBdHRlbnRpb24oY2xpZW50KSIgbm90IGluIHNvdXJjZToKICAgIHJhaXNlIFN5c3RlbUV4aXQoIlBIQVNFMkRfQVBQX05PVF9GT1VORCIpCmlmICLnj77lnKjjgIHnorroqo3jgYzlv4XopoHjgarjgYrlrqLmp5jjga/jgYTjgb7jgZvjgpPjgIIiIG5vdCBpbiBzb3VyY2U6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJQSEFTRTJEX0VNUFRZX1NUQVRFX05PVF9GT1VORCIpCgpidWlsZF9saW5lID0gJ3dpbmRvdy5EUFJPX0NDX0FQUF9CVUlMRCA9ICInICsgQlVJTEQgKyAnIjtcbicKaWYgIndpbmRvdy5EUFJPX0NDX0FQUF9CVUlMRCIgbm90IGluIHNvdXJjZToKICAgIHNvdXJjZSA9IGJ1aWxkX2xpbmUgKyBzb3VyY2UKICAgIFBhdGgoImFwcC5qcyIpLndyaXRlX3RleHQoc291cmNlLCBlbmNvZGluZz0idXRmLTgiKQoKUGF0aChBUFBfRklMRSkud3JpdGVfdGV4dChzb3VyY2UsIGVuY29kaW5nPSJ1dGYtOCIpCgpwID0gUGF0aCgiaW5kZXguaHRtbCIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpvbGRfYXBwID0gJ2FwcC5qcz92PURQUk8tQ0MtVUktVjItUEhBU0UyRC1SMS0yMDI2MDkyMScKbmV3X2FwcCA9IEFQUF9GSUxFICsgJz92PScgKyBCVUlMRAppZiBvbGRfYXBwIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiSU5ERVhfQVBQX0JBU0VMSU5FX05PVF9GT1VORCIpCnMgPSBzLnJlcGxhY2Uob2xkX2FwcCwgbmV3X2FwcCwgMSkKCm9sZF9jZmcgPSAnY29uZmlnLmpzP3Y9RFBSTy1DQy1VSS1WMi1QSEFTRTJCLVIxLTIwMjYwOTIxJwpuZXdfY2ZnID0gJ2NvbmZpZy5qcz92PURQUk8tQ0MtVUktVjItUEhBU0UyRC1DQUNIRUdVQVJELVIxLTIwMjYwOTIxJwppZiBvbGRfY2ZnIGluIHM6CiAgICBzID0gcy5yZXBsYWNlKG9sZF9jZmcsIG5ld19jZmcsIDEpCgpvbGRfbWV0YSA9ICc8bWV0YSBodHRwLWVxdWl2PSJDYWNoZS1Db250cm9sIiBjb250ZW50PSJuby1jYWNoZSwgbm8tc3RvcmUsIG11c3QtcmV2YWxpZGF0ZSI+JwpuZXdfbWV0YSA9ICc8bWV0YSBodHRwLWVxdWl2PSJDYWNoZS1Db250cm9sIiBjb250ZW50PSJuby1jYWNoZSwgbm8tc3RvcmUsIG11c3QtcmV2YWxpZGF0ZSwgbWF4LWFnZT0wIj4nCmlmIG9sZF9tZXRhIGluIHM6CiAgICBzID0gcy5yZXBsYWNlKG9sZF9tZXRhLCBuZXdfbWV0YSwgMSkKCnAud3JpdGVfdGV4dChzLCBlbmNvZGluZz0idXRmLTgiKQoKcCA9IFBhdGgoImNvbmZpZy5qcyIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpndWFyZF9pZCA9ICJEUFJPX0NDX0lOREVYX0NBQ0hFX0dVQVJEX1BIQVNFMkRfUjEiCmd1YXJkID0gJ1xuLy8gRFBST19DQ19JTkRFWF9DQUNIRV9HVUFSRF9QSEFTRTJEX1IxXG4oKCkgPT4ge1xuICBjb25zdCBleHBlY3RlZEJ1aWxkID0gIkRQUk8tQ0MtVUktVjItUEhBU0UyRC1SMS0yMDI2MDkyMSI7XG4gIGNvbnN0IHJlbG9hZEtleSA9ICJwaGFzZTJkLXIxLTIwMjYwOTIxIjtcbiAgY29uc3QgcGFnZSA9IChsb2NhdGlvbi5wYXRobmFtZS5zcGxpdCgiLyIpLnBvcCgpIHx8ICJpbmRleC5odG1sIikudG9Mb3dlckNhc2UoKTtcbiAgaWYgKCFbIiIsICJpbmRleC5odG1sIl0uaW5jbHVkZXMocGFnZSkpIHJldHVybjtcblxuICBjb25zdCB2ZXJpZnkgPSAoKSA9PiB7XG4gICAgaWYgKHdpbmRvdy5EUFJPX0NDX0FQUF9CVUlMRCA9PT0gZXhwZWN0ZWRCdWlsZCkgcmV0dXJuO1xuXG4gICAgY29uc3QgdXJsID0gbmV3IFVSTChsb2NhdGlvbi5ocmVmKTtcbiAgICBpZiAodXJsLnNlYXJjaFBhcmFtcy5nZXQoImRwcm9fdWkiKSA9PT0gcmVsb2FkS2V5KSByZXR1cm47XG5cbiAgICB1cmwuc2VhcmNoUGFyYW1zLnNldCgiZHByb191aSIsIHJlbG9hZEtleSk7XG4gICAgbG9jYXRpb24ucmVwbGFjZSh1cmwudG9TdHJpbmcoKSk7XG4gIH07XG5cbiAgaWYgKGRvY3VtZW50LnJlYWR5U3RhdGUgPT09ICJsb2FkaW5nIikge1xuICAgIGRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoIkRPTUNvbnRlbnRMb2FkZWQiLCAoKSA9PiBzZXRUaW1lb3V0KHZlcmlmeSwgMCksIHsgb25jZTogdHJ1ZSB9KTtcbiAgfSBlbHNlIHtcbiAgICBzZXRUaW1lb3V0KHZlcmlmeSwgMCk7XG4gIH1cbn0pKCk7XG4nCmlmIGd1YXJkX2lkIG5vdCBpbiBzOgogICAgcyArPSBndWFyZAoKb2xkX3NoZWxsID0gJy4vY2Mtc2hlbGwtdjIuanM/dj1EUFJPLUNDLVVJLVYyLVBIQVNFMkItUjEtMjAyNjA5MjEnCm5ld19zaGVsbCA9ICcuL2NjLXNoZWxsLXYyLmpzP3Y9RFBSTy1DQy1VSS1WMi1QSEFTRTJELUNBQ0hFR1VBUkQtUjEtMjAyNjA5MjEnCmlmIG9sZF9zaGVsbCBpbiBzOgogICAgcyA9IHMucmVwbGFjZShvbGRfc2hlbGwsIG5ld19zaGVsbCwgMSkKCnAud3JpdGVfdGV4dChzLCBlbmNvZGluZz0idXRmLTgiKQo=' | base64 -d > /tmp/phase2d_cacheguard_fix.py
+          python /tmp/phase2d_cacheguard_fix.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check app-ui-v2-phase2d-r1.js
+          node --check config.js
+          grep -F 'window.DPRO_CC_APP_BUILD = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";' app.js
+          grep -F 'window.DPRO_CC_APP_BUILD = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";' app-ui-v2-phase2d-r1.js
+          grep -F 'function dashboardClientNeedsAttention(client)' app-ui-v2-phase2d-r1.js
+          grep -F '現在、確認が必要なお客様はいません。' app-ui-v2-phase2d-r1.js
+          grep -F 'app-ui-v2-phase2d-r1.js?v=DPRO-CC-UI-V2-PHASE2D-R1-20260921' index.html
+          grep -F 'DPRO_CC_INDEX_CACHE_GUARD_PHASE2D_R1' config.js
+          grep -F 'dpro_ui' config.js
+
+          if git diff --name-only | grep -E '^contact-v1(\.|-)|^dpro-contact-' >/dev/null; then
+            echo "Protected DPRO CONTACT file changed."
+            exit 1
+          fi
+
+      - name: Remove failed and one-shot workflows
+        shell: bash
+        run: |
+          rm -f .github/workflows/dpro-control-center-ui-v2-phase2d-cache-guard-r1.yml
+          rm -f .github/workflows/dpro-control-center-ui-v2-phase2d-cache-guard-r1-fix.yml
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DPRO Factory Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Control Center UI cache guard"
+          git push
