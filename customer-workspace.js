@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO03B-SETUP-WIZARD-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO03B1-REAL-CONTRACT-FILTER-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -292,9 +292,18 @@
   }
 
   function renderCandidates() {
-    const rows = state.projects.filter((p) => p.contract_id && p.status !== "cancelled");
+    const rows = state.projects.filter((p) => {
+      const client = clientFor(p.client_id);
+      return Boolean(
+        p.contract_id
+        && p.status !== "cancelled"
+        && client
+        && client.is_demo !== true
+        && !client.archived_at
+      );
+    });
     if (!rows.length) {
-      $("candidateGrid").innerHTML = `<div class="empty-state"><strong>導入候補の契約案件はありません</strong><span>契約→制作プロジェクト作成後にここへ表示されます。</span></div>`;
+      $("candidateGrid").innerHTML = `<div class="empty-state"><strong>現在、実契約の導入候補はありません</strong><span>正式契約済みの実顧客案件だけ、ここに表示します。デモ・開発案件は表示しません。</span></div>`;
       return;
     }
 
