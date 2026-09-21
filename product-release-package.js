@@ -1,10 +1,12 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R2-20260921";
+  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921";
   const PACKAGE_VERSION = "PRODUCT-RELEASE-START-R2";
   const RELEASE_MASTER_VERSION = "DPRO_PRODUCT_RELEASE_MASTER_V1.2";
   const RELEASE_MASTER_SHA256 = "802ba7dd0de6e53fb5c3dc9adea028e81697140716cc67f044fc9b43fff8d718";
+  const RELEASE_MASTER_REVISION = "20260921-HISTORY-PRESERVATION-R1";
+  const RELEASE_MASTER_REVISION_SHA256 = "c15dd4137044f12156ebeb6541f1935a329a640d3d22dcbd79505ab3b45833ea";
   const OFFICIAL_REPOSITORY = "dpromstk2000-lab/dpro-shop-official-site";
   const PRODUCT_REPOSITORY = "dpromstk2000-lab/dpro-line-systems-site";
   const CONTROL_CENTER_REPOSITORY = "dpromstk2000-lab/dpro-shop-control-center";
@@ -41,6 +43,31 @@
   }
   function humanAccepted(r){
     return returnPayload(r)?.human_acceptance?.pass===true;
+  }
+
+  function historyPreservationGate(r){
+    const payload=returnPayload(r);
+    const hp=payload?.history_preservation;
+    const revised=payload?.release_master_revision===RELEASE_MASTER_REVISION;
+
+    if(!hp){
+      return revised
+        ? {value:"WAIT",note:"履歴保全QA未評価",ok:false}
+        : {value:"—",note:"次回STARTから必須",ok:true};
+    }
+
+    if(hp.assessed!==true) return {value:"WAIT",note:"適用可否の評価待ち",ok:false};
+    if(hp.applicable===false){
+      return hp.pass===true && String(hp.reason||"").trim()
+        ? {value:"N/A",note:"非対象理由を記録済み",ok:true}
+        : {value:"FAIL",note:"非対象理由またはPASS記録不足",ok:false};
+    }
+    if(hp.applicable===true){
+      return hp.pass===true
+        ? {value:"PASS",note:"履歴保全証拠PASS",ok:true}
+        : {value:"FAIL",note:"履歴保全QAにFAILあり",ok:false};
+    }
+    return {value:"WAIT",note:"applicable未確定",ok:false};
   }
   function jstDateStamp(){
     const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
@@ -164,6 +191,7 @@
     const b=countTrue(r?.brushup),f=countTrue(r?.final_release);
     const legacy=isLegacyLocked(r);
     const human=humanAccepted(r);
+    const historyGate=historyPreservationGate(r);
     const currentV12Lock=Boolean(r?.product_release_lock) && !legacy && r?.release_master_version===RELEASE_MASTER_VERSION;
     $("selectedTitle").textContent=p.product_name||"DPRO製品";
     $("selectedMeta").textContent=`${p.dev_code||""} / ${p.target_system_code||""} / SYSTEM台帳 ${p.status||"—"}`;
@@ -173,6 +201,7 @@
       [r?.initial_public_qa_pass?"PASS":"WAIT","INITIAL PUBLISH",r?.initial_public_qa_pass?"初回公開済み / 完成ではない":"商品化開始後"],
       [`${b}/4`,"RELEASE BRUSHUP",b===4?"全PASS":"横断ブラッシュアップ"],
       [human?"PASS":"WAIT","HUMAN ACCEPTANCE",human?"実画面承認済み":"見た目・写真・販売導線を人が確認"],
+      [historyGate.value,"履歴保全QA",historyGate.note],
       [`${f}/4`,"FINAL RELEASE",f===4?"全PASS":"最終4/4"],
       [currentV12Lock?"LOCK":legacy?"OLD":"WAIT","PRODUCT RELEASE",currentV12Lock?"V1.2 COMPLETE":legacy?"V1.2再監査が必要":"LOCK前"]
     ];
@@ -326,12 +355,12 @@
     const task={
       schema_version:"DPRO-PRODUCT-RELEASE-TASK-R2",
       generated_at:generatedAt,
-      release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256},
+      release_master:{version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256},
       product:{product_dev_id:p.id,dev_code:p.dev_code,product_name:p.product_name,system_code:p.target_system_code,category:p.category,source_dev_status:p.status},
       system_final_lock:{repository:r.system_repository,head:r.system_final_lock_head,pages_root:r.system_pages_root,worker_url:r.system_worker_url,versions:{frontend:r.frontend_version,worker:r.worker_version,database:r.database_version}},
       central_baseline:heads,
       release_sequence:["REL-00 START ZIP INTAKE","REL-01 FACT LOCK / DRIFT CHECK","REL-02 PRODUCT SITE","REL-03 OFFICIAL SITE","REL-04 SALES LP","REL-05 A4 SALES FLYER","REL-06 OPERATION EXPERIENCE / PDF","REL-07 CATALOG / NAV / SITEMAP / MUTUAL LINK","REL-08 INITIAL PUBLISH","REL-B1 FACT / COPY / SITE-WIDE SCAN","REL-B2 EXACT SALES JOURNEY","REL-B3 VISUAL / MOBILE / PRINT / QR","REL-B4 LIVE PUBLIC / 4-WAY DEPLOY EVIDENCE","REL-H HUMAN ACCEPTANCE","REL-F1 FINAL FACT / SCOPE","REL-F2 FINAL WEB / JOURNEY","REL-F3 FINAL PRINT / VISUAL","REL-F4 FINAL DEPLOY / EVIDENCE","REL-LOCK PRODUCT RELEASE LOCK","REL-RETURN PRODUCT RELEASE COMPLETE"],
-      required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},
+      required_gates:{initial_publish:true,brushup_4_of_4:true,human_acceptance:true,history_preservation_assessment:true,history_preservation_if_applicable:true,final_release_4_of_4:true,deploy_attestation_4_way:true,open_blocker_high_zero:true},
       expected_release_workflows:[],
       system_modification_allowed:false,
       on_system_bug:"SYSTEM_REOPEN_REQUIRED"
@@ -346,13 +375,14 @@
 
     const masterId={
       name:"DPRO PRODUCT RELEASE MASTER",version:RELEASE_MASTER_VERSION,sha256:RELEASE_MASTER_SHA256,date:"2026-09-21",
-      defect_audit_integrated:true,release_brushup_required:true,human_acceptance_required:true,final_release_4_of_4_required:true,
+      revision:RELEASE_MASTER_REVISION,revision_sha256:RELEASE_MASTER_REVISION_SHA256,
+      defect_audit_integrated:true,history_preservation_guard_required:true,release_brushup_required:true,human_acceptance_required:true,final_release_4_of_4_required:true,
       deploy_attestation_4_way_required:true,open_blocker_high_zero_required:true,product_release_lock_required:true
     };
 
     const returnTemplate={
       schema_version:"DPRO-PRODUCT-RELEASE-RETURN-R2",
-      product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,
+      product_dev_id:p.id,system_code:p.target_system_code,release_master_version:RELEASE_MASTER_VERSION,release_master_revision:RELEASE_MASTER_REVISION,
       fact_lock_snapshot:{},
       initial_publish:{pass:false,evidence:[]},
       brushup:{
@@ -363,6 +393,23 @@
       },
       public_surface_matrix:{pass:false},
       human_acceptance:{pass:false,approver:"",approved_at:null},
+      history_preservation:{
+        assessed:false,
+        applicable:null,
+        reason:"",
+        pass:false,
+        evidence:{
+          persistent_store_verified:false,
+          thread_identity_stable:false,
+          no_destructive_reset_path:false,
+          upgrade_migration_preserves_history:false,
+          stale_response_guard:false,
+          before_after_count_verified:false,
+          cross_device_consistency_result:"pending",
+          backup_or_export_policy:"",
+          evidence_refs:[]
+        }
+      },
       final_release:{
         "1_fact_scope":{pass:false,evidence:[]},
         "2_web_sales_journey":{pass:false,evidence:[]},
@@ -381,11 +428,11 @@
     const startHere=[
       "DPRO PRODUCT RELEASE START ZIP / R2","",`製品: ${p.product_name}`,`SYSTEM CODE: ${p.target_system_code}`,`PRODUCT DEV ID: ${p.id}`,
       `SYSTEM FINAL LOCK: ${r.system_repository} @ ${r.system_final_lock_head}`,`RELEASE MASTER: ${RELEASE_MASTER_VERSION}`,`MASTER ZIP SHA256: ${RELEASE_MASTER_SHA256}`,"",
-      "【最重要】","- SYSTEM本体はFINAL LOCK済みとして保護する。","- INITIAL PUBLISHは完成ではない。","- 最初にFACT_LOCK.jsonをREL-01で完成し、推測URL・価格・slug・画像を使わない。","- exact CTA / site-wide fact / visual / PDF / QR / deploy attestationを必ず行う。","- HUMAN ACCEPTANCEなしでLOCKしない。","- open blocker/high defectが1件でもあればLOCKしない。","- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。","","NEXT: REL-00 → REL-01 FACT LOCK / DRIFT CHECK",""
+      "【最重要】","- SYSTEM本体はFINAL LOCK済みとして保護する。","- INITIAL PUBLISHは完成ではない。","- 最初にFACT_LOCK.jsonをREL-01で完成し、推測URL・価格・slug・画像を使わない。","- exact CTA / site-wide fact / visual / PDF / QR / deploy attestationを必ず行う。","- HUMAN ACCEPTANCEなしでLOCKしない。","- open blocker/high defectが1件でもあればLOCKしない。","- SYSTEM本体の不具合だけSYSTEM_REOPEN_REQUIREDへ分離する。","- 全製品で履歴保全QAの適用可否をREL-01で判定する。","- applicable=trueならDB件数・thread identity・destructive reset・migration・race guard・cross-device・backup/exportを証明する。","- 完成時はPRODUCT_RELEASE_RETURN.jsonをR2 schemaで返す。","","NEXT: REL-00 → REL-01 FACT LOCK / DRIFT CHECK",""
     ].join("\n");
 
     const returnRequirements=[
-      "DPRO PRODUCT RELEASE RETURN REQUIREMENTS / R2","","完成時はZIP直下に PRODUCT_RELEASE_RETURN.json を必ず含める。","schema_version = DPRO-PRODUCT-RELEASE-RETURN-R2","product_dev_id / system_code はSTART R2と完全一致。","","LOCK必須条件:","- initial_publish.pass = true","- brushup 4/4 = true","- human_acceptance.pass = true + approver + approved_at","- public_surface_matrix.pass = true","- final_release 4/4 = true","- deploy_attestation.pass = true","- deploy attestation 4 rules = true","- open blocker/high defects = 0","- blockers = []","- evidence completeness = PASS","- product_release_lock.pass = true","","未達ならpartial return。PRODUCT RELEASE COMPLETEを宣言しない。",""
+      "DPRO PRODUCT RELEASE RETURN REQUIREMENTS / R2","","完成時はZIP直下に PRODUCT_RELEASE_RETURN.json を必ず含める。","schema_version = DPRO-PRODUCT-RELEASE-RETURN-R2","product_dev_id / system_code はSTART R2と完全一致。","","LOCK必須条件:","- initial_publish.pass = true","- brushup 4/4 = true","- human_acceptance.pass = true + approver + approved_at","- history_preservation.assessed = true","- applicable=falseはreason必須 + pass=true","- applicable=trueはHISTORY PRESERVATION evidence全PASS","- public_surface_matrix.pass = true","- final_release 4/4 = true","- deploy_attestation.pass = true","- deploy attestation 4 rules = true","- open blocker/high defects = 0","- blockers = []","- evidence completeness = PASS","- product_release_lock.pass = true","","未達ならpartial return。PRODUCT RELEASE COMPLETEを宣言しない。",""
     ].join("\n");
 
     const nextAction=[
@@ -436,7 +483,7 @@
 
       const manifest=[];
       for(const [name,content] of Object.entries(files)) manifest.push(`${await sha256Bytes(content)}  ${name}`);
-      files["MANIFEST_SHA256.txt"]=["DPRO PRODUCT RELEASE START R2 PACKAGE MANIFEST",`Package Version: ${PACKAGE_VERSION}`,`Release Master: ${RELEASE_MASTER_VERSION}`,`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Generated: ${new Date().toISOString()}`,"",...manifest,""].join("\n");
+      files["MANIFEST_SHA256.txt"]=["DPRO PRODUCT RELEASE START R2 PACKAGE MANIFEST",`Package Version: ${PACKAGE_VERSION}`,`Release Master: ${RELEASE_MASTER_VERSION}`,`Release Master ZIP SHA256: ${RELEASE_MASTER_SHA256}`,`Release Master Revision: ${RELEASE_MASTER_REVISION}`,`Revision SHA256: ${RELEASE_MASTER_REVISION_SHA256}`,`Generated: ${new Date().toISOString()}`,"",...manifest,""].join("\n");
 
       const zip=new JSZip();
       for(const [name,content] of Object.entries(files)) zip.file(name,content,{binary:false});
@@ -499,7 +546,7 @@
         if(validation.error) throw validation.error;
         if(!validation.data?.ok){
           const v=validation.data||{};
-          throw new Error(`V1.2 LOCK条件未達: BRUSHUP=${v.brushup_4_of_4?"PASS":"WAIT"} / HUMAN=${v.human_acceptance&&v.human_meta_ok?"PASS":"WAIT"} / FINAL=${v.final_release_4_of_4?"PASS":"WAIT"} / DEPLOY=${v.deploy_attestation&&v.deploy_rules_ok?"PASS":"WAIT"} / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}`);
+          throw new Error(`V1.2 LOCK条件未達: BRUSHUP=${v.brushup_4_of_4?"PASS":"WAIT"} / HUMAN=${v.human_acceptance&&v.human_meta_ok?"PASS":"WAIT"} / FINAL=${v.final_release_4_of_4?"PASS":"WAIT"} / DEPLOY=${v.deploy_attestation&&v.deploy_rules_ok?"PASS":"WAIT"} / SURFACE=${v.public_surface_matrix?"PASS":"WAIT"} / HISTORY=${v.history_preservation_required?(v.history_preservation_ok?"PASS":"WAIT"):"LEGACY"} / OPEN HIGH+BLOCKER=${v.open_blocker_high??"?"} / EVIDENCE=${v.evidence_complete?"PASS":"WAIT"}`);
         }
       }
 

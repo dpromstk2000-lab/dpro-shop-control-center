@@ -12,8 +12,8 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script defer src="config.js?v=PRODUCT-RELEASE-CC-R2-20260921"></script>
-  <script defer src="product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-20260921"></script>
-  <script defer src="product-release-package.js?v=PRODUCT-RELEASE-CC-R2-20260921"></script>
+  <script defer src="product-release-master-v1-2.js?v=DPRO-PRODUCT-RELEASE-MASTER-V1.2-HISTORY-R1-20260921"></script>
+  <script defer src="product-release-package.js?v=PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921"></script>
 </head>
 <body>
   <div id="loadingScreen" class="state-screen"><div class="spinner"></div><strong>DPRO PRODUCT RELEASE</strong><p id="loadingText">商品化基準とFINAL LOCK返却状態を確認しています…</p></div>
@@ -31,8 +31,8 @@
         <a href="factory-v2.html"><i>V2</i>FACTORY V2監査</a>
         <a href="index.html#view-products"><i>製</i>製品・連動標準</a>
       </nav>
-      <div class="sidebar-note"><strong>PRODUCT RELEASE V1.2</strong><span>SYSTEM FINAL LOCKとは分離</span><small>初回公開→BRUSHUP 4/4→人の確認→FINAL 4/4→LOCK</small></div>
-      <div class="version">PRODUCT-RELEASE-CC-R1<br><span>MASTER V1.2</span></div>
+      <div class="sidebar-note"><strong>PRODUCT RELEASE V1.2</strong><span>+ HISTORY PRESERVATION R1</span><small>初回公開→BRUSHUP 4/4→履歴保全→人の確認→FINAL 4/4→LOCK</small></div>
+      <div class="version">PRODUCT-RELEASE-CC-R3<br><span>MASTER V1.2 / HISTORY R1</span></div>
     </aside>
 
     <main class="main">
@@ -45,6 +45,7 @@
           <article><strong>FINAL LOCK返却が入口</strong><span>開発台帳の古い進捗を手で合わせず、完成証跡ZIPをそのまま取り込みます。</span></article>
           <article><strong>SYSTEM本体は触らない</strong><span>商品化中の本体不具合はSYSTEM_REOPEN_REQUIREDとしてFACTORYへ戻します。</span></article>
           <article><strong>BRUSHUP 4/4</strong><span>事実・販売導線・見た目/印刷・公開実物を横断して再点検します。</span></article>
+          <article><strong>履歴保全QA</strong><span>会話・問い合わせ履歴を持つSYSTEMは、件数・thread identity・移行・競合・復旧方針を証明してからLOCKします。</span></article>
           <article><strong>人の実画面承認 + FINAL 4/4</strong><span>写真・見切れ・販売導線を人が確認し、HEAD / Actions / Pages / Public証拠まで揃った時だけLOCKします。</span></article>
         </div>
 
