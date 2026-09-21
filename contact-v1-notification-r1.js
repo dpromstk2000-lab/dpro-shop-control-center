@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R2-20260830-WEB-PUSH";
+  const VERSION = "DPRO-CONTACT-REPLY-ALERT-PWA-R3A-20260921-CROSS-DEVICE-SYNC";
   const CONFIG = window.DPRO_CONTACT_CONFIG || {};
   const state = {
     threads: [],
@@ -107,7 +107,7 @@
   const registerPushServiceWorker = async () => {
     if (!("serviceWorker" in navigator)) throw new Error("Service Worker非対応");
     return navigator.serviceWorker.register(
-      "./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R2-20260830",
+      "./contact-v1-sw.js?v=DPRO-CONTACT-PWA-SW-R3.1-20260909-AUTHORITATIVE-BADGE",
       { scope: "./", updateViaCache: "none" }
     );
   };
@@ -564,9 +564,14 @@
     });
     document.getElementById("threadSearch")?.addEventListener("input", () => setTimeout(syncAll, 0));
 
+    const refreshVisibleNow = () => {
+      if (document.hidden) return;
+      setTimeout(refreshAndSync, 100);
+    };
+
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
-        setTimeout(refreshAndSync, 250);
+        refreshVisibleNow();
         if ("Notification" in window && Notification.permission === "granted" && !state.pushConnected) {
           setTimeout(async () => {
             await ensurePushSubscription({ interactive: false });
@@ -575,6 +580,19 @@
         }
       }
     });
+
+    window.addEventListener("focus", refreshVisibleNow);
+    window.addEventListener("online", refreshVisibleNow);
+    window.addEventListener("pageshow", refreshVisibleNow);
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "DPRO_CONTACT_STATE_SYNC") {
+          setTimeout(refreshAndSync, 0);
+        }
+      });
+    }
   };
 
   const boot = async () => {
@@ -595,8 +613,10 @@
     }
     await refreshAndSync();
 
-    state.syncTimer = setInterval(syncAll, 5000);
-    state.refreshTimer = setInterval(refreshAndSync, 30000);
+    state.syncTimer = setInterval(syncAll, 4000);
+    state.refreshTimer = setInterval(() => {
+      if (!document.hidden) refreshAndSync();
+    }, 8000);
   };
 
   window.addEventListener("pagehide", () => {

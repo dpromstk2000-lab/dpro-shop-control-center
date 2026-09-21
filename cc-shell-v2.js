@@ -4,7 +4,7 @@
   const VERSION = "DPRO-CC-UI-V2-PHASE1-R1-20260921";
   const CONTACT_URL = "contact-v1.html";
   const SESSION_KEY = "dpro-control-center-auth-v1";
-  const REFRESH_MS = 30000;
+  const REFRESH_MS = 8000;
 
   if (document.body?.dataset?.dproContactPage === "true" || /\/contact-v1\.html$/i.test(location.pathname)) return;
 
@@ -462,10 +462,15 @@
       if (!document.hidden) fetchUnread();
     }, REFRESH_MS);
 
-    window.addEventListener("focus", fetchUnread);
-    window.addEventListener("online", fetchUnread);
-    document.addEventListener("visibilitychange", () => {
+    const refreshUnreadNow = () => {
       if (!document.hidden) fetchUnread();
+    };
+
+    window.addEventListener("focus", refreshUnreadNow);
+    window.addEventListener("online", refreshUnreadNow);
+    window.addEventListener("pageshow", refreshUnreadNow);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshUnreadNow();
     });
 
     if ("serviceWorker" in navigator) {
