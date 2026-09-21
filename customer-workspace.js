@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO04B-VERIFICATION-UI-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO04C2-ACTIVE-PROBE-UI-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -505,6 +505,18 @@
     }).format(d);
   }
 
+  async function runActiveEnvironmentProbe(){
+    if (!state.selectedCaseId) throw new Error("Customer Workspaceを選択してください。");
+    if (!canTechnicalWrite()) throw new Error("実チェックは管理責任者 / 技術管理者のみ実行できます。");
+
+    const {data,error}=await state.supabase.functions.invoke("dpro-customer-env-probe",{
+      body:{case_id:state.selectedCaseId},
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || "実チェックに失敗しました。");
+    return data;
+  }
+
   async function loadEnvironmentVerification(caseId,{silent=false}={}){
     if (!caseId) return;
     if (!silent) {
@@ -582,12 +594,21 @@
       ]),
     ].join("");
 
+    const runButton=$("runActiveVerificationButton");
+    if (runButton) {
+      runButton.disabled=!canTechnicalWrite() || !state.selectedCaseId;
+      runButton.title=canTechnicalWrite()
+        ?"SYSTEM / Supabase / GitHub / Worker / 公開URLの実到達確認を実行します"
+        :"管理責任者 / 技術管理者のみ実行できます";
+    }
+
     const actions=[];
     if (w?.system_check_url) actions.push(`<a class="btn secondary" href="${esc(w.system_check_url)}" target="_blank" rel="noopener noreferrer">SYSTEM CHECKを開く ↗</a>`);
     if (w?.supabase_dashboard_url) actions.push(`<a class="btn secondary" href="${esc(w.supabase_dashboard_url)}" target="_blank" rel="noopener noreferrer">Supabaseを開く ↗</a>`);
     if (w?.repository_url) actions.push(`<a class="btn secondary" href="${esc(w.repository_url)}" target="_blank" rel="noopener noreferrer">GitHubを開く ↗</a>`);
     if (w?.worker_health_url || w?.worker_url) actions.push(`<a class="btn secondary" href="${esc(w.worker_health_url || w.worker_url)}" target="_blank" rel="noopener noreferrer">Worker / Healthを開く ↗</a>`);
     if (w?.website_public_url || w?.public_url) actions.push(`<a class="btn secondary" href="${esc(w.website_public_url || w.public_url)}" target="_blank" rel="noopener noreferrer">公開URLを開く ↗</a>`);
+    actions.push(`<span class="verification-run-note">実チェックはHTTPS到達・HTTP応答を測定します。SYSTEM CHECKの中身やprivate Repository権限を未確認のままPASSにはしません。</span>`);
     $("verificationActions").innerHTML=actions.join("");
   }
 
@@ -995,6 +1016,29 @@
     $("requirementsForm")?.addEventListener("submit",confirmRequirements);
     $("setHoldButton")?.addEventListener("click",setHold);
     $("clearHoldButton")?.addEventListener("click",clearHold);
+    $("runActiveVerificationButton")?.addEventListener("click",async()=>{
+      if (!state.selectedCaseId) return;
+      const button=$("runActiveVerificationButton");
+      const oldText=button.textContent;
+      button.disabled=true;
+      button.textContent="実チェック中…";
+      try{
+        const result=await runActiveEnvironmentProbe();
+        await loadAll(true);
+        await loadEnvironmentVerification(state.selectedCaseId,{silent:true});
+        renderDetail();
+        const attempted=Object.values(result.checks||{}).filter((x)=>x?.attempted).length;
+        const passed=Object.values(result.checks||{}).filter((x)=>x?.attempted && x?.ok).length;
+        toast(`実チェック完了：${passed}/${attempted} 到達PASS`);
+      }catch(error){
+        console.error(BUILD,error);
+        toast(error?.message||"実チェックを実行できませんでした。",true);
+      }finally{
+        button.disabled=!canTechnicalWrite();
+        button.textContent=oldText;
+      }
+    });
+
     $("refreshVerificationButton")?.addEventListener("click",async()=>{
       if (!state.selectedCaseId) return;
       const button=$("refreshVerificationButton");

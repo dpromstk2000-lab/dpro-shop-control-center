@@ -98,6 +98,8 @@
 
 .verification-block{border-color:#b7cfe0;background:linear-gradient(180deg,#fbfdff 0%,#fff 100%)}
 .verification-lead{margin:5px 0 0;color:var(--cw-muted);font-size:12px;line-height:1.6}
+.verification-head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.verification-run-note{margin-top:10px;padding:9px 11px;border-radius:10px;background:#f5f8f7;color:var(--cw-muted);font-size:10px;line-height:1.55}
 .verification-summary{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px;border:1px solid #d9e4eb;border-radius:14px;background:#f8fbfd;margin-bottom:12px}
 .verification-summary.is-pass{border-color:#b8dfd0;background:#f0faf6}
 .verification-summary.is-fail{border-color:#edb7b7;background:#fff4f4}
