@@ -313,3 +313,70 @@ html[data-cc-ui-v2="phase1b"] .cc9-sidebar nav.ccv2-nav{
     grid-column:2;
   }
 }
+
+/* PHASE 2-C / DPRO sidebar readability */
+.ccv2-nav-section-title{
+  min-height:44px!important;
+  padding:10px 10px 7px!important;
+  font-size:14px!important;
+  line-height:1.45!important;
+  letter-spacing:.03em!important;
+  color:rgba(255,255,255,.78)!important;
+}
+.ccv2-nav-section-title b{
+  font-size:16px!important;
+  color:rgba(255,255,255,.72)!important;
+}
+.ccv2-nav-link,
+.ccv2-nav .nav-button{
+  min-height:46px!important;
+  padding:9px 10px!important;
+  font-size:15px!important;
+  line-height:1.45!important;
+  font-weight:850!important;
+}
+.ccv2-nav-icon{
+  width:31px!important;
+  height:31px!important;
+  min-width:31px!important;
+  font-size:11px!important;
+}
+.ccv2-nav-link small{
+  font-size:11px!important;
+  line-height:1.4!important;
+}
+.ccv2-contact-priority{
+  min-height:64px!important;
+  padding:11px 12px!important;
+}
+.ccv2-contact-copy strong{
+  font-size:15px!important;
+  line-height:1.4!important;
+}
+.ccv2-contact-copy small{
+  font-size:12px!important;
+  line-height:1.45!important;
+  margin-top:2px!important;
+}
+.ccv2-contact-icon{
+  width:36px!important;
+  height:36px!important;
+  min-width:36px!important;
+  font-size:12px!important;
+}
+.ccv2-advanced{
+  margin-top:5px!important;
+  padding-top:6px!important;
+}
+
+@media(max-width:760px){
+  .ccv2-nav-section-title{
+    min-height:46px!important;
+    font-size:15px!important;
+  }
+  .ccv2-nav-link,
+  .ccv2-nav .nav-button{
+    min-height:48px!important;
+    font-size:15px!important;
+  }
+}
