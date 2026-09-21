@@ -1,0 +1,69 @@
+name: DPRO Control Center UI V2 Phase 2D Attention Accuracy R1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dpro-control-center-ui-v2-phase2d-attention-accuracy-r1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard Phase 2C
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app.js
+          test -f index.html
+          grep -F 'DPRO-CC-UI-V2-PHASE2C-R1-20260921' config.js
+          grep -F 'app.js?v=DPRO-CC-UI-V2-PHASE2B-R1-20260921' index.html
+          grep -F 'function renderDashboardClients()' app.js
+          grep -F '顧客が登録されていません。' app.js
+
+      - name: Apply attention accuracy
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' 'CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAoKcCA9IFBhdGgoImFwcC5qcyIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQoKb2xkID0gJycnICBmdW5jdGlvbiByZW5kZXJEYXNoYm9hcmRDbGllbnRzKCkgewogICAgY29uc3QgY2xpZW50cyA9IFsuLi5zdGF0ZS5jbGllbnRzXQogICAgICAuc29ydCgoYSwgYikgPT4gKChiLm9wZW5fdGFza19jb3VudCB8fCAwKSArIChiLm93bmVyX3Jlc3BvbnNlX3N0YXR1cyA9PT0gIndhaXRpbmciID8gNSA6IDApKSAtICgoYS5vcGVuX3Rhc2tfY291bnQgfHwgMCkgKyAoYS5vd25lcl9yZXNwb25zZV9zdGF0dXMgPT09ICJ3YWl0aW5nIiA/IDUgOiAwKSkpCiAgICAgIC5zbGljZSgwLCA2KTsKICAgICQoImRhc2hib2FyZENsaWVudHMiKS5pbm5lckhUTUwgPSBjbGllbnRzLmxlbmd0aCA/IGNsaWVudHMubWFwKChjbGllbnQpID0+IGAKICAgICAgPGJ1dHRvbiBjbGFzcz0ibGlzdC1pdGVtIiB0eXBlPSJidXR0b24iIGRhdGEtb3Blbi1jbGllbnQ9IiR7Y2xpZW50LmlkfSI+CiAgICAgICAgPGRpdiBjbGFzcz0ibGlzdC1pdGVtLW1haW4iPjxzdHJvbmc+JHtlc2NhcGVIdG1sKGNsaWVudC5kaXNwbGF5X25hbWUpfTwvc3Ryb25nPjxwPiR7ZXNjYXBlSHRtbChjbGllbnQuY2xpZW50X2NvZGUpfeODu+acquWujOS6hiAke2NsaWVudC5vcGVuX3Rhc2tfY291bnQgfHwgMH3ku7Y8L3A+PC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0ibGlzdC1pdGVtLW1ldGEiPiR7cGlsbChvd25lclJlc3BvbnNlTGFiZWxzW2NsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXNdIHx8IGNsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXMsIHN0YXR1c1RvbmUoY2xpZW50Lm93bmVyX3Jlc3BvbnNlX3N0YXR1cykpfTwvZGl2PgogICAgICA8L2J1dHRvbj4KICAgIGApLmpvaW4oIiIpIDogJzxkaXYgY2xhc3M9ImVtcHR5LXN0YXRlIj7poaflrqLjgYznmbvpjLLjgZXjgozjgabjgYTjgb7jgZvjgpPjgII8L2Rpdj4nOwogICAgYmluZENsaWVudE9wZW5CdXR0b25zKCQoImRhc2hib2FyZENsaWVudHMiKSk7CiAgfScnJwoKbmV3ID0gJycnICBmdW5jdGlvbiBkYXNoYm9hcmRDbGllbnROZWVkc0F0dGVudGlvbihjbGllbnQpIHsKICAgIGNvbnN0IG9wZW5UYXNrcyA9IE51bWJlcihjbGllbnQub3Blbl90YXNrX2NvdW50IHx8IDApOwogICAgY29uc3Qgb3BlblN1cHBvcnQgPSBOdW1iZXIoY2xpZW50Lm9wZW5fc3VwcG9ydF9jYXNlX2NvdW50IHx8IDApOwogICAgY29uc3QgcmVzcG9uc2UgPSBTdHJpbmcoY2xpZW50Lm93bmVyX3Jlc3BvbnNlX3N0YXR1cyB8fCAiIikudG9Mb3dlckNhc2UoKTsKICAgIHJldHVybiBvcGVuVGFza3MgPiAwIHx8IG9wZW5TdXBwb3J0ID4gMCB8fCBbIndhaXRpbmciLCAib3ZlcmR1ZSJdLmluY2x1ZGVzKHJlc3BvbnNlKTsKICB9CgogIGZ1bmN0aW9uIGRhc2hib2FyZENsaWVudFByaW9yaXR5KGNsaWVudCkgewogICAgY29uc3QgcmVzcG9uc2UgPSBTdHJpbmcoY2xpZW50Lm93bmVyX3Jlc3BvbnNlX3N0YXR1cyB8fCAiIikudG9Mb3dlckNhc2UoKTsKICAgIGNvbnN0IG9wZW5TdXBwb3J0ID0gTnVtYmVyKGNsaWVudC5vcGVuX3N1cHBvcnRfY2FzZV9jb3VudCB8fCAwKTsKICAgIGNvbnN0IG9wZW5UYXNrcyA9IE51bWJlcihjbGllbnQub3Blbl90YXNrX2NvdW50IHx8IDApOwogICAgcmV0dXJuIChyZXNwb25zZSA9PT0gIm92ZXJkdWUiID8gMTAwMCA6IDApCiAgICAgICsgKHJlc3BvbnNlID09PSAid2FpdGluZyIgPyA1MDAgOiAwKQogICAgICArIChvcGVuU3VwcG9ydCAqIDUwKQogICAgICArIG9wZW5UYXNrczsKICB9CgogIGZ1bmN0aW9uIGRhc2hib2FyZENsaWVudFJlYXNvbihjbGllbnQpIHsKICAgIGNvbnN0IHJlc3BvbnNlID0gU3RyaW5nKGNsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXMgfHwgIiIpLnRvTG93ZXJDYXNlKCk7CiAgICBjb25zdCByZWFzb25zID0gW107CiAgICBpZiAocmVzcG9uc2UgPT09ICJvdmVyZHVlIikgcmVhc29ucy5wdXNoKCLlm57nrZTmnJ/pmZDotoXpgY4iKTsKICAgIGVsc2UgaWYgKHJlc3BvbnNlID09PSAid2FpdGluZyIpIHJlYXNvbnMucHVzaCgi44Kq44O844OK44O85Zue562U5b6F44GhIik7CgogICAgY29uc3Qgb3BlblN1cHBvcnQgPSBOdW1iZXIoY2xpZW50Lm9wZW5fc3VwcG9ydF9jYXNlX2NvdW50IHx8IDApOwogICAgY29uc3Qgb3BlblRhc2tzID0gTnVtYmVyKGNsaWVudC5vcGVuX3Rhc2tfY291bnQgfHwgMCk7CiAgICBpZiAob3BlblN1cHBvcnQgPiAwKSByZWFzb25zLnB1c2goYOOCteODneODvOODiCAke29wZW5TdXBwb3J0feS7tmApOwogICAgaWYgKG9wZW5UYXNrcyA+IDApIHJlYXNvbnMucHVzaChg5pyq5a6M5LqG44K/44K544KvICR7b3BlblRhc2tzfeS7tmApOwogICAgcmV0dXJuIHJlYXNvbnMuam9pbigi44O7IikgfHwgIueiuuiqjeS6i+mgheOBguOCiiI7CiAgfQoKICBmdW5jdGlvbiByZW5kZXJEYXNoYm9hcmRDbGllbnRzKCkgewogICAgY29uc3QgY2xpZW50cyA9IFsuLi5zdGF0ZS5jbGllbnRzXQogICAgICAuZmlsdGVyKGRhc2hib2FyZENsaWVudE5lZWRzQXR0ZW50aW9uKQogICAgICAuc29ydCgoYSwgYikgPT4gZGFzaGJvYXJkQ2xpZW50UHJpb3JpdHkoYikgLSBkYXNoYm9hcmRDbGllbnRQcmlvcml0eShhKSkKICAgICAgLnNsaWNlKDAsIDYpOwoKICAgICQoImRhc2hib2FyZENsaWVudHMiKS5pbm5lckhUTUwgPSBjbGllbnRzLmxlbmd0aCA/IGNsaWVudHMubWFwKChjbGllbnQpID0+IGAKICAgICAgPGJ1dHRvbiBjbGFzcz0ibGlzdC1pdGVtIiB0eXBlPSJidXR0b24iIGRhdGEtb3Blbi1jbGllbnQ9IiR7Y2xpZW50LmlkfSI+CiAgICAgICAgPGRpdiBjbGFzcz0ibGlzdC1pdGVtLW1haW4iPjxzdHJvbmc+JHtlc2NhcGVIdG1sKGNsaWVudC5kaXNwbGF5X25hbWUpfTwvc3Ryb25nPjxwPiR7ZXNjYXBlSHRtbChjbGllbnQuY2xpZW50X2NvZGUpfeODuyR7ZXNjYXBlSHRtbChkYXNoYm9hcmRDbGllbnRSZWFzb24oY2xpZW50KSl9PC9wPjwvZGl2PgogICAgICAgIDxkaXYgY2xhc3M9Imxpc3QtaXRlbS1tZXRhIj4ke1sid2FpdGluZyIsICJvdmVyZHVlIl0uaW5jbHVkZXMoU3RyaW5nKGNsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXMgfHwgIiIpLnRvTG93ZXJDYXNlKCkpID8gcGlsbChvd25lclJlc3BvbnNlTGFiZWxzW2NsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXNdIHx8IGNsaWVudC5vd25lcl9yZXNwb25zZV9zdGF0dXMsIHN0YXR1c1RvbmUoY2xpZW50Lm93bmVyX3Jlc3BvbnNlX3N0YXR1cykpIDogcGlsbCgi6KaB56K66KqNIiwgImFtYmVyIil9PC9kaXY+CiAgICAgIDwvYnV0dG9uPgogICAgYCkuam9pbigiIikgOiAnPGRpdiBjbGFzcz0iZW1wdHktc3RhdGUiPuePvuWcqOOAgeeiuuiqjeOBjOW/heimgeOBquOBiuWuouanmOOBr+OBhOOBvuOBm+OCk+OAgjwvZGl2Pic7CgogICAgYmluZENsaWVudE9wZW5CdXR0b25zKCQoImRhc2hib2FyZENsaWVudHMiKSk7CiAgfScnJwoKaWYgb2xkIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiREFTSEJPQVJEX0NMSUVOVF9CQVNFTElORV9OT1RfRk9VTkQiKQoKcyA9IHMucmVwbGFjZShvbGQsIG5ldywgMSkKcC53cml0ZV90ZXh0KHMsIGVuY29kaW5nPSJ1dGYtOCIpCgpwID0gUGF0aCgiaW5kZXguaHRtbCIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpvbGRfdmVyID0gJ2FwcC5qcz92PURQUk8tQ0MtVUktVjItUEhBU0UyQi1SMS0yMDI2MDkyMScKbmV3X3ZlciA9ICdhcHAuanM/dj1EUFJPLUNDLVVJLVYyLVBIQVNFMkQtUjEtMjAyNjA5MjEnCmlmIG9sZF92ZXIgbm90IGluIHM6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJBUFBfQ0FDSEVfQkFTRUxJTkVfTk9UX0ZPVU5EIikKcyA9IHMucmVwbGFjZShvbGRfdmVyLCBuZXdfdmVyLCAxKQpwLndyaXRlX3RleHQocywgZW5jb2Rpbmc9InV0Zi04IikK' | base64 -d > /tmp/phase2d_patch.py
+          python /tmp/phase2d_patch.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          grep -F 'function dashboardClientNeedsAttention(client)' app.js
+          grep -F 'function dashboardClientPriority(client)' app.js
+          grep -F 'function dashboardClientReason(client)' app.js
+          grep -F '.filter(dashboardClientNeedsAttention)' app.js
+          grep -F '現在、確認が必要なお客様はいません。' app.js
+          grep -F 'app.js?v=DPRO-CC-UI-V2-PHASE2D-R1-20260921' index.html
+
+          if git diff --name-only | grep -E '^contact-v1(\.|-)|^dpro-contact-' >/dev/null; then
+            echo "Protected DPRO CONTACT file changed."
+            exit 1
+          fi
+
+      - name: Remove one-shot
+        shell: bash
+        run: |
+          rm -f .github/workflows/dpro-control-center-ui-v2-phase2d-attention-accuracy-r1.yml
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DPRO Factory Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve Control Center attention accuracy"
+          git push
