@@ -9,10 +9,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
   <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
-  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO03B-SETUP-WIZARD-R1-20260921">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO04B-VERIFICATION-UI-R1-20260921">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
-  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO03B1-REAL-CONTRACT-FILTER-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO04B-VERIFICATION-UI-R1-20260921"></script>
 </head>
 <body data-dpro-customer-workspace-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -140,6 +140,19 @@
 
           <div id="statusGrid" class="status-grid"></div>
 
+          <section id="verificationBlock" class="workspace-block verification-block">
+            <div class="workspace-block-head">
+              <div>
+                <p class="eyebrow">ENVIRONMENT VERIFICATION</p>
+                <h3>本番環境の確認</h3>
+                <p class="verification-lead">実際に保存された確認結果だけで判定します。未確認・古い結果をPASSにはしません。</p>
+              </div>
+              <button id="refreshVerificationButton" class="btn secondary" type="button">確認結果を更新</button>
+            </div>
+            <div id="verificationSummary" class="verification-summary"></div>
+            <div id="verificationGrid" class="verification-grid"></div>
+            <div id="verificationActions" class="verification-actions"></div>
+          </section>
           <section id="setupWizardBlock" class="workspace-block setup-wizard-block">
             <div class="workspace-block-head">
               <div>

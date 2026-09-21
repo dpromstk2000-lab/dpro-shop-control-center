@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO03B1-REAL-CONTRACT-FILTER-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO04B-VERIFICATION-UI-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -20,6 +20,7 @@
     currentTab: "cases",
     namePlan: null,
     setupStep: "owner",
+    verification: null,
   };
 
   const roleLabels = {
@@ -362,14 +363,19 @@
     state.selectedCaseId = caseId;
     state.namePlan = null;
     state.setupStep = "owner";
+    state.verification = null;
     renderDetail();
     $("detailPanel").classList.remove("hidden");
     $("detailPanel").scrollIntoView({behavior:"smooth",block:"start"});
     try {
-      await loadSetupNamePlan(caseId);
+      await Promise.all([
+        loadSetupNamePlan(caseId),
+        loadEnvironmentVerification(caseId),
+      ]);
       const w=workspaceFor(caseId);
       state.setupStep=chooseSetupStep(w);
       renderSetupWizard();
+      renderEnvironmentVerification();
     } catch (error) {
       console.error(BUILD,error);
       toast(error?.message || "名前候補を生成できませんでした。",true);
@@ -478,8 +484,112 @@
     }
 
     renderSetupWizard();
+    renderEnvironmentVerification();
   }
 
+
+  const verificationLabels={
+    pass:"PASS",wait:"WAIT",stale:"STALE",fail:"FAIL",missing:"MISSING",na:"N/A",
+  };
+
+  function verificationLabel(value){
+    return verificationLabels[value] || String(value || "WAIT").toUpperCase();
+  }
+
+  function verificationTime(value){
+    if (!value) return "未確認";
+    const d=new Date(value);
+    if (Number.isNaN(d.getTime())) return "未確認";
+    return new Intl.DateTimeFormat("ja-JP",{
+      year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"
+    }).format(d);
+  }
+
+  async function loadEnvironmentVerification(caseId,{silent=false}={}){
+    if (!caseId) return;
+    if (!silent) {
+      $("verificationSummary").innerHTML='<span>確認結果を読み込んでいます…</span>';
+      $("verificationGrid").innerHTML="";
+    }
+    const {data,error}=await state.supabase.rpc("cc_customer_onboarding_environment_verification",{
+      p_case_id:caseId,
+    });
+    if (error) throw error;
+    state.verification=data || null;
+  }
+
+  function verificationCard(title,check,rows=[]){
+    const stateValue=check?.state || "wait";
+    return `<article class="verification-card is-${esc(stateValue)}">
+      <div class="verification-card-head">
+        <strong>${esc(title)}</strong>
+        <span class="verification-state">${esc(verificationLabel(stateValue))}</span>
+      </div>
+      <dl>${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v ?? "—")}</dd></div>`).join("")}</dl>
+    </article>`;
+  }
+
+  function renderEnvironmentVerification(){
+    const box=$("verificationBlock");
+    if (!box) return;
+    const v=state.verification;
+    const w=workspaceFor(state.selectedCaseId);
+
+    if (!v){
+      $("verificationSummary").className="verification-summary is-wait";
+      $("verificationSummary").innerHTML='<div class="verification-overall">WAIT</div><div class="verification-summary-main"><strong>確認結果を読み込んでください</strong><span>実測結果がないものはPASSにしません。</span></div>';
+      $("verificationGrid").innerHTML="";
+      $("verificationActions").innerHTML="";
+      return;
+    }
+
+    const overall=v.overall_state || "wait";
+    $("verificationSummary").className=`verification-summary is-${overall}`;
+    $("verificationSummary").innerHTML=`
+      <div class="verification-overall">${esc(verificationLabel(overall))}</div>
+      <div class="verification-summary-main">
+        <strong>${esc(v.blocker_reason || (overall==="pass"?"本番環境の記録済み確認結果はPASSです":"確認が必要です"))}</strong>
+        <span>次：${esc(v.next_verification_action || "—")} / 最終確認 ${esc(verificationTime(v.latest_verified_at))}</span>
+      </div>
+      <div class="verification-score">${esc(v.passed_check_count ?? 0)} / ${esc(v.required_check_count ?? 0)} PASS</div>`;
+
+    const c=v.checks || {};
+    $("verificationGrid").innerHTML=[
+      verificationCard("SYSTEM",c.system,[
+        ["Health",c.system?.health_status || "unknown"],
+        ["Health確認",verificationTime(c.system?.health_checked_at)],
+        ["System Check",verificationTime(c.system?.system_check_at)],
+      ]),
+      verificationCard("Supabase",c.supabase,[
+        ["Project Ref",c.supabase?.project_ref || "未登録"],
+        ["招待",c.supabase?.required===false?"対象外":(c.supabase?.invitation_status || "未確認")],
+        ["接続確認",verificationTime(c.supabase?.checked_at)],
+      ]),
+      verificationCard("GitHub / Pages",c.github,[
+        ["Repository",c.github?.repository || "未登録"],
+        ["Access",c.github?.required===false?"対象外":(c.github?.access_status || "未確認")],
+        ["Pages確認",verificationTime(c.github?.checked_at)],
+      ]),
+      verificationCard("Cloudflare Worker",c.worker,[
+        ["Worker",c.worker?.worker_name || "未登録"],
+        ["HTTP",c.worker?.http_status ?? "未確認"],
+        ["確認日時",verificationTime(c.worker?.checked_at)],
+      ]),
+      verificationCard("公開URL",c.website,[
+        ["URL",c.website?.public_url || (c.website?.required===false?"対象外":"未登録")],
+        ["SSL",c.website?.required===false?"対象外":(c.website?.ssl_status || "未確認")],
+        ["確認日時",verificationTime(c.website?.checked_at)],
+      ]),
+    ].join("");
+
+    const actions=[];
+    if (w?.system_check_url) actions.push(`<a class="btn secondary" href="${esc(w.system_check_url)}" target="_blank" rel="noopener noreferrer">SYSTEM CHECKを開く ↗</a>`);
+    if (w?.supabase_dashboard_url) actions.push(`<a class="btn secondary" href="${esc(w.supabase_dashboard_url)}" target="_blank" rel="noopener noreferrer">Supabaseを開く ↗</a>`);
+    if (w?.repository_url) actions.push(`<a class="btn secondary" href="${esc(w.repository_url)}" target="_blank" rel="noopener noreferrer">GitHubを開く ↗</a>`);
+    if (w?.worker_health_url || w?.worker_url) actions.push(`<a class="btn secondary" href="${esc(w.worker_health_url || w.worker_url)}" target="_blank" rel="noopener noreferrer">Worker / Healthを開く ↗</a>`);
+    if (w?.website_public_url || w?.public_url) actions.push(`<a class="btn secondary" href="${esc(w.website_public_url || w.public_url)}" target="_blank" rel="noopener noreferrer">公開URLを開く ↗</a>`);
+    $("verificationActions").innerHTML=actions.join("");
+  }
 
   function canTechnicalWrite() {
     return ["owner_admin","technical_admin"].includes(state.staff?.role_key);
@@ -678,7 +788,10 @@
     });
     if (error) throw error;
     await loadAll(true);
-    await loadSetupNamePlan(state.selectedCaseId,{silent:true});
+    await Promise.all([
+      loadSetupNamePlan(state.selectedCaseId,{silent:true}),
+      loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
+    ]);
     renderDetail();
     toast(message);
   }
@@ -862,7 +975,14 @@
   function bind() {
     $("retryButton")?.addEventListener("click",boot);
     $("reloadButton")?.addEventListener("click",async() => {
-      try { await loadAll(true); toast("最新情報へ更新しました。"); }
+      try {
+        await loadAll(true);
+        if (state.selectedCaseId) {
+          await loadEnvironmentVerification(state.selectedCaseId,{silent:true});
+          renderDetail();
+        }
+        toast("最新情報へ更新しました。");
+      }
       catch (e) { toast(e?.message || "更新できませんでした。",true); }
     });
     $("caseSearch")?.addEventListener("input",renderCases);
@@ -875,6 +995,22 @@
     $("requirementsForm")?.addEventListener("submit",confirmRequirements);
     $("setHoldButton")?.addEventListener("click",setHold);
     $("clearHoldButton")?.addEventListener("click",clearHold);
+    $("refreshVerificationButton")?.addEventListener("click",async()=>{
+      if (!state.selectedCaseId) return;
+      const button=$("refreshVerificationButton");
+      const oldText=button.textContent;
+      button.disabled=true; button.textContent="更新中…";
+      try{
+        await loadEnvironmentVerification(state.selectedCaseId,{silent:true});
+        renderEnvironmentVerification();
+        toast("確認結果を更新しました。");
+      }catch(error){
+        console.error(BUILD,error);
+        toast(error?.message||"確認結果を更新できませんでした。",true);
+      }finally{
+        button.disabled=false; button.textContent=oldText;
+      }
+    });
     document.querySelectorAll("[data-setup-step]").forEach((button)=>button.addEventListener("click",()=>{ const w=workspaceFor(state.selectedCaseId); if (!w) return; if (!setupStepApplicable(w,button.dataset.setupStep)) return toast("今回の契約では対象外です。"); switchSetupStep(button.dataset.setupStep); }));
     $("refreshNamePlanButton")?.addEventListener("click",async()=>{ try{ await loadSetupNamePlan(state.selectedCaseId); renderSetupWizard(); toast("名前候補を再生成しました。"); }catch(error){ console.error(BUILD,error); toast(error?.message||"名前候補を生成できませんでした。",true); } });
     $("setupOwnerForm")?.addEventListener("submit",saveOwnerSetup);
