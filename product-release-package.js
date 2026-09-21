@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R3-HISTORY-GUARD-20260921";
+  const BUILD = "DPRO-PRODUCT-RELEASE-CC-R3.1-RETURN-EVIDENCE-MERGE-20260921";
   const PACKAGE_VERSION = "PRODUCT-RELEASE-START-R2";
   const RELEASE_MASTER_VERSION = "DPRO_PRODUCT_RELEASE_MASTER_V1.2";
   const RELEASE_MASTER_SHA256 = "802ba7dd0de6e53fb5c3dc9adea028e81697140716cc67f044fc9b43fff8d718";
@@ -525,16 +525,109 @@
     const file=event.target.files?.[0];event.target.value="";if(!file)return;
     const p=selectedProject(),r=selectedRelease();if(!p)return;
     const note=$("returnImportNote");note.textContent="返却内容を確認中…";
+
     try{
       if(!r?.package_sha256) throw new Error("先にPRODUCT RELEASE START R2 ZIPを発行してください。");
+
       let payload;
+      let zip=null;
+      let integrity={pass:false,checked:false,files:0};
+
       if(file.name.toLowerCase().endsWith(".json")){
         payload=JSON.parse(await file.text());
       }else{
-        const zip=await JSZip.loadAsync(await file.arrayBuffer());
-        const entry=zip.file("PRODUCT_RELEASE_RETURN.json")||Object.values(zip.files).find(x=>!x.dir&&x.name.endsWith("/PRODUCT_RELEASE_RETURN.json"));
+        zip=await JSZip.loadAsync(await file.arrayBuffer());
+        const entries=Object.values(zip.files).filter(x=>!x.dir);
+
+        if(entries.some(x=>x.name.includes("/"))){
+          throw new Error("RETURN ZIPはZIP直下のみで取り込んでください。");
+        }
+
+        const entry=zip.file("PRODUCT_RELEASE_RETURN.json");
         if(!entry) throw new Error("PRODUCT_RELEASE_RETURN.jsonがありません。");
         payload=JSON.parse(await entry.async("string"));
+
+        const sumEntry=zip.file("SHA256SUMS.txt");
+        const lockRequested=payload?.schema_version==="DPRO-PRODUCT-RELEASE-RETURN-R2" && payload?.product_release_lock?.pass===true;
+
+        if(!sumEntry && lockRequested){
+          throw new Error("LOCK返却ZIPにSHA256SUMS.txtがありません。証拠完全性を確認できません。");
+        }
+
+        if(sumEntry){
+          note.textContent="RETURN ZIPのSHA256を検証中…";
+          const text=await sumEntry.async("string");
+          const expected=new Map();
+
+          for(const raw of text.split(/\r?\n/)){
+            const line=raw.trim();
+            if(!line) continue;
+            const m=line.match(/^([0-9a-f]{64})\s+(.+)$/i);
+            if(m) expected.set(m[2].trim(),m[1].toLowerCase());
+          }
+
+          for(const item of entries){
+            if(item.name==="SHA256SUMS.txt") continue;
+            const want=expected.get(item.name);
+            if(!want) throw new Error(`SHA256SUMSに ${item.name} がありません。`);
+            const actual=await sha256Bytes(await item.async("arraybuffer"));
+            if(actual!==want) throw new Error(`RETURN ZIPのSHA256不一致: ${item.name}`);
+          }
+
+          integrity={pass:true,checked:true,files:entries.length};
+        }
+
+        if(payload?.schema_version==="DPRO-PRODUCT-RELEASE-RETURN-R2"){
+          const readJson=async(name)=>{
+            const e=zip.file(name);
+            if(!e) return null;
+            return JSON.parse(await e.async("string"));
+          };
+
+          const [factLock,surfaceMatrix,humanAcceptance,deployAttestation,defectRegister]=await Promise.all([
+            readJson("FACT_LOCK.json"),
+            readJson("PUBLIC_SURFACE_MATRIX.json"),
+            readJson("HUMAN_ACCEPTANCE.json"),
+            readJson("DEPLOY_ATTESTATION.json"),
+            readJson("OPEN_DEFECT_REGISTER.json")
+          ]);
+
+          if(payload?.product_release_lock?.pass===true){
+            const missing=[];
+            if(!factLock) missing.push("FACT_LOCK.json");
+            if(!surfaceMatrix) missing.push("PUBLIC_SURFACE_MATRIX.json");
+            if(!humanAcceptance) missing.push("HUMAN_ACCEPTANCE.json");
+            if(!deployAttestation) missing.push("DEPLOY_ATTESTATION.json");
+            if(!defectRegister) missing.push("OPEN_DEFECT_REGISTER.json");
+            if(missing.length) throw new Error(`LOCK返却ZIPの必須証拠不足: ${missing.join(", ")}`);
+          }
+
+          if(factLock) payload.fact_lock_snapshot=factLock;
+          if(surfaceMatrix) payload.public_surface_matrix=surfaceMatrix;
+          if(humanAcceptance) payload.human_acceptance=humanAcceptance;
+          if(deployAttestation) payload.deploy_attestation=deployAttestation;
+
+          if(defectRegister && Array.isArray(defectRegister.defects)){
+            payload.open_defects=defectRegister.defects.filter((d)=>{
+              const status=String(d?.status||"open").toLowerCase();
+              return !["closed","resolved","accepted_closed"].includes(status);
+            });
+          }
+
+          payload.public_urls=payload.public_urls&&typeof payload.public_urls==="object"?payload.public_urls:{};
+          if(!payload.public_urls.official){
+            payload.public_urls.official=payload.public_urls.official_custom||payload.public_urls.official_github_pages||"";
+          }
+
+          payload.evidence=payload.evidence&&typeof payload.evidence==="object"?payload.evidence:{};
+          if(integrity.checked){
+            payload.evidence.return_zip_integrity={
+              pass:true,
+              source:"SHA256SUMS.txt",
+              file_count:integrity.files
+            };
+          }
+        }
       }
 
       if(!["DPRO-PRODUCT-RELEASE-RETURN-R1","DPRO-PRODUCT-RELEASE-RETURN-R2"].includes(payload?.schema_version)) throw new Error("返却JSONのschema_versionが違います。");
@@ -542,6 +635,7 @@
       if(String(payload?.system_code||"").toUpperCase()!==String(p.target_system_code||"").toUpperCase()) throw new Error("返却JSONのSYSTEM CODEが違います。");
 
       if(payload?.schema_version==="DPRO-PRODUCT-RELEASE-RETURN-R2" && payload?.product_release_lock?.pass===true){
+        note.textContent=integrity.checked?"証拠ファイルを統合してLOCK条件を検証中…":"LOCK条件を検証中…";
         const validation=await state.supabase.rpc("cc_product_release_validate_return_v2",{p_payload:payload});
         if(validation.error) throw validation.error;
         if(!validation.data?.ok){
@@ -556,11 +650,11 @@
 
       const rr=selectedRelease(),b=countTrue(rr?.brushup),f=countTrue(rr?.final_release),human=humanAccepted(rr);
       note.textContent=rr?.release_status==="complete"
-        ? "PRODUCT RELEASE V1.2 COMPLETE / RELEASE LOCK済み"
+        ? `PRODUCT RELEASE V1.2 COMPLETE / RELEASE LOCK済み${integrity.checked?" / ZIP SHA256 PASS":""}`
         : `取込済み / BRUSHUP ${b}/4 / HUMAN ${human?"PASS":"WAIT"} / FINAL ${f}/4`;
 
       toast(rr?.release_status==="complete"
-        ? "MASTER V1.2の全Gateを通過し、PRODUCT RELEASE LOCKを取り込みました。"
+        ? "RETURN ZIPの証拠を統合・検証し、PRODUCT RELEASE LOCKを取り込みました。"
         : "商品化の途中返却を取り込みました。初回公開だけではCOMPLETEになりません。");
     }catch(error){
       console.error(BUILD,error);
