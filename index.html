@@ -205,22 +205,49 @@
       </header>
 
       <main class="content">
-        <section id="view-dashboard" class="view active-view">
-          <div class="page-head">
-            <div><p class="eyebrow">OVERVIEW</p><h1>DPRO SHOP全体を一目で確認</h1><p>LINE公式運用、DPROシステム、ホームページ、対応待ちをまとめて表示します。</p></div>
+        <section id="view-dashboard" class="view active-view ccv2-home">
+          <div class="page-head ccv2-home-head">
+            <div><p class="eyebrow">TODAY</p><h1>今日のDPRO SHOP</h1><p>まず、連絡・対応待ち・次に進める仕事を確認します。</p></div>
             <button id="refreshDashboard" class="btn btn-secondary" type="button">最新情報に更新</button>
           </div>
-          <div id="metricGrid" class="metric-grid" aria-live="polite"></div>
-          <div class="dashboard-grid">
+
+          <nav class="ccv2-home-actions" aria-label="よく使う操作">
+            <a class="ccv2-home-action is-contact" href="contact-v1.html">
+              <span class="ccv2-home-action-icon">話</span>
+              <span><strong>顧客対応</strong><small>問い合わせを確認</small></span>
+            </a>
+            <button class="ccv2-home-action" type="button" data-go-view="clients">
+              <span class="ccv2-home-action-icon">顧</span>
+              <span><strong>お客様を見る</strong><small>顧客・契約を確認</small></span>
+            </button>
+            <a class="ccv2-home-action" href="start.html">
+              <span class="ccv2-home-action-icon">始</span>
+              <span><strong>導入を進める</strong><small>契約開始から本番準備</small></span>
+            </a>
+            <a class="ccv2-home-action" href="product-development.html">
+              <span class="ccv2-home-action-icon">製</span>
+              <span><strong>DPRO製品を作る</strong><small>SYSTEMから商品公開へ</small></span>
+            </a>
+          </nav>
+
+          <div class="dashboard-grid ccv2-home-priority">
             <section class="panel">
-              <div class="panel-head"><div><h2>優先対応</h2><p>期限・確認待ちを優先順に表示</p></div><button class="text-button" type="button" data-go-view="tasks">すべて見る</button></div>
+              <div class="panel-head"><div><h2>今日やること</h2><p>期限・確認待ちを優先順に表示</p></div><button class="text-button" type="button" data-go-view="tasks">すべて見る</button></div>
               <div id="dashboardTasks" class="list-stack"></div>
             </section>
             <section class="panel">
-              <div class="panel-head"><div><h2>最近確認する顧客</h2><p>タスクや確認待ちがある顧客</p></div><button class="text-button" type="button" data-go-view="clients">全顧客</button></div>
+              <div class="panel-head"><div><h2>確認するお客様</h2><p>タスクや確認待ちがあるお客様</p></div><button class="text-button" type="button" data-go-view="clients">全顧客</button></div>
               <div id="dashboardClients" class="list-stack"></div>
             </section>
           </div>
+
+          <details class="ccv2-overview-details">
+            <summary>
+              <span><strong>全体状況</strong><small>顧客・LINE・SYSTEM・WEB・異常件数を確認</small></span>
+              <b aria-hidden="true">⌄</b>
+            </summary>
+            <div id="metricGrid" class="metric-grid" aria-live="polite"></div>
+          </details>
         </section>
 
         <section id="view-clients" class="view hidden">

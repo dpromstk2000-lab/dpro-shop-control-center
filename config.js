@@ -11,7 +11,7 @@ window.DPRO_CONTROL_CENTER_CONFIG = Object.freeze({
 // Navigation + contact priority only. DPRO CONTACT PWA does not load config.js.
 window.DPRO_CC_SHELL_V2_ACTIVE = true;
 (() => {
-  const cssHref = "./cc-shell-v2.css?v=DPRO-CC-UI-V2-PHASE1C-R1-20260921";
+  const cssHref = "./cc-shell-v2.css?v=DPRO-CC-UI-V2-PHASE2A-R1-20260921";
   if (!document.querySelector('link[data-dpro-cc-shell-v2="true"]')) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
