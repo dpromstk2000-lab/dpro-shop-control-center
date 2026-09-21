@@ -118,3 +118,25 @@ html[data-cc-ui-v2="phase1b"] .cc9-sidebar nav.ccv2-nav{
   .ccv2-nav-section-title{min-height:42px!important}
   .ccv2-nav-link,.ccv2-nav .nav-button{min-height:44px!important}
 }
+
+/* PHASE 1-C / accordion display fix */
+.ccv2-nav-section-body{
+  display:block!important;
+  max-height:0!important;
+  overflow:hidden!important;
+  opacity:0;
+  transition:max-height .18s ease, opacity .12s ease;
+}
+.ccv2-nav-section-body > *{
+  overflow:visible!important;
+}
+.ccv2-nav-section.is-open .ccv2-nav-section-body{
+  max-height:420px!important;
+  opacity:1;
+}
+.ccv2-nav-section[data-ccv2-section="home"] > .ccv2-nav-section-title{
+  display:none!important;
+}
+.ccv2-nav-section[data-ccv2-section="home"]{
+  margin-bottom:2px!important;
+}
