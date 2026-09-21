@@ -1,0 +1,73 @@
+name: DPRO Customer Workspace CO04C2 Active Probe UI R1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dpro-customer-workspace-co04c2-active-probe-ui-r1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(git rev-parse HEAD^)"
+          test "$BASE" = "70e6196f21a7439ccfb4abe60e4202d176f626d1"
+          grep -F 'DPRO-CUSTOMER-WORKSPACE-CO04B-VERIFICATION-UI-R1-20260921' customer-workspace.js
+          grep -F 'id="verificationBlock"' customer-workspace.html
+          ! grep -F 'id="runActiveVerificationButton"' customer-workspace.html
+
+      - name: Apply CO04C2
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCBqc29uCm9wcz1qc29uLmxvYWRzKCdbeyJwYXRoIjogImN1c3RvbWVyLXdvcmtzcGFjZS5odG1sIiwgIm9sZCI6ICI8YnV0dG9uIGlkPVxcInJlZnJlc2hWZXJpZmljYXRpb25CdXR0b25cXCIgY2xhc3M9XFwiYnRuIHNlY29uZGFyeVxcIiB0eXBlPVxcImJ1dHRvblxcIj7norroqo3ntZDmnpzjgpLmm7TmlrA8L2J1dHRvbj4iLCAibmV3IjogIjxkaXYgY2xhc3M9XFwidmVyaWZpY2F0aW9uLWhlYWQtYWN0aW9uc1xcIj5cXG4gICAgICAgICAgICAgICAgPGJ1dHRvbiBpZD1cXCJydW5BY3RpdmVWZXJpZmljYXRpb25CdXR0b25cXCIgY2xhc3M9XFwiYnRuIHByaW1hcnlcXCIgdHlwZT1cXCJidXR0b25cXCI+5a6f44OB44Kn44OD44Kv44KS5a6f6KGMPC9idXR0b24+XFxuICAgICAgICAgICAgICAgIDxidXR0b24gaWQ9XFwicmVmcmVzaFZlcmlmaWNhdGlvbkJ1dHRvblxcIiBjbGFzcz1cXCJidG4gc2Vjb25kYXJ5XFwiIHR5cGU9XFwiYnV0dG9uXFwiPueiuuiqjee1kOaenOOCkuabtOaWsDwvYnV0dG9uPlxcbiAgICAgICAgICAgICAgPC9kaXY+IiwgImxhYmVsIjogIkhUTUxfQlVUVE9OIn0sIHsicGF0aCI6ICJjdXN0b21lci13b3Jrc3BhY2UuaHRtbCIsICJvbGQiOiAiY3VzdG9tZXItd29ya3NwYWNlLmNzcz92PURQUk8tQ1VTVE9NRVItV09SS1NQQUNFLUNPMDRCLVZFUklGSUNBVElPTi1VSS1SMS0yMDI2MDkyMSIsICJuZXciOiAiY3VzdG9tZXItd29ya3NwYWNlLmNzcz92PURQUk8tQ1VTVE9NRVItV09SS1NQQUNFLUNPMDRDMi1BQ1RJVkUtUFJPQkUtVUktUjEtMjAyNjA5MjEiLCAibGFiZWwiOiAiSFRNTF9DU1NfQ0FDSEUifSwgeyJwYXRoIjogImN1c3RvbWVyLXdvcmtzcGFjZS5odG1sIiwgIm9sZCI6ICJjdXN0b21lci13b3Jrc3BhY2UuanM/dj1EUFJPLUNVU1RPTUVSLVdPUktTUEFDRS1DTzA0Qi1WRVJJRklDQVRJT04tVUktUjEtMjAyNjA5MjEiLCAibmV3IjogImN1c3RvbWVyLXdvcmtzcGFjZS5qcz92PURQUk8tQ1VTVE9NRVItV09SS1NQQUNFLUNPMDRDMi1BQ1RJVkUtUFJPQkUtVUktUjEtMjAyNjA5MjEiLCAibGFiZWwiOiAiSFRNTF9KU19DQUNIRSJ9LCB7InBhdGgiOiAiY3VzdG9tZXItd29ya3NwYWNlLmNzcyIsICJvbGQiOiAiLnZlcmlmaWNhdGlvbi1sZWFke21hcmdpbjo1cHggMCAwO2NvbG9yOnZhcigtLWN3LW11dGVkKTtmb250LXNpemU6MTJweDtsaW5lLWhlaWdodDoxLjZ9IiwgIm5ldyI6ICIudmVyaWZpY2F0aW9uLWxlYWR7bWFyZ2luOjVweCAwIDA7Y29sb3I6dmFyKC0tY3ctbXV0ZWQpO2ZvbnQtc2l6ZToxMnB4O2xpbmUtaGVpZ2h0OjEuNn1cXG4udmVyaWZpY2F0aW9uLWhlYWQtYWN0aW9uc3tkaXNwbGF5OmZsZXg7Z2FwOjhweDthbGlnbi1pdGVtczpjZW50ZXI7ZmxleC13cmFwOndyYXA7anVzdGlmeS1jb250ZW50OmZsZXgtZW5kfVxcbi52ZXJpZmljYXRpb24tcnVuLW5vdGV7bWFyZ2luLXRvcDoxMHB4O3BhZGRpbmc6OXB4IDExcHg7Ym9yZGVyLXJhZGl1czoxMHB4O2JhY2tncm91bmQ6I2Y1ZjhmNztjb2xvcjp2YXIoLS1jdy1tdXRlZCk7Zm9udC1zaXplOjEwcHg7bGluZS1oZWlnaHQ6MS41NX0iLCAibGFiZWwiOiAiQ1NTX0hFQUQifSwgeyJwYXRoIjogImN1c3RvbWVyLXdvcmtzcGFjZS5qcyIsICJvbGQiOiAiY29uc3QgQlVJTEQgPSBcXCJEUFJPLUNVU1RPTUVSLVdPUktTUEFDRS1DTzA0Qi1WRVJJRklDQVRJT04tVUktUjEtMjAyNjA5MjFcXCI7IiwgIm5ldyI6ICJjb25zdCBCVUlMRCA9IFxcIkRQUk8tQ1VTVE9NRVItV09SS1NQQUNFLUNPMDRDMi1BQ1RJVkUtUFJPQkUtVUktUjEtMjAyNjA5MjFcXCI7IiwgImxhYmVsIjogIkpTX0JVSUxEIn0sIHsicGF0aCI6ICJjdXN0b21lci13b3Jrc3BhY2UuanMiLCAib2xkIjogIiAgYXN5bmMgZnVuY3Rpb24gbG9hZEVudmlyb25tZW50VmVyaWZpY2F0aW9uKGNhc2VJZCx7c2lsZW50PWZhbHNlfT17fSl7IiwgIm5ldyI6ICIgIGFzeW5jIGZ1bmN0aW9uIHJ1bkFjdGl2ZUVudmlyb25tZW50UHJvYmUoKXtcXG4gICAgaWYgKCFzdGF0ZS5zZWxlY3RlZENhc2VJZCkgdGhyb3cgbmV3IEVycm9yKFxcIkN1c3RvbWVyIFdvcmtzcGFjZeOCkumBuOaKnuOBl+OBpuOBj+OBoOOBleOBhOOAglxcIik7XFxuICAgIGlmICghY2FuVGVjaG5pY2FsV3JpdGUoKSkgdGhyb3cgbmV3IEVycm9yKFxcIuWun+ODgeOCp+ODg+OCr+OBr+euoeeQhuiyrOS7u+iAhSAvIOaKgOihk+euoeeQhuiAheOBruOBv+Wun+ihjOOBp+OBjeOBvuOBmeOAglxcIik7XFxuXFxuICAgIGNvbnN0IHtkYXRhLGVycm9yfT1hd2FpdCBzdGF0ZS5zdXBhYmFzZS5mdW5jdGlvbnMuaW52b2tlKFxcImRwcm8tY3VzdG9tZXItZW52LXByb2JlXFwiLHtcXG4gICAgICBib2R5OntjYXNlX2lkOnN0YXRlLnNlbGVjdGVkQ2FzZUlkfSxcXG4gICAgfSk7XFxuICAgIGlmIChlcnJvcikgdGhyb3cgZXJyb3I7XFxuICAgIGlmICghZGF0YT8ub2spIHRocm93IG5ldyBFcnJvcihkYXRhPy5lcnJvciB8fCBcXCLlrp/jg4Hjgqfjg4Pjgq/jgavlpLHmlZfjgZfjgb7jgZfjgZ/jgIJcXCIpO1xcbiAgICByZXR1cm4gZGF0YTtcXG4gIH1cXG5cXG4gIGFzeW5jIGZ1bmN0aW9uIGxvYWRFbnZpcm9ubWVudFZlcmlmaWNhdGlvbihjYXNlSWQse3NpbGVudD1mYWxzZX09e30peyIsICJsYWJlbCI6ICJKU19GVU5DVElPTiJ9LCB7InBhdGgiOiAiY3VzdG9tZXItd29ya3NwYWNlLmpzIiwgIm9sZCI6ICIgICAgY29uc3QgYWN0aW9ucz1bXTtcXG4gICAgaWYgKHc/LnN5c3RlbV9jaGVja191cmwpIGFjdGlvbnMucHVzaChgPGEgY2xhc3M9XFwiYnRuIHNlY29uZGFyeVxcIiBocmVmPVxcIiR7ZXNjKHcuc3lzdGVtX2NoZWNrX3VybCl9XFwiIHRhcmdldD1cXCJfYmxhbmtcXCIgcmVsPVxcIm5vb3BlbmVyIG5vcmVmZXJyZXJcXCI+U1lTVEVNIENIRUNL44KS6ZaL44GPIOKGlzwvYT5gKTsiLCAibmV3IjogIiAgICBjb25zdCBydW5CdXR0b249JChcXCJydW5BY3RpdmVWZXJpZmljYXRpb25CdXR0b25cXCIpO1xcbiAgICBpZiAocnVuQnV0dG9uKSB7XFxuICAgICAgcnVuQnV0dG9uLmRpc2FibGVkPSFjYW5UZWNobmljYWxXcml0ZSgpIHx8ICFzdGF0ZS5zZWxlY3RlZENhc2VJZDtcXG4gICAgICBydW5CdXR0b24udGl0bGU9Y2FuVGVjaG5pY2FsV3JpdGUoKVxcbiAgICAgICAgP1xcIlNZU1RFTSAvIFN1cGFiYXNlIC8gR2l0SHViIC8gV29ya2VyIC8g5YWs6ZaLVVJM44Gu5a6f5Yiw6YGU56K66KqN44KS5a6f6KGM44GX44G+44GZXFwiXFxuICAgICAgICA6XFwi566h55CG6LKs5Lu76ICFIC8g5oqA6KGT566h55CG6ICF44Gu44G/5a6f6KGM44Gn44GN44G+44GZXFwiO1xcbiAgICB9XFxuXFxuICAgIGNvbnN0IGFjdGlvbnM9W107XFxuICAgIGlmICh3Py5zeXN0ZW1fY2hlY2tfdXJsKSBhY3Rpb25zLnB1c2goYDxhIGNsYXNzPVxcImJ0biBzZWNvbmRhcnlcXCIgaHJlZj1cXCIke2VzYyh3LnN5c3RlbV9jaGVja191cmwpfVxcIiB0YXJnZXQ9XFwiX2JsYW5rXFwiIHJlbD1cXCJub29wZW5lciBub3JlZmVycmVyXFwiPlNZU1RFTSBDSEVDS+OCkumWi+OBjyDihpc8L2E+YCk7IiwgImxhYmVsIjogIkpTX1JFTkRFUl9CVVRUT04ifSwgeyJwYXRoIjogImN1c3RvbWVyLXdvcmtzcGFjZS5qcyIsICJvbGQiOiAiICAgICQoXFwidmVyaWZpY2F0aW9uQWN0aW9uc1xcIikuaW5uZXJIVE1MPWFjdGlvbnMuam9pbihcXCJcXCIpO1xcbiAgfSIsICJuZXciOiAiICAgIGFjdGlvbnMucHVzaChgPHNwYW4gY2xhc3M9XFwidmVyaWZpY2F0aW9uLXJ1bi1ub3RlXFwiPuWun+ODgeOCp+ODg+OCr+OBr0hUVFBT5Yiw6YGU44O7SFRUUOW/nOetlOOCkua4rOWumuOBl+OBvuOBmeOAglNZU1RFTSBDSEVDS+OBruS4rei6q+OChHByaXZhdGUgUmVwb3NpdG9yeeaoqemZkOOCkuacqueiuuiqjeOBruOBvuOBvlBBU1Pjgavjga/jgZfjgb7jgZvjgpPjgII8L3NwYW4+YCk7XFxuICAgICQoXFwidmVyaWZpY2F0aW9uQWN0aW9uc1xcIikuaW5uZXJIVE1MPWFjdGlvbnMuam9pbihcXCJcXCIpO1xcbiAgfSIsICJsYWJlbCI6ICJKU19SRU5ERVJfTk9URSJ9LCB7InBhdGgiOiAiY3VzdG9tZXItd29ya3NwYWNlLmpzIiwgIm9sZCI6ICIgICAgJChcXCJyZWZyZXNoVmVyaWZpY2F0aW9uQnV0dG9uXFwiKT8uYWRkRXZlbnRMaXN0ZW5lcihcXCJjbGlja1xcIixhc3luYygpPT57IiwgIm5ldyI6ICIgICAgJChcXCJydW5BY3RpdmVWZXJpZmljYXRpb25CdXR0b25cXCIpPy5hZGRFdmVudExpc3RlbmVyKFxcImNsaWNrXFwiLGFzeW5jKCk9PntcXG4gICAgICBpZiAoIXN0YXRlLnNlbGVjdGVkQ2FzZUlkKSByZXR1cm47XFxuICAgICAgY29uc3QgYnV0dG9uPSQoXFwicnVuQWN0aXZlVmVyaWZpY2F0aW9uQnV0dG9uXFwiKTtcXG4gICAgICBjb25zdCBvbGRUZXh0PWJ1dHRvbi50ZXh0Q29udGVudDtcXG4gICAgICBidXR0b24uZGlzYWJsZWQ9dHJ1ZTtcXG4gICAgICBidXR0b24udGV4dENvbnRlbnQ9XFwi5a6f44OB44Kn44OD44Kv5Lit4oCmXFwiO1xcbiAgICAgIHRyeXtcXG4gICAgICAgIGNvbnN0IHJlc3VsdD1hd2FpdCBydW5BY3RpdmVFbnZpcm9ubWVudFByb2JlKCk7XFxuICAgICAgICBhd2FpdCBsb2FkQWxsKHRydWUpO1xcbiAgICAgICAgYXdhaXQgbG9hZEVudmlyb25tZW50VmVyaWZpY2F0aW9uKHN0YXRlLnNlbGVjdGVkQ2FzZUlkLHtzaWxlbnQ6dHJ1ZX0pO1xcbiAgICAgICAgcmVuZGVyRGV0YWlsKCk7XFxuICAgICAgICBjb25zdCBhdHRlbXB0ZWQ9T2JqZWN0LnZhbHVlcyhyZXN1bHQuY2hlY2tzfHx7fSkuZmlsdGVyKCh4KT0+eD8uYXR0ZW1wdGVkKS5sZW5ndGg7XFxuICAgICAgICBjb25zdCBwYXNzZWQ9T2JqZWN0LnZhbHVlcyhyZXN1bHQuY2hlY2tzfHx7fSkuZmlsdGVyKCh4KT0+eD8uYXR0ZW1wdGVkICYmIHg/Lm9rKS5sZW5ndGg7XFxuICAgICAgICB0b2FzdChg5a6f44OB44Kn44OD44Kv5a6M5LqG77yaJHtwYXNzZWR9LyR7YXR0ZW1wdGVkfSDliLDpgZRQQVNTYCk7XFxuICAgICAgfWNhdGNoKGVycm9yKXtcXG4gICAgICAgIGNvbnNvbGUuZXJyb3IoQlVJTEQsZXJyb3IpO1xcbiAgICAgICAgdG9hc3QoZXJyb3I/Lm1lc3NhZ2V8fFxcIuWun+ODgeOCp+ODg+OCr+OCkuWun+ihjOOBp+OBjeOBvuOBm+OCk+OBp+OBl+OBn+OAglxcIix0cnVlKTtcXG4gICAgICB9ZmluYWxseXtcXG4gICAgICAgIGJ1dHRvbi5kaXNhYmxlZD0hY2FuVGVjaG5pY2FsV3JpdGUoKTtcXG4gICAgICAgIGJ1dHRvbi50ZXh0Q29udGVudD1vbGRUZXh0O1xcbiAgICAgIH1cXG4gICAgfSk7XFxuXFxuICAgICQoXFwicmVmcmVzaFZlcmlmaWNhdGlvbkJ1dHRvblxcIik/LmFkZEV2ZW50TGlzdGVuZXIoXFwiY2xpY2tcXCIsYXN5bmMoKT0+eyIsICJsYWJlbCI6ICJKU19CSU5EIn1dJykKZm9yIG9wIGluIG9wczoKICAgIHA9UGF0aChvcFsicGF0aCJdKQogICAgcz1wLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQogICAgb2xkPW9wWyJvbGQiXQogICAgbmV3PW9wWyJuZXciXQogICAgaWYgb2xkIG5vdCBpbiBzOgogICAgICAgIHJhaXNlIFN5c3RlbUV4aXQoZidDTzA0QzJfe29wWyJsYWJlbCJdfV9NQVJLRVJfTk9UX0ZPVU5EJykKICAgIHM9cy5yZXBsYWNlKG9sZCxuZXcsMSkKICAgIHAud3JpdGVfdGV4dChzLGVuY29kaW5nPSJ1dGYtOCIpCg==' | base64 -d > /tmp/co04c2_patch.py
+          python /tmp/co04c2_patch.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check customer-workspace.js
+          grep -F 'DPRO-CUSTOMER-WORKSPACE-CO04C2-ACTIVE-PROBE-UI-R1-20260921' customer-workspace.js
+          grep -F 'dpro-customer-env-probe' customer-workspace.js
+          grep -F 'id="runActiveVerificationButton"' customer-workspace.html
+          grep -F '実チェックを実行' customer-workspace.html
+          grep -F '.verification-head-actions' customer-workspace.css
+          grep -F 'CO04C2-ACTIVE-PROBE-UI-R1-20260921' customer-workspace.html
+
+          CHANGED="$(git diff --name-only | sort)"
+          EXPECTED="$(printf 'customer-workspace.css\ncustomer-workspace.html\ncustomer-workspace.js')"
+          test "$CHANGED" = "$EXPECTED"
+
+          if git diff --name-only | grep -E '^contact-v1|^product-release-package|\.sql$|^worker|^contact-onboarding' >/dev/null; then
+            echo "Protected area changed."
+            git diff --name-only
+            exit 1
+          fi
+
+      - name: Remove one-shot
+        shell: bash
+        run: |
+          rm -f .github/workflows/dpro-customer-workspace-co04c2-active-probe-ui-r1.yml
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DPRO Factory Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Connect active customer environment probe CO-04C"
+          git push
