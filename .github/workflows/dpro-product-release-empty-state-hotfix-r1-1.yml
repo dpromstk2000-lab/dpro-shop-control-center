@@ -1,0 +1,88 @@
+name: DPRO Product Release Empty State Hotfix R1.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dpro-product-release-empty-state-hotfix-r1-1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard current target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f product-release-package.js
+          test -f product-release-package.html
+          grep -F 'if(filter==="active" && !r || ["complete","final_lock_imported","package_ready"].includes(r.release_status)) return false;' product-release-package.js
+          grep -F 'DPRO-PRODUCT-RELEASE-CC-R1-20260921' product-release-package.js
+          grep -F 'product-release-package.js?v=PRODUCT-RELEASE-CC-R1-20260921' product-release-package.html
+
+      - name: Fix zero-release initial state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          js = Path("product-release-package.js")
+          s = js.read_text(encoding="utf-8")
+          old = 'if(filter==="active" && !r || ["complete","final_lock_imported","package_ready"].includes(r.release_status)) return false;'
+          new = 'if(filter==="active" && (!r || ["complete","final_lock_imported","package_ready"].includes(r.release_status))) return false;'
+          if old not in s:
+              raise SystemExit("BUGGY_CONDITION_NOT_FOUND")
+          s = s.replace(old, new, 1)
+          s = s.replace(
+              'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R1-20260921";',
+              'const BUILD = "DPRO-PRODUCT-RELEASE-CC-R1.1-20260921";',
+              1
+          )
+          js.write_text(s, encoding="utf-8")
+
+          html = Path("product-release-package.html")
+          h = html.read_text(encoding="utf-8")
+          h = h.replace(
+              'product-release-package.css?v=PRODUCT-RELEASE-CC-R1-20260921',
+              'product-release-package.css?v=PRODUCT-RELEASE-CC-R1.1-20260921'
+          )
+          h = h.replace(
+              'product-release-package.js?v=PRODUCT-RELEASE-CC-R1-20260921',
+              'product-release-package.js?v=PRODUCT-RELEASE-CC-R1.1-20260921'
+          )
+          html.write_text(h, encoding="utf-8")
+          PY
+
+      - name: Static validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check product-release-package.js
+          ! grep -F 'if(filter==="active" && !r || ["complete","final_lock_imported","package_ready"].includes(r.release_status)) return false;' product-release-package.js
+          grep -F 'if(filter==="active" && (!r || ["complete","final_lock_imported","package_ready"].includes(r.release_status))) return false;' product-release-package.js
+          grep -F 'DPRO-PRODUCT-RELEASE-CC-R1.1-20260921' product-release-package.js
+          grep -F 'product-release-package.js?v=PRODUCT-RELEASE-CC-R1.1-20260921' product-release-package.html
+
+      - name: Remove one-shot workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/dpro-product-release-empty-state-hotfix-r1-1.yml
+
+      - name: Commit hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DPRO Factory Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add product-release-package.js product-release-package.html .github/workflows/dpro-product-release-empty-state-hotfix-r1-1.yml
+          git commit -m "Fix product release empty state"
+          git push
