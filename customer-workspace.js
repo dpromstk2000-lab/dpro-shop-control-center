@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO03B-SETUP-WIZARD-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -18,6 +18,8 @@
     releases: [],
     selectedCaseId: null,
     currentTab: "cases",
+    namePlan: null,
+    setupStep: "owner",
   };
 
   const roleLabels = {
@@ -347,11 +349,22 @@
     </article>`;
   }
 
-  function openCase(caseId) {
+  async function openCase(caseId) {
     state.selectedCaseId = caseId;
+    state.namePlan = null;
+    state.setupStep = "owner";
     renderDetail();
     $("detailPanel").classList.remove("hidden");
     $("detailPanel").scrollIntoView({behavior:"smooth",block:"start"});
+    try {
+      await loadSetupNamePlan(caseId);
+      const w=workspaceFor(caseId);
+      state.setupStep=chooseSetupStep(w);
+      renderSetupWizard();
+    } catch (error) {
+      console.error(BUILD,error);
+      toast(error?.message || "名前候補を生成できませんでした。",true);
+    }
   }
 
   function renderDetail() {
@@ -454,6 +467,280 @@
       $("holdCode").value = "";
       $("holdReason").value = "";
     }
+
+    renderSetupWizard();
+  }
+
+
+  function canTechnicalWrite() {
+    return ["owner_admin","technical_admin"].includes(state.staff?.role_key);
+  }
+
+  function setInput(id,value) {
+    const el=$(id);
+    if (el) el.value=value ?? "";
+  }
+
+  function inputValue(id) {
+    return String($(id)?.value ?? "").trim();
+  }
+
+  async function loadSetupNamePlan(caseId,{silent=false}={}) {
+    if (!caseId) return;
+    if (!silent) $("setupPlanSummary").innerHTML='<div class="empty-state"><strong>名前候補を生成しています…</strong></div>';
+    const {data,error}=await state.supabase.rpc("cc_customer_onboarding_name_plan",{
+      p_case_id:caseId,
+      p_github_owner:"dpromstk2000-lab",
+      p_workers_domain:"dpromstk2000.workers.dev",
+    });
+    if (error) throw error;
+    state.namePlan=data || null;
+  }
+
+  function setupPlanCard(label,value) {
+    return `<article class="setup-plan-card"><span>${esc(label)}</span><strong>${esc(value||"—")}</strong>${value?`<button class="mini-btn" type="button" data-copy-value="${esc(value)}">コピー</button>`:""}</article>`;
+  }
+
+  function setupStepApplicable(w,step) {
+    if (["owner","system"].includes(step)) return true;
+    if (step==="supabase") return requirement(w,"supabase_required",true);
+    if (step==="github") return requirement(w,"github_required",true);
+    if (step==="worker") return requirement(w,"worker_required",true);
+    if (step==="website") return requirement(w,"website_required",false);
+    if (step==="line") return requirement(w,"line_required",false);
+    return true;
+  }
+
+  function setupStepStatus(w,step) {
+    if (step==="owner") return Boolean(w.owner_email);
+    if (step==="system") return Boolean(w.system_instance_id);
+    if (step==="supabase") return !setupStepApplicable(w,step) || Boolean(w.supabase_project_ref);
+    if (step==="github") return !setupStepApplicable(w,step) || Boolean(w.repository_full_name);
+    if (step==="worker") return !setupStepApplicable(w,step) || Boolean(w.worker_name);
+    if (step==="website") return !setupStepApplicable(w,step) || Boolean(w.website_id);
+    if (step==="line") return !setupStepApplicable(w,step) || Boolean(w.line_account_id);
+    return false;
+  }
+
+  function chooseSetupStep(w) {
+    return ["owner","system","supabase","github","worker","website","line"]
+      .find((step)=>setupStepApplicable(w,step) && !setupStepStatus(w,step)) || "owner";
+  }
+
+  function switchSetupStep(step) {
+    state.setupStep=step;
+    document.querySelectorAll("[data-setup-step]").forEach((b)=>b.classList.toggle("is-active",b.dataset.setupStep===step));
+    document.querySelectorAll("[data-setup-panel]").forEach((p)=>p.classList.toggle("hidden",p.dataset.setupPanel!==step));
+  }
+
+  function disableSetupForms(disabled) {
+    document.querySelectorAll("#setupWizardBlock input,#setupWizardBlock select,#setupWizardBlock button.setup-save")
+      .forEach((el)=>{ el.disabled=disabled; });
+  }
+
+  function bindSetupCopyButtons() {
+    document.querySelectorAll("#setupPlanSummary [data-copy-value]").forEach((button)=>{
+      button.addEventListener("click",async()=>{
+        try{ await navigator.clipboard.writeText(button.dataset.copyValue||""); toast("コピーしました。"); }
+        catch{ toast("コピーできませんでした。",true); }
+      });
+    });
+  }
+
+  function renderSetupWizard() {
+    const w=workspaceFor(state.selectedCaseId);
+    if (!w || !$("setupWizardBlock")) return;
+    const confirmed=w.requirements_status==="confirmed";
+    const technical=canTechnicalWrite();
+    const s=state.namePlan?.suggestions || {};
+
+    $("setupWriteMode").textContent=technical?"登録可能":"閲覧のみ";
+    $("setupWriteMode").className=`badge ${technical?"green":"amber"}`;
+
+    const gate=$("setupGateMessage");
+    if (!confirmed) {
+      gate.textContent="先に「今回導入する構成」を確定してください。不要なLINE・Website・Domain作業を発生させないための固定Gateです。";
+      gate.classList.remove("hidden");
+    } else if (!technical) {
+      gate.textContent="環境登録は管理責任者 / 技術管理者のみ実行できます。";
+      gate.classList.remove("hidden");
+    } else {
+      gate.classList.add("hidden");
+    }
+
+    $("setupPlanSummary").innerHTML=[
+      setupPlanCard("facility_code",s.facility_code),
+      setupPlanCard("GitHub Repository",s.repository_full_name),
+      setupPlanCard("Cloudflare Worker",s.worker_name),
+      setupPlanCard("Supabase Project",s.supabase_project_name),
+      setupPlanCard("schema",s.schema_name),
+      setupPlanCard("tenant_code",s.tenant_code),
+    ].join("");
+    bindSetupCopyButtons();
+
+    document.querySelectorAll("[data-setup-step]").forEach((button)=>{
+      const step=button.dataset.setupStep;
+      button.classList.toggle("is-complete",setupStepStatus(w,step));
+      button.classList.toggle("is-na",!setupStepApplicable(w,step));
+    });
+
+    if (!state.setupStep || !setupStepApplicable(w,state.setupStep)) state.setupStep=chooseSetupStep(w);
+    switchSetupStep(state.setupStep);
+
+    setInput("setupOwnerName",w.owner_name||"");
+    setInput("setupOwnerEmail",w.owner_email||"");
+    setInput("setupOwnerPhone",w.owner_phone_normalized||"");
+    setInput("setupOwnerAuthId",w.owner_auth_user_id||"");
+
+    setInput("setupSystemName",w.system_name||state.namePlan?.system_name||w.effective_system_name||w.product_name_snapshot||"");
+    setInput("setupFacilityCode",w.facility_code||s.facility_code||"");
+    setInput("setupPublicUrl",w.public_url||"");
+    setInput("setupOwnerUrl",w.owner_url||"");
+    setInput("setupStaffUrl",w.staff_url||"");
+    setInput("setupMemberUrl",w.member_url||"");
+    setInput("setupIpadUrl",w.ipad_url||"");
+    setInput("setupSystemCheckUrl",w.system_check_url||"");
+    setInput("setupHealthUrl",w.system_health_url||"");
+
+    setInput("setupSupabaseName",w.supabase_project_name||s.supabase_project_name||"");
+    setInput("setupSupabaseRef",w.supabase_project_ref||"");
+    setInput("setupSupabaseDashboard",w.supabase_dashboard_url||"");
+    setInput("setupSupabaseOwnerLabel",w.supabase_owner_label||`${w.client_name||""} Owner`);
+    setInput("setupSupabaseRegion",w.supabase_region||"");
+    setInput("setupSupabaseInvite",w.supabase_invitation_status||"not_requested");
+    setInput("setupSupabaseRole",w.supabase_dpro_role||"");
+    setInput("setupSupabaseSchema",s.schema_name||"");
+    setInput("setupTenantCode",s.tenant_code||"");
+
+    setInput("setupRepoFullName",w.repository_full_name||s.repository_full_name||"");
+    setInput("setupRepoUrl",w.repository_url||s.repository_url||"");
+    setInput("setupPagesUrl",w.pages_url||s.pages_url||"");
+    setInput("setupRepoVisibility","private");
+    setInput("setupGithubAccess",w.github_access_status||"not_checked");
+
+    setInput("setupWorkerName",w.worker_name||s.worker_name||"");
+    setInput("setupWorkerUrl",w.worker_url||s.worker_url||"");
+    setInput("setupWorkerHealth",w.worker_health_url||"");
+    setInput("setupWorkerAccount",w.worker_account_label||"");
+
+    setInput("setupWebsiteName",w.website_name||`${w.client_name||""} 公式サイト`);
+    setInput("setupWebsiteUrl",w.website_public_url||"");
+    setInput("setupCustomDomain",w.custom_domain||"");
+    setInput("setupWebsitePlatform",w.website_platform||"github_pages");
+
+    setInput("setupLineName",w.line_account_name||"");
+    setInput("setupLineBasicId",w.line_basic_id||"");
+    setInput("setupLineChannelId",w.line_channel_id||"");
+    setInput("setupLineManager",w.line_manager_url||"");
+    setInput("setupLinePermission",w.line_permission_status||"not_requested");
+    setInput("setupLineMessaging",w.line_messaging_api_status||"not_used");
+    setInput("setupLineWebhook",w.line_webhook_status||"not_used");
+    setInput("setupLineLiff",w.line_liff_status||"not_used");
+
+    const webRequired=requirement(w,"website_required",false);
+    const lineRequired=requirement(w,"line_required",false);
+    $("setupWebsiteRequired").textContent=webRequired?"対象":"N/A";
+    $("setupWebsiteRequired").className=`badge ${webRequired?"green":""}`;
+    $("setupLineRequired").textContent=lineRequired?"対象":"N/A";
+    $("setupLineRequired").className=`badge ${lineRequired?"green":""}`;
+
+    disableSetupForms(!confirmed || !technical);
+    if (!webRequired) $("setupWebsiteForm").querySelectorAll("input,select,button.setup-save").forEach((el)=>el.disabled=true);
+    if (!lineRequired) $("setupLineForm").querySelectorAll("input,select,button.setup-save").forEach((el)=>el.disabled=true);
+    $("refreshNamePlanButton").disabled=!confirmed;
+  }
+
+  function ownerPayloadFromSetup() {
+    const name=inputValue("setupOwnerName");
+    const email=inputValue("setupOwnerEmail");
+    if (!name || !email) return null;
+    const payload={display_name:name,email,preferred_contact:"email"};
+    const phone=inputValue("setupOwnerPhone");
+    const auth=inputValue("setupOwnerAuthId");
+    if (phone) payload.phone=phone;
+    if (auth) payload.external_auth_user_id=auth;
+    return payload;
+  }
+
+  async function saveSetupPayload(payload,message) {
+    const {error}=await state.supabase.rpc("cc_customer_onboarding_save_setup",{
+      p_case_id:state.selectedCaseId,
+      p_payload:payload,
+    });
+    if (error) throw error;
+    await loadAll(true);
+    await loadSetupNamePlan(state.selectedCaseId,{silent:true});
+    renderDetail();
+    toast(message);
+  }
+
+  async function saveOwnerSetup(event) {
+    event.preventDefault();
+    const owner=ownerPayloadFromSetup();
+    if (!owner) return toast("Owner氏名とメールを入力してください。",true);
+    try{ await saveSetupPayload({owner},"Owner情報を保存しました。"); state.setupStep="system"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"Owner情報を保存できませんでした。",true); }
+  }
+
+  async function saveSystemSetup(event) {
+    event.preventDefault();
+    const system={system_name:inputValue("setupSystemName"),facility_code:inputValue("setupFacilityCode")};
+    for (const [key,id] of [["public_url","setupPublicUrl"],["owner_url","setupOwnerUrl"],["staff_url","setupStaffUrl"],["member_url","setupMemberUrl"],["ipad_url","setupIpadUrl"],["system_check_url","setupSystemCheckUrl"],["health_url","setupHealthUrl"]]) {
+      const v=inputValue(id); if (v) system[key]=v;
+    }
+    const payload={system}; const owner=ownerPayloadFromSetup(); if (owner) payload.owner=owner;
+    try{ await saveSetupPayload(payload,"本番SYSTEM情報を保存しました。"); state.setupStep="supabase"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"SYSTEM情報を保存できませんでした。",true); }
+  }
+
+  async function saveSupabaseSetup(event) {
+    event.preventDefault();
+    if (!inputValue("setupSupabaseRef")) return toast("Supabase Project Refを入力してください。",true);
+    const supabase={
+      project_name:inputValue("setupSupabaseName"),project_ref:inputValue("setupSupabaseRef"),
+      dashboard_url:inputValue("setupSupabaseDashboard"),owner_label:inputValue("setupSupabaseOwnerLabel"),
+      region:inputValue("setupSupabaseRegion"),invitation_status:inputValue("setupSupabaseInvite"),
+      dpro_role:inputValue("setupSupabaseRole"),schema_name:inputValue("setupSupabaseSchema"),
+      tenant_code:inputValue("setupTenantCode"),
+    };
+    try{ await saveSetupPayload({supabase},"Supabase情報を保存しました。"); state.setupStep="github"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"Supabase情報を保存できませんでした。",true); }
+  }
+
+  async function saveGithubSetup(event) {
+    event.preventDefault();
+    if (!inputValue("setupRepoFullName")) return toast("Repository full nameを入力してください。",true);
+    const github={
+      repository_full_name:inputValue("setupRepoFullName"),repository_url:inputValue("setupRepoUrl"),
+      pages_url:inputValue("setupPagesUrl"),visibility:inputValue("setupRepoVisibility"),
+      access_status:inputValue("setupGithubAccess"),
+    };
+    try{ await saveSetupPayload({github},"GitHub情報を保存しました。"); state.setupStep="worker"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"GitHub情報を保存できませんでした。",true); }
+  }
+
+  async function saveWorkerSetup(event) {
+    event.preventDefault();
+    if (!inputValue("setupWorkerName") || !inputValue("setupWorkerUrl")) return toast("Worker名とWorker URLを入力してください。",true);
+    const worker={worker_name:inputValue("setupWorkerName"),worker_url:inputValue("setupWorkerUrl"),health_url:inputValue("setupWorkerHealth"),account_label:inputValue("setupWorkerAccount")};
+    try{ await saveSetupPayload({worker},"Cloudflare Worker情報を保存しました。"); const w=workspaceFor(state.selectedCaseId); state.setupStep=requirement(w,"website_required",false)?"website":requirement(w,"line_required",false)?"line":"owner"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"Cloudflare情報を保存できませんでした。",true); }
+  }
+
+  async function saveWebsiteSetup(event) {
+    event.preventDefault();
+    if (!inputValue("setupWebsiteUrl")) return toast("Website公開URLを入力してください。",true);
+    const website={website_name:inputValue("setupWebsiteName"),public_url:inputValue("setupWebsiteUrl"),custom_domain:inputValue("setupCustomDomain"),platform:inputValue("setupWebsitePlatform")};
+    try{ await saveSetupPayload({website},"Website / Domain情報を保存しました。"); state.setupStep="line"; renderSetupWizard(); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"Website情報を保存できませんでした。",true); }
+  }
+
+  async function saveLineSetup(event) {
+    event.preventDefault();
+    if (!inputValue("setupLineName")) return toast("LINE公式アカウント名を入力してください。",true);
+    const line={account_name:inputValue("setupLineName"),basic_id:inputValue("setupLineBasicId"),channel_id:inputValue("setupLineChannelId"),manager_url:inputValue("setupLineManager"),permission_status:inputValue("setupLinePermission"),messaging_api_status:inputValue("setupLineMessaging"),webhook_status:inputValue("setupLineWebhook"),liff_status:inputValue("setupLineLiff")};
+    try{ await saveSetupPayload({line},"LINE公式情報を保存しました。"); }
+    catch(error){ console.error(BUILD,error); toast(error?.message||"LINE情報を保存できませんでした。",true); }
   }
 
   async function startOnboarding(projectId) {
@@ -579,6 +866,15 @@
     $("requirementsForm")?.addEventListener("submit",confirmRequirements);
     $("setHoldButton")?.addEventListener("click",setHold);
     $("clearHoldButton")?.addEventListener("click",clearHold);
+    document.querySelectorAll("[data-setup-step]").forEach((button)=>button.addEventListener("click",()=>{ const w=workspaceFor(state.selectedCaseId); if (!w) return; if (!setupStepApplicable(w,button.dataset.setupStep)) return toast("今回の契約では対象外です。"); switchSetupStep(button.dataset.setupStep); }));
+    $("refreshNamePlanButton")?.addEventListener("click",async()=>{ try{ await loadSetupNamePlan(state.selectedCaseId); renderSetupWizard(); toast("名前候補を再生成しました。"); }catch(error){ console.error(BUILD,error); toast(error?.message||"名前候補を生成できませんでした。",true); } });
+    $("setupOwnerForm")?.addEventListener("submit",saveOwnerSetup);
+    $("setupSystemForm")?.addEventListener("submit",saveSystemSetup);
+    $("setupSupabaseForm")?.addEventListener("submit",saveSupabaseSetup);
+    $("setupGithubForm")?.addEventListener("submit",saveGithubSetup);
+    $("setupWorkerForm")?.addEventListener("submit",saveWorkerSetup);
+    $("setupWebsiteForm")?.addEventListener("submit",saveWebsiteSetup);
+    $("setupLineForm")?.addEventListener("submit",saveLineSetup);
   }
 
   async function boot() {

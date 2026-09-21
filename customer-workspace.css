@@ -95,6 +95,38 @@
 .customer-section-head{margin-bottom:12px}
 .toast{position:fixed;right:20px;bottom:20px;max-width:min(440px,calc(100vw - 40px));padding:12px 15px;border-radius:12px;background:#153e33;color:#fff;box-shadow:0 16px 36px rgba(0,0,0,.18);z-index:1000}
 .toast.error{background:#8c2d2d}
+
+.setup-wizard-block{border-color:#9dcbbb;background:linear-gradient(180deg,#fbfefd 0%,#fff 100%)}
+.setup-lead{margin:5px 0 0;color:var(--cw-muted);font-size:12px;line-height:1.6}
+.setup-head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.setup-gate-message{padding:12px 14px;border:1px solid #ecd39c;border-radius:12px;background:var(--cw-amber-bg);color:#6f4a08;font-size:12px;font-weight:750;margin-bottom:12px}
+.setup-plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:13px}
+.setup-plan-card{border:1px solid #dce7e3;border-radius:12px;background:#fff;padding:11px;min-width:0}
+.setup-plan-card span{display:block;font-size:10px;font-weight:850;color:var(--cw-muted)}
+.setup-plan-card strong{display:block;margin-top:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--cw-green-dark);overflow-wrap:anywhere}
+.setup-plan-card .mini-btn{margin-top:7px}
+.setup-step-tabs{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px}
+.setup-step-tabs button{appearance:none;white-space:nowrap;border:1px solid var(--cw-border);border-radius:999px;background:#fff;padding:8px 11px;font:inherit;font-size:11px;font-weight:850;color:var(--cw-green-dark);cursor:pointer}
+.setup-step-tabs button.is-active{background:var(--cw-green-dark);border-color:var(--cw-green-dark);color:#fff}
+.setup-step-tabs button.is-complete{border-color:#9fd4c1;background:#edf8f4}
+.setup-step-tabs button.is-na{opacity:.48}
+.setup-panels{border-top:1px solid #e5ece9;padding-top:13px}
+.setup-panel{display:grid;gap:12px}
+.setup-panel-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.setup-panel-head>div:first-child{display:grid;gap:3px}
+.setup-panel-head strong{font-size:17px;color:var(--cw-green-dark)}
+.setup-panel-head span{font-size:11px;color:var(--cw-muted)}
+.setup-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.setup-form-grid label{display:grid;gap:5px}
+.setup-form-grid label.wide{grid-column:1/-1}
+.setup-form-grid label>span{font-size:10px;font-weight:850;color:#53675f}
+.setup-form-grid input,.setup-form-grid select{width:100%;min-height:42px;border:1px solid var(--cw-border);border-radius:10px;background:#fff;padding:0 11px;font:inherit;color:var(--cw-green-dark)}
+.setup-form-grid input:disabled,.setup-form-grid select:disabled{background:#f3f6f5;color:#81908a}
+.setup-note{margin:0;border-radius:10px;background:#f5f8f7;padding:9px 11px;color:var(--cw-muted);font-size:10px;line-height:1.55}
+.setup-save{justify-self:stretch}
+@media(max-width:1050px){.setup-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.setup-plan-grid,.setup-form-grid{grid-template-columns:1fr}.setup-form-grid label.wide{grid-column:auto}.setup-panel-head{display:grid}.setup-head-actions{justify-content:flex-start}}
+
 @media(max-width:1050px){
   .customer-policy,.customer-metrics{grid-template-columns:repeat(2,1fr)}
   .customer-grid,.candidate-grid{grid-template-columns:1fr}

@@ -9,10 +9,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
   <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
-  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO03B-SETUP-WIZARD-R1-20260921">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
-  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO03B-SETUP-WIZARD-R1-20260921"></script>
 </head>
 <body data-dpro-customer-workspace-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -139,6 +139,153 @@
           <article id="nextActionCard" class="next-action-card"></article>
 
           <div id="statusGrid" class="status-grid"></div>
+
+          <section id="setupWizardBlock" class="workspace-block setup-wizard-block">
+            <div class="workspace-block-head">
+              <div>
+                <p class="eyebrow">CONTRACT-TO-PRODUCTION SETUP</p>
+                <h3>契約後セットアップ</h3>
+                <p class="setup-lead">Owner → SYSTEM → Supabase → GitHub → Cloudflare → Website / LINE の順で、本番導入情報をここへ固定します。</p>
+              </div>
+              <div class="setup-head-actions">
+                <span id="setupWriteMode" class="badge"></span>
+                <button id="refreshNamePlanButton" class="btn secondary" type="button">名前候補を再生成</button>
+              </div>
+            </div>
+
+            <div id="setupGateMessage" class="setup-gate-message hidden"></div>
+            <div id="setupPlanSummary" class="setup-plan-grid"></div>
+
+            <div id="setupStepTabs" class="setup-step-tabs">
+              <button type="button" data-setup-step="owner">1 Owner</button>
+              <button type="button" data-setup-step="system">2 SYSTEM</button>
+              <button type="button" data-setup-step="supabase">3 Supabase</button>
+              <button type="button" data-setup-step="github">4 GitHub</button>
+              <button type="button" data-setup-step="worker">5 Cloudflare</button>
+              <button type="button" data-setup-step="website">6 Website</button>
+              <button type="button" data-setup-step="line">7 LINE</button>
+            </div>
+
+            <div class="setup-panels">
+              <form id="setupOwnerForm" class="setup-panel" data-setup-panel="owner">
+                <div class="setup-panel-head">
+                  <div><strong>Owner</strong><span>Owner本人の正式情報を登録</span></div>
+                  <a class="mini-link" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener noreferrer">Supabaseを開く ↗</a>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>Owner氏名</span><input id="setupOwnerName" autocomplete="name" required></label>
+                  <label><span>Ownerメール</span><input id="setupOwnerEmail" type="email" autocomplete="email" required></label>
+                  <label><span>電話番号</span><input id="setupOwnerPhone" inputmode="tel" autocomplete="tel"></label>
+                  <label><span>Auth User ID</span><input id="setupOwnerAuthId" placeholder="作成後に登録 / 任意"></label>
+                </div>
+                <p class="setup-note">パスワードは入力・保存しません。OwnerのAuth作成後はUser IDだけを記録します。</p>
+                <button class="btn primary setup-save" type="submit">Owner情報を保存</button>
+              </form>
+
+              <form id="setupSystemForm" class="setup-panel hidden" data-setup-panel="system">
+                <div class="setup-panel-head">
+                  <div><strong>DPRO SYSTEM</strong><span>顧客本番SYSTEMの識別子と公開URLを固定</span></div>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>SYSTEM名</span><input id="setupSystemName" required></label>
+                  <label><span>facility_code</span><input id="setupFacilityCode" required></label>
+                  <label class="wide"><span>Customer/Public URL</span><input id="setupPublicUrl" type="url" placeholder="https://..."></label>
+                  <label class="wide"><span>Owner URL</span><input id="setupOwnerUrl" type="url" placeholder="https://..."></label>
+                  <label><span>Staff URL</span><input id="setupStaffUrl" type="url" placeholder="https://..."></label>
+                  <label><span>Member URL</span><input id="setupMemberUrl" type="url" placeholder="https://..."></label>
+                  <label><span>iPad URL</span><input id="setupIpadUrl" type="url" placeholder="https://..."></label>
+                  <label><span>System Check URL</span><input id="setupSystemCheckUrl" type="url" placeholder="https://..."></label>
+                  <label class="wide"><span>Health URL</span><input id="setupHealthUrl" type="url" placeholder="https://..."></label>
+                </div>
+                <p class="setup-note">DEMOではなくproduction SYSTEMとして登録します。SYSTEM FINAL LOCK自体は変更しません。</p>
+                <button class="btn primary setup-save" type="submit">SYSTEM情報を保存</button>
+              </form>
+
+              <form id="setupSupabaseForm" class="setup-panel hidden" data-setup-panel="supabase">
+                <div class="setup-panel-head">
+                  <div><strong>Supabase</strong><span>Ownerが管理主体となる本番Projectを記録</span></div>
+                  <a class="mini-link" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener noreferrer">Supabaseを開く ↗</a>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>Project名</span><input id="setupSupabaseName" required></label>
+                  <label><span>Project Ref</span><input id="setupSupabaseRef" required placeholder="xxxxxxxxxxxxxxxxxxxx"></label>
+                  <label class="wide"><span>Dashboard URL</span><input id="setupSupabaseDashboard" type="url" placeholder="自動候補あり"></label>
+                  <label><span>Owner表示</span><input id="setupSupabaseOwnerLabel" placeholder="例：〇〇店 Owner"></label>
+                  <label><span>Region</span><input id="setupSupabaseRegion" placeholder="例：ap-northeast-1"></label>
+                  <label><span>招待状態</span><select id="setupSupabaseInvite"><option value="not_requested">未依頼</option><option value="pending">招待中</option><option value="accepted">承認済み</option></select></label>
+                  <label><span>DPRO Role</span><input id="setupSupabaseRole" placeholder="例：Developer"></label>
+                  <label><span>schema</span><input id="setupSupabaseSchema"></label>
+                  <label><span>tenant_code</span><input id="setupTenantCode"></label>
+                </div>
+                <p class="setup-note">service_role / API key等のsecretは管理センターへ保存しません。</p>
+                <button class="btn primary setup-save" type="submit">Supabase情報を保存</button>
+              </form>
+
+              <form id="setupGithubForm" class="setup-panel hidden" data-setup-panel="github">
+                <div class="setup-panel-head">
+                  <div><strong>GitHub</strong><span>本番Repository名を候補から固定</span></div>
+                  <a class="mini-link" href="https://github.com/new" target="_blank" rel="noopener noreferrer">新規Repository ↗</a>
+                </div>
+                <div class="setup-form-grid">
+                  <label class="wide"><span>Repository full name</span><input id="setupRepoFullName" required placeholder="owner/repository"></label>
+                  <label class="wide"><span>Repository URL</span><input id="setupRepoUrl" type="url"></label>
+                  <label class="wide"><span>GitHub Pages URL</span><input id="setupPagesUrl" type="url"></label>
+                  <label><span>Visibility</span><select id="setupRepoVisibility"><option value="private">private</option><option value="public">public</option></select></label>
+                  <label><span>アクセス状態</span><select id="setupGithubAccess"><option value="not_checked">未確認</option><option value="pending">確認中</option><option value="granted">利用可</option><option value="denied">利用不可</option></select></label>
+                </div>
+                <p class="setup-note">PAT・tokenは保存しません。Repositoryを実際に作成した後、その事実だけ記録します。</p>
+                <button class="btn primary setup-save" type="submit">GitHub情報を保存</button>
+              </form>
+
+              <form id="setupWorkerForm" class="setup-panel hidden" data-setup-panel="worker">
+                <div class="setup-panel-head">
+                  <div><strong>Cloudflare Worker</strong><span>本番Worker名とURLを固定</span></div>
+                  <a class="mini-link" href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflareを開く ↗</a>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>Worker名</span><input id="setupWorkerName" required></label>
+                  <label class="wide"><span>Worker URL</span><input id="setupWorkerUrl" type="url" required></label>
+                  <label class="wide"><span>Health URL</span><input id="setupWorkerHealth" type="url" placeholder="https://.../health"></label>
+                  <label><span>Account表示</span><input id="setupWorkerAccount" placeholder="Owner / DPRO等"></label>
+                </div>
+                <p class="setup-note">Cloudflare API token / secretは保存しません。Worker作成後の識別情報だけ記録します。</p>
+                <button class="btn primary setup-save" type="submit">Cloudflare情報を保存</button>
+              </form>
+
+              <form id="setupWebsiteForm" class="setup-panel hidden" data-setup-panel="website">
+                <div class="setup-panel-head">
+                  <div><strong>Website / Domain</strong><span>HP契約時だけ使用</span></div>
+                  <span id="setupWebsiteRequired" class="badge"></span>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>Website名</span><input id="setupWebsiteName"></label>
+                  <label class="wide"><span>公開URL</span><input id="setupWebsiteUrl" type="url"></label>
+                  <label><span>独自ドメイン</span><input id="setupCustomDomain" placeholder="example.jp"></label>
+                  <label><span>Platform</span><select id="setupWebsitePlatform"><option value="github_pages">GitHub Pages</option><option value="cloudflare_pages">Cloudflare Pages</option><option value="other">その他</option></select></label>
+                </div>
+                <button class="btn primary setup-save" type="submit">Website情報を保存</button>
+              </form>
+
+              <form id="setupLineForm" class="setup-panel hidden" data-setup-panel="line">
+                <div class="setup-panel-head">
+                  <div><strong>LINE公式</strong><span>LINE契約時だけ使用</span></div>
+                  <div><span id="setupLineRequired" class="badge"></span> <a class="mini-link" href="https://manager.line.biz/" target="_blank" rel="noopener noreferrer">LINE Manager ↗</a></div>
+                </div>
+                <div class="setup-form-grid">
+                  <label><span>アカウント名</span><input id="setupLineName"></label>
+                  <label><span>Basic ID</span><input id="setupLineBasicId"></label>
+                  <label><span>Channel ID</span><input id="setupLineChannelId"></label>
+                  <label class="wide"><span>Manager URL</span><input id="setupLineManager" type="url"></label>
+                  <label><span>管理権限</span><select id="setupLinePermission"><option value="not_requested">未依頼</option><option value="pending">招待中</option><option value="granted">承認済み</option></select></label>
+                  <label><span>Messaging API</span><select id="setupLineMessaging"><option value="not_used">未使用</option><option value="not_checked">未確認</option><option value="configured">設定済み</option></select></label>
+                  <label><span>Webhook</span><select id="setupLineWebhook"><option value="not_used">未使用</option><option value="not_checked">未確認</option><option value="ok">PASS</option></select></label>
+                  <label><span>LIFF</span><select id="setupLineLiff"><option value="not_used">未使用</option><option value="not_checked">未確認</option><option value="configured">設定済み</option></select></label>
+                </div>
+                <p class="setup-note">Channel Secret / Access Tokenは保存しません。</p>
+                <button class="btn primary setup-save" type="submit">LINE情報を保存</button>
+              </form>
+            </div>
+          </section>
 
           <div class="workspace-detail-grid">
             <section class="workspace-block">
