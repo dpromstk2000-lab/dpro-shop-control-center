@@ -21,7 +21,7 @@ window.DPRO_CC_SHELL_V2_ACTIVE = true;
   }
   if (!document.querySelector('script[data-dpro-cc-shell-v2="true"]')) {
     const script = document.createElement("script");
-    script.src = "./cc-shell-v2.js?v=DPRO-CC-UI-V2-PHASE2B-R1-20260921";
+    script.src = "./cc-shell-v2.js?v=DPRO-CC-UI-V2-PHASE2D-CACHEGUARD-R1-20260921";
     script.defer = true;
     script.dataset.dproCcShellV2 = "true";
     document.head.appendChild(script);
@@ -524,4 +524,28 @@ window.DPRO_CC_SHELL_V2_ACTIVE = true;
     installArtifactArchiveLink();
     if (tries >= 80) clearInterval(timer);
   }, 125);
+})();
+
+// DPRO_CC_INDEX_CACHE_GUARD_PHASE2D_R1
+(() => {
+  const expectedBuild = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";
+  const reloadKey = "phase2d-r1-20260921";
+  const page = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  if (!["", "index.html"].includes(page)) return;
+
+  const verify = () => {
+    if (window.DPRO_CC_APP_BUILD === expectedBuild) return;
+
+    const url = new URL(location.href);
+    if (url.searchParams.get("dpro_ui") === reloadKey) return;
+
+    url.searchParams.set("dpro_ui", reloadKey);
+    location.replace(url.toString());
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => setTimeout(verify, 0), { once: true });
+  } else {
+    setTimeout(verify, 0);
+  }
 })();
