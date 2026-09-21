@@ -9,10 +9,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>お客様導入・運用｜DPRO SHOP CONTROL CENTER</title>
   <link rel="stylesheet" href="product-development.css?v=PRODUCT-DEV-R3-FACTORY-DEV-PACKAGE-20260920">
-  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO04C2-ACTIVE-PROBE-UI-R1-20260921">
+  <link rel="stylesheet" href="customer-workspace.css?v=DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="config.js?v=DPRO-CUSTOMER-WORKSPACE-CO02-R1-20260921"></script>
-  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO04C2-ACTIVE-PROBE-UI-R1-20260921"></script>
+  <script defer src="customer-workspace.js?v=DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921"></script>
 </head>
 <body data-dpro-customer-workspace-page="true">
   <div id="loadingScreen" class="state-screen">
@@ -155,6 +155,27 @@
             <div id="verificationSummary" class="verification-summary"></div>
             <div id="verificationGrid" class="verification-grid"></div>
             <div id="verificationActions" class="verification-actions"></div>
+          </section>
+          <section id="goLiveGateBlock" class="workspace-block go-live-gate-block">
+            <div class="workspace-block-head">
+              <div>
+                <p class="eyebrow">FINAL GO LIVE GATE</p>
+                <h3>本番開始の最終判定</h3>
+                <p class="go-live-gate-lead">契約・Owner・PRODUCT RELEASE LOCK・環境検証・品質・引継ぎ・保守予定が全部揃うまで本番開始できません。</p>
+              </div>
+              <button id="refreshGoLiveGateButton" class="btn secondary" type="button">最終判定を更新</button>
+            </div>
+
+            <div id="goLiveGateSummary" class="go-live-gate-summary"></div>
+            <div id="goLiveGateChecks" class="go-live-gate-checks"></div>
+            <ul id="goLiveGateBlockers" class="go-live-gate-blockers"></ul>
+
+            <div class="go-live-gate-actions">
+              <a class="btn secondary" href="delivery.html">制作・納品を開く</a>
+              <a class="btn secondary" href="ready-control-center.html">READY本番準備を開く</a>
+              <button id="activateGoLiveButton" class="btn primary" type="button" disabled>本番開始を確定</button>
+            </div>
+            <p class="go-live-gate-note">「本番開始を確定」は最終GateがPASSした実契約だけ有効になります。SYSTEM FINAL LOCK / PRODUCT RELEASE LOCKは開きません。</p>
           </section>
           <section id="setupWizardBlock" class="workspace-block setup-wizard-block">
             <div class="workspace-block-head">

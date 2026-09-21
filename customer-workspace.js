@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO04C2-ACTIVE-PROBE-UI-R1-20260921";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO05B-GO-LIVE-GATE-UI-R1-20260921";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
   const $ = (id) => document.getElementById(id);
 
@@ -21,6 +21,7 @@
     namePlan: null,
     setupStep: "owner",
     verification: null,
+    goLiveGate: null,
   };
 
   const roleLabels = {
@@ -364,6 +365,7 @@
     state.namePlan = null;
     state.setupStep = "owner";
     state.verification = null;
+    state.goLiveGate = null;
     renderDetail();
     $("detailPanel").classList.remove("hidden");
     $("detailPanel").scrollIntoView({behavior:"smooth",block:"start"});
@@ -371,11 +373,13 @@
       await Promise.all([
         loadSetupNamePlan(caseId),
         loadEnvironmentVerification(caseId),
+        loadGoLiveGate(caseId),
       ]);
       const w=workspaceFor(caseId);
       state.setupStep=chooseSetupStep(w);
       renderSetupWizard();
       renderEnvironmentVerification();
+      renderGoLiveGate();
     } catch (error) {
       console.error(BUILD,error);
       toast(error?.message || "名前候補を生成できませんでした。",true);
@@ -485,6 +489,7 @@
 
     renderSetupWizard();
     renderEnvironmentVerification();
+    renderGoLiveGate();
   }
 
 
@@ -610,6 +615,121 @@
     if (w?.website_public_url || w?.public_url) actions.push(`<a class="btn secondary" href="${esc(w.website_public_url || w.public_url)}" target="_blank" rel="noopener noreferrer">公開URLを開く ↗</a>`);
     actions.push(`<span class="verification-run-note">実チェックはHTTPS到達・HTTP応答を測定します。SYSTEM CHECKの中身やprivate Repository権限を未確認のままPASSにはしません。</span>`);
     $("verificationActions").innerHTML=actions.join("");
+  }
+
+  async function loadGoLiveGate(caseId,{silent=false}={}){
+    if (!caseId) return;
+    if (!silent) {
+      $("goLiveGateSummary").innerHTML='<span>最終判定を読み込んでいます…</span>';
+      $("goLiveGateChecks").innerHTML="";
+      $("goLiveGateBlockers").innerHTML="";
+    }
+    const {data,error}=await state.supabase.rpc("cc_customer_onboarding_go_live_gate",{
+      p_case_id:caseId,
+    });
+    if (error) throw error;
+    state.goLiveGate=data || null;
+  }
+
+  function goLiveCheckCard(label,pass,detail){
+    return `<article class="go-live-check ${pass?"pass":"wait"}">
+      <span>${esc(label)}</span>
+      <strong>${esc(pass?"PASS":(detail||"WAIT"))}</strong>
+    </article>`;
+  }
+
+  function renderGoLiveGate(){
+    const block=$("goLiveGateBlock");
+    if (!block) return;
+    const g=state.goLiveGate;
+    const button=$("activateGoLiveButton");
+
+    if (!g){
+      $("goLiveGateSummary").className="go-live-gate-summary is-blocked";
+      $("goLiveGateSummary").innerHTML='<div class="go-live-gate-status">WAIT</div><div class="go-live-gate-main"><strong>最終判定を読み込んでください</strong><span>条件が未確認のまま本番開始はできません。</span></div>';
+      $("goLiveGateChecks").innerHTML="";
+      $("goLiveGateBlockers").innerHTML="";
+      if (button) button.disabled=true;
+      return;
+    }
+
+    const ready=g.ready===true;
+    const checks=g.checks || {};
+    const blockerCount=Number(g.blocker_count || 0);
+
+    $("goLiveGateSummary").className=`go-live-gate-summary ${ready?"is-ready":"is-blocked"}`;
+    $("goLiveGateSummary").innerHTML=`
+      <div class="go-live-gate-status">${ready?"READY":"BLOCKED"}</div>
+      <div class="go-live-gate-main">
+        <strong>${ready?"本番開始できます":"本番開始はまだできません"}</strong>
+        <span>${ready?"全ての最終Gateを通過しています。":"下の不足条件を上から解消してください。"}</span>
+      </div>
+      <div class="go-live-gate-score">${ready?"ALL PASS":`${blockerCount} BLOCKER`}</div>`;
+
+    $("goLiveGateChecks").innerHTML=[
+      goLiveCheckCard("正式契約",checks.contract_ready,"契約未完了"),
+      goLiveCheckCard("PRODUCT RELEASE",checks.product_release_locked,"LOCK未完了"),
+      goLiveCheckCard("本番SYSTEM",checks.production_system_ready,"本番環境未完了"),
+      goLiveCheckCard("Owner",checks.owner_account_ready,checks.owner_required===false?"対象外":"初回ログイン未完了"),
+      goLiveCheckCard("Owner承認",checks.owner_acceptance_ready,checks.owner_required===false?"対象外":"実画面承認未完了"),
+      goLiveCheckCard("環境検証",checks.environment_verification_pass,"実チェック未完了"),
+      goLiveCheckCard("CENTER-8品質",checks.center8_activation_gate_ready,"品質Gate未完了"),
+      goLiveCheckCard("工程",checks.onboarding_stage_ready,"公開前工程未完了"),
+      goLiveCheckCard("本番稼働記録",checks.go_live_record_ready,"引継ぎ・保守予定未完了"),
+      goLiveCheckCard("導入構成",checks.requirements_confirmed,"構成未確定"),
+    ].join("");
+
+    const blockers=Array.isArray(g.blockers)?g.blockers:[];
+    $("goLiveGateBlockers").innerHTML=blockers.map((b)=>`
+      <li><strong>${esc(b.code || "BLOCKER")}</strong>：${esc(b.message || "確認が必要です")}</li>
+    `).join("");
+
+    if (button) {
+      button.disabled=!ready || !canTechnicalWrite();
+      button.title=!canTechnicalWrite()
+        ?"管理責任者 / 技術管理者のみ本番開始できます"
+        :ready
+          ?"全Gate PASS。本番開始を確定します"
+          :"Blockerを全て解消してください";
+    }
+  }
+
+  async function activateGoLive(){
+    if (!state.selectedCaseId) return;
+    const g=state.goLiveGate;
+    if (!g?.ready) return toast("最終GateがPASSしていません。",true);
+    if (!canTechnicalWrite()) return toast("本番開始は管理責任者 / 技術管理者のみ実行できます。",true);
+
+    const w=workspaceFor(state.selectedCaseId);
+    const name=w?.client_name || "このお客様";
+    if (!window.confirm(`${name} を本番開始します。\n\n契約・Owner・環境検証・品質・引継ぎの最終GateはPASSしています。\n本番開始を確定しますか？`)) return;
+
+    const button=$("activateGoLiveButton");
+    const oldText=button.textContent;
+    button.disabled=true;
+    button.textContent="本番開始処理中…";
+
+    try{
+      const {data,error}=await state.supabase.rpc("cc_customer_onboarding_activate_go_live",{
+        p_case_id:state.selectedCaseId,
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("本番開始処理を完了できませんでした。");
+
+      await loadAll(true);
+      await Promise.all([
+        loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
+        loadGoLiveGate(state.selectedCaseId,{silent:true}),
+      ]);
+      renderDetail();
+      toast("GO LIVEを確定しました。");
+    }catch(error){
+      console.error(BUILD,error);
+      toast(error?.message || "本番開始を確定できませんでした。",true);
+    }finally{
+      button.textContent=oldText;
+      renderGoLiveGate();
+    }
   }
 
   function canTechnicalWrite() {
@@ -812,6 +932,7 @@
     await Promise.all([
       loadSetupNamePlan(state.selectedCaseId,{silent:true}),
       loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
+      loadGoLiveGate(state.selectedCaseId,{silent:true}),
     ]);
     renderDetail();
     toast(message);
@@ -999,7 +1120,10 @@
       try {
         await loadAll(true);
         if (state.selectedCaseId) {
-          await loadEnvironmentVerification(state.selectedCaseId,{silent:true});
+          await Promise.all([
+            loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
+            loadGoLiveGate(state.selectedCaseId,{silent:true}),
+          ]);
           renderDetail();
         }
         toast("最新情報へ更新しました。");
@@ -1016,6 +1140,26 @@
     $("requirementsForm")?.addEventListener("submit",confirmRequirements);
     $("setHoldButton")?.addEventListener("click",setHold);
     $("clearHoldButton")?.addEventListener("click",clearHold);
+    $("refreshGoLiveGateButton")?.addEventListener("click",async()=>{
+      if (!state.selectedCaseId) return;
+      const button=$("refreshGoLiveGateButton");
+      const oldText=button.textContent;
+      button.disabled=true;
+      button.textContent="判定中…";
+      try{
+        await loadGoLiveGate(state.selectedCaseId,{silent:true});
+        renderGoLiveGate();
+        toast("GO LIVE最終判定を更新しました。");
+      }catch(error){
+        console.error(BUILD,error);
+        toast(error?.message || "GO LIVE最終判定を更新できませんでした。",true);
+      }finally{
+        button.disabled=false;
+        button.textContent=oldText;
+      }
+    });
+    $("activateGoLiveButton")?.addEventListener("click",activateGoLive);
+
     $("runActiveVerificationButton")?.addEventListener("click",async()=>{
       if (!state.selectedCaseId) return;
       const button=$("runActiveVerificationButton");
@@ -1025,7 +1169,10 @@
       try{
         const result=await runActiveEnvironmentProbe();
         await loadAll(true);
-        await loadEnvironmentVerification(state.selectedCaseId,{silent:true});
+        await Promise.all([
+          loadEnvironmentVerification(state.selectedCaseId,{silent:true}),
+          loadGoLiveGate(state.selectedCaseId,{silent:true}),
+        ]);
         renderDetail();
         const attempted=Object.values(result.checks||{}).filter((x)=>x?.attempted).length;
         const passed=Object.values(result.checks||{}).filter((x)=>x?.attempted && x?.ok).length;
