@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>全SYSTEM確認ZIP｜DPRO PRODUCT EVERGREEN</title>
+  <link rel="stylesheet" href="product-evergreen.css?v=EVG-05-R1-20260922">
+  <link rel="stylesheet" href="evergreen-all-review.css?v=EVG-05-R1-20260922">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script defer src="evergreen-all-review.js?v=EVG-05-R1-20260922"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>全SYSTEM確認ZIP</strong>
+    <p id="loadingText">現在のSYSTEM・MASTER・Evergreen監査を確認しています…</p>
+  </div>
+
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>全SYSTEM確認ZIPはDPROスタッフ専用です。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>全SYSTEM確認ZIPを開けません</h1>
+      <p id="errorText">接続状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="product-evergreen.html">PRODUCT EVERGREENへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html">
+        <span>D</span>
+        <div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div>
+      </a>
+
+      <nav>
+        <div class="nav-section">
+          <small>DPRO製品</small>
+          <a href="index.html#view-products"><i>製</i>DPRO製品一覧</a>
+          <a href="product-development.html"><i>新</i>新しい製品を作る</a>
+          <a href="product-release-package.html"><i>販</i>商品として公開</a>
+          <a href="product-evergreen.html"><i>循</i>PRODUCT EVERGREEN</a>
+          <a class="active" href="evergreen-all-review.html"><i>全</i>全SYSTEM確認ZIP</a>
+          <a href="ai-core.html"><i>AI</i>DPRO AI CORE</a>
+        </div>
+        <div class="nav-section">
+          <small>品質・管理</small>
+          <a href="master-standard.html"><i>基</i>DPRO基準</a>
+          <a href="factory-v2.html"><i>品</i>FACTORY品質</a>
+          <a href="system-check.html"><i>✓</i>接続確認</a>
+        </div>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>EVG-05</strong>
+        <span>ALL SYSTEM REVIEW</span>
+        <small>SYSTEM数は固定しない。現在登録されている全SYSTEMを1個のZIPへ。</small>
+      </div>
+      <div class="version">EVG-05 R1<br><span>ALL SYSTEM REVIEW PACKAGE</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div class="top-title">
+          <strong>全SYSTEM確認ZIP</strong>
+          <small>ChatGPTへZIPを1個渡すだけで、全DPRO SYSTEMをまとめて確認</small>
+        </div>
+        <div class="staff-chip">
+          <span id="staffInitial">D</span>
+          <div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div>
+        </div>
+      </header>
+
+      <section class="content bulk-content">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">DPRO PRODUCT EVERGREEN / EVG-05</p>
+            <h1>全SYSTEMを、<br>ZIP 1個でChatGPTへ。</h1>
+            <p>現在登録されている全SYSTEM、最新DPRO MASTER、Evergreen監査・Evidenceを自動収録します。SYSTEM追加時も件数は自動で増えます。</p>
+          </div>
+          <div class="head-actions">
+            <a class="btn secondary" href="product-evergreen.html">EVERGREENへ戻る</a>
+            <button id="refreshButton" class="btn secondary" type="button">最新情報に更新</button>
+          </div>
+        </div>
+
+        <div class="bulk-rule-grid">
+          <article><b>1</b><strong>全SYSTEMを自動収録</strong><span>現在のRegistryから動的取得。件数の固定なし。</span></article>
+          <article><b>2</b><strong>UNKNOWNはFAILにしない</strong><span>Evidence未確認と不具合を区別したまま渡す。</span></article>
+          <article><b>3</b><strong>FINAL LOCKを保護</strong><span>証明された不具合なしに既存LOCKを開かない。</span></article>
+          <article><b>4</b><strong>前回ZIPのSTALEを自動判定</strong><span>MASTER・SYSTEM・Evidenceが変われば再生成を案内。</span></article>
+        </div>
+
+        <section id="snapshotPanel" class="bulk-panel"></section>
+        <div id="metrics" class="bulk-metrics"></div>
+
+        <section class="bulk-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">PACKAGE CONTENTS</p>
+              <h2>ChatGPTが全SYSTEM確認に使うデータ</h2>
+              <p>顧客・患者レコード、APIキー、Secretは収録しません。</p>
+            </div>
+            <span id="fileCountBadge" class="pill progress">確認中</span>
+          </div>
+          <div id="fileList" class="bulk-file-list"></div>
+        </section>
+
+        <section class="bulk-panel bulk-action-panel">
+          <div>
+            <p class="eyebrow">ONE CLICK</p>
+            <h2>最新状態で全SYSTEM確認ZIPを生成</h2>
+            <p id="actionNote">生成直前にDBを再取得し、ZIP全体SHA256とスナップショット指紋をEvergreenへ記録します。</p>
+          </div>
+          <button id="generateButton" class="btn primary bulk-generate-button" type="button">全SYSTEM確認ZIPを生成・ダウンロード</button>
+        </section>
+
+        <section id="resultPanel" class="bulk-panel bulk-result hidden">
+          <p class="eyebrow">PACKAGE READY</p>
+          <h2>全SYSTEM確認ZIPを作成しました</h2>
+          <dl class="bulk-result-grid">
+            <div><dt>ファイル名</dt><dd id="resultFilename">—</dd></div>
+            <div><dt>収録SYSTEM</dt><dd id="resultSystems">—</dd></div>
+            <div><dt>監査項目</dt><dd id="resultAuditItems">—</dd></div>
+            <div><dt>ZIP SHA256</dt><dd id="resultSha">—</dd></div>
+          </dl>
+          <div class="bulk-next">
+            <strong>次にすること</strong>
+            <span>このZIPをこのChatGPTへ1個アップロードし、「このZIPを基準に、全SYSTEMを最新DPRO基準で確認して。問題があるものだけ詳しく教えて」と送ってください。</span>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
