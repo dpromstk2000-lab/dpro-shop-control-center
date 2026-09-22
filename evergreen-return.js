@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const BUILD="DPRO-EVERGREEN-RETURN-EVG07-R1-20260922";
+  const BUILD="DPRO-EVERGREEN-RETURN-EVG07-HOTFIX1-DROP-20260922";
   const API_BASE="https://dpro-shop-control-center-api.dpromstk2000.workers.dev";
   const $=id=>document.getElementById(id);
   const state={supabase:null,session:null,staff:null,aal2:false,file:null,zipSha:null,fileCount:0,payload:null,validated:false};
@@ -36,14 +36,73 @@
     }catch(e){console.error(BUILD,e);$("errorText").textContent=e?.message||"RETURN ZIP取込を読み込めませんでした。";showOnly("errorScreen");}
   }
 
+  function firstDroppedFile(dt){
+    if (!dt) return null;
+    if (dt.files && dt.files.length) return dt.files[0];
+    if (dt.items && dt.items.length) {
+      for (const item of dt.items) {
+        if (item.kind === "file") {
+          const file = item.getAsFile?.();
+          if (file) return file;
+        }
+      }
+    }
+    return null;
+  }
+
+  function hasFileDrag(dt){
+    if (!dt) return false;
+    if (dt.files && dt.files.length) return true;
+    return Array.from(dt.types || []).includes("Files");
+  }
+
   function bind(){
     $("retryButton")?.addEventListener("click",()=>location.reload());
     $("menuButton")?.addEventListener("click",()=>$("sidebar")?.classList.toggle("open"));
-    $("returnFile")?.addEventListener("change",e=>{const f=e.target.files?.[0];if(f)readReturn(f);});
+    $("returnFile")?.addEventListener("change",e=>{
+      const f=e.target.files?.[0];
+      if(f) readReturn(f);
+    });
+
     const dz=$("dropZone");
-    ["dragenter","dragover"].forEach(ev=>dz?.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
-    ["dragleave","drop"].forEach(ev=>dz?.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
-    dz?.addEventListener("drop",e=>{const f=e.dataTransfer?.files?.[0];if(f)readReturn(f);});
+
+    const preventWindowFileOpen=(e)=>{
+      if(!hasFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      if(e.dataTransfer) e.dataTransfer.dropEffect="copy";
+    };
+    window.addEventListener("dragover",preventWindowFileOpen,false);
+    window.addEventListener("drop",preventWindowFileOpen,false);
+
+    const activate=(e)=>{
+      if(!hasFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.dataTransfer) e.dataTransfer.dropEffect="copy";
+      dz?.classList.add("drag");
+    };
+    const deactivate=(e)=>{
+      if(!hasFileDrag(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dz?.classList.remove("drag");
+    };
+    const dropped=(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      dz?.classList.remove("drag");
+      const f=firstDroppedFile(e.dataTransfer);
+      if(!f){
+        setValidation("ファイルを取得できませんでした。Windowsのダウンロードフォルダ/エクスプローラーからZIPをドロップするか、枠をクリックして選択してください。",true);
+        return;
+      }
+      readReturn(f);
+    };
+
+    ["dragenter","dragover"].forEach(ev=>dz?.addEventListener(ev,activate,true));
+    dz?.addEventListener("dragleave",deactivate,true);
+    dz?.addEventListener("drop",dropped,true);
+
     $("applyButton")?.addEventListener("click",applyReturn);
   }
 
