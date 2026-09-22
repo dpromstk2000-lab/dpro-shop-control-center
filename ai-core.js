@@ -6,7 +6,7 @@
   const $=(id)=>document.getElementById(id);
   const $$=(selector,scope=document)=>Array.from(scope.querySelectorAll(selector));
 
-  const state={supabase:null,session:null,staff:null,policy:null,summary:null,systems:[],queue:[],selectedProposal:null};
+  const state={supabase:null,session:null,staff:null,policy:null,summary:null,systems:[],queue:[],providerState:null,selectedProposal:null};
   const roleLabels={owner_admin:"管理責任者",technical_admin:"技術管理者",support:"DPROサポート",read_only:"閲覧専用"};
 
   function esc(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -68,7 +68,13 @@
   function bind(){
     $("retryButton")?.addEventListener("click",()=>location.reload());
     $("refreshButton")?.addEventListener("click",async()=>{try{await loadAll();toast("AI COREを最新状態へ更新しました。");}catch(e){toast(e?.message||"更新できませんでした。",true);}});
-    $("newRequestButton")?.addEventListener("click",()=>openRequest());
+    $("newRequestButton")?.addEventListener("click",()=>{
+      if(state.providerState?.provider_mode==="MANUAL_CHATGPT"){
+        location.href="product-evergreen.html";
+        return;
+      }
+      openRequest();
+    });
     $("requestForm")?.addEventListener("submit",submitRequest);
     $("searchInput")?.addEventListener("input",renderQueue);
     $("queueStatusFilter")?.addEventListener("change",renderQueue);
@@ -80,20 +86,23 @@
   }
 
   async function loadAll(){
-    const [policyResult,summaryResult,systemsResult,queueResult]=await Promise.all([
+    const [policyResult,summaryResult,systemsResult,queueResult,providerResult]=await Promise.all([
       state.supabase.rpc("cc_ai_core_current_policy"),
       state.supabase.from("cc_v_ai_core_summary").select("*").maybeSingle(),
       state.supabase.from("cc_v_dpro_system_registry").select("system_code,product_number,product_name,category,registry_status").order("product_number",{ascending:true,nullsFirst:false}),
-      state.supabase.from("cc_v_ai_core_queue").select("*").order("request_created_at",{ascending:false}).limit(100)
+      state.supabase.from("cc_v_ai_core_queue").select("*").order("request_created_at",{ascending:false}).limit(100),
+      state.supabase.from("cc_v_ai_core_provider_state").select("*").maybeSingle()
     ]);
-    for(const result of [policyResult,summaryResult,systemsResult,queueResult]) if(result.error) throw result.error;
+    for(const result of [policyResult,summaryResult,systemsResult,queueResult,providerResult]) if(result.error) throw result.error;
     state.policy=policyResult.data||{};
     state.summary=summaryResult.data||{};
     state.systems=systemsResult.data||[];
     state.queue=queueResult.data||[];
+    state.providerState=providerResult.data||{};
     renderPolicy();
     renderMetrics();
     renderRisk();
+    renderProviderState();
     renderSystemOptions();
     renderQueue();
   }
@@ -138,6 +147,38 @@
     $("riskGrid").innerHTML=rows.map(([r,t,d,g,c])=>`<article class="risk-card ${c}"><b>${r}</b><strong>${esc(t)}</strong><span>${esc(d)}<br>${esc(g)}</span></article>`).join("");
   }
 
+
+  function renderProviderState(){
+    const p=state.providerState||{};
+    const manual=p.provider_mode==="MANUAL_CHATGPT";
+    const active=p.provider_mode==="OPENAI_API" && p.api_enabled===true;
+    const card=$("providerStateCard");
+    card.classList.remove("manual","api","disabled");
+
+    if(manual){
+      card.classList.add("manual");
+      $("providerStateTitle").textContent="MANUAL CHATGPT";
+      $("providerStateSub").textContent="API料金 0円 / START ZIP手動アップロード";
+      $("providerDescription").textContent="PRODUCT EVERGREENまでは自動化し、AI分析だけSTART ZIPをChatGPTへ手動アップロードします。API課金は発生しません。";
+      $("manualWorkflowPanel").classList.remove("hidden");
+      $("newRequestButton").textContent="START ZIPでChatGPT分析";
+    }else if(active){
+      card.classList.add("api");
+      $("providerStateTitle").textContent=`${p.provider_name||"OPENAI"} API ACTIVE`;
+      $("providerStateSub").textContent=`${p.model_name||"model未設定"} / 従量課金`;
+      $("providerDescription").textContent="Safe Provider Bridgeを通し、R0〜R4・AAL2承認Gate付きでAPI連携します。";
+      $("manualWorkflowPanel").classList.add("hidden");
+      $("newRequestButton").textContent="＋ AI分析を準備";
+    }else{
+      card.classList.add("disabled");
+      $("providerStateTitle").textContent="API DISABLED";
+      $("providerStateSub").textContent="Provider設定はあるが実行停止中";
+      $("providerDescription").textContent="AI API実行は停止しています。";
+      $("manualWorkflowPanel").classList.add("hidden");
+      $("newRequestButton").textContent="AI分析を準備";
+    }
+  }
+
   function renderSystemOptions(){
     const current=$("requestSystem")?.value||"";
     $("requestSystem").innerHTML='<option value="">DPRO全体</option>'+state.systems.map(s=>`<option value="${esc(s.system_code)}">${s.product_number?`#${String(s.product_number).padStart(2,"0")}｜`:""}${esc(s.product_name||s.system_code)}（${esc(s.system_code)}）</option>`).join("");
@@ -172,7 +213,9 @@
           ${canDecide?`<button class="mini-button approve" type="button" data-approve="${esc(row.proposal_id)}">承認</button><button class="mini-button reject" type="button" data-reject="${esc(row.proposal_id)}">却下</button>`:""}
         </div>
       </article>`;
-    }).join(""):'<div class="empty-ai">AI Requestはまだありません。右上の「＋ AI分析を準備」から安全なRequestを作成できます。</div>';
+    }).join(""):(state.providerState?.provider_mode==="MANUAL_CHATGPT"
+      ? '<div class="empty-ai">現在はMANUAL CHATGPTモードです。AI Request APIは使用せず、PRODUCT EVERGREENのSTART ZIPをこのChatGPTへアップロードして分析します。</div>'
+      : '<div class="empty-ai">AI Requestはまだありません。右上の「＋ AI分析を準備」から安全なRequestを作成できます。</div>');
 
     $$("[data-open-proposal]").forEach(b=>b.addEventListener("click",()=>openProposalByRequest(b.dataset.openProposal)));
     $$("[data-approve]").forEach(b=>b.addEventListener("click",()=>decide(b.dataset.approve,"APPROVE")));
@@ -242,7 +285,13 @@
 
   function applyDeepLink(){
     const system=(new URLSearchParams(location.search).get("system")||"").trim().toUpperCase();
-    if(system && state.systems.some(s=>s.system_code===system)) setTimeout(()=>openRequest(system),100);
+    if(system && state.systems.some(s=>s.system_code===system)){
+      if(state.providerState?.provider_mode==="MANUAL_CHATGPT"){
+        setTimeout(()=>{ location.href=`evergreen-package.html?system=${encodeURIComponent(system)}`; },100);
+      }else{
+        setTimeout(()=>openRequest(system),100);
+      }
+    }
   }
 
   window.addEventListener("DOMContentLoaded",boot,{once:true});

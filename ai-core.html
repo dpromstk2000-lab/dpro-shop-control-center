@@ -94,7 +94,7 @@
           <div class="head-actions">
             <a class="btn secondary" href="product-evergreen.html">EVERGREENへ戻る</a>
             <button id="refreshButton" class="btn secondary" type="button">最新情報に更新</button>
-            <button id="newRequestButton" class="btn primary" type="button">＋ AI分析を準備</button>
+            <button id="newRequestButton" class="btn primary" type="button">AI分析を開始</button>
           </div>
         </div>
 
@@ -138,15 +138,32 @@
 
         <section class="ai-panel connector-panel">
           <div>
-            <p class="eyebrow">AI PROVIDER</p>
-            <h2>接続状態</h2>
-            <p>OpenAI APIキーをブラウザやGitHubへ置かず、Cloudflare WorkerのSecretとして保持します。</p>
+            <p class="eyebrow">AI PROVIDER MODE</p>
+            <h2>現在のAI運用モード</h2>
+            <p id="providerDescription">現在のProvider設定を確認しています。</p>
           </div>
-          <div class="connector-state">
+          <div class="connector-state" id="providerStateCard">
             <span class="connector-dot"></span>
-            <div><strong>AI-02 接続待ち</strong><small>Safe CoreはREADY / Provider未接続</small></div>
+            <div><strong id="providerStateTitle">確認中</strong><small id="providerStateSub">—</small></div>
           </div>
         </section>
+
+        <section id="manualWorkflowPanel" class="ai-panel manual-workflow hidden">
+          <div>
+            <p class="eyebrow">MANUAL CHATGPT MODE</p>
+            <h2>PRODUCT EVERGREEN → START ZIP → ChatGPT</h2>
+            <p>API料金を使わず、Evergreenが生成した最新START ZIPをこのChatGPTへ1個アップロードしてAI分析します。</p>
+          </div>
+          <div class="manual-flow">
+            <div><b>1</b><strong>EVERGREENで対象SYSTEMを選ぶ</strong><span>最新MASTERと監査差分を自動取得</span></div>
+            <div><b>2</b><strong>START ZIPを生成</strong><span>Evidence・FINAL LOCK基準を1個に固定</span></div>
+            <div><b>3</b><strong>ChatGPTへZIPを1個アップロード</strong><span>API課金なしで差分分析・ブラッシュアップ</span></div>
+          </div>
+          <div class="manual-actions">
+            <a class="btn primary" href="product-evergreen.html">START ZIPを作るSYSTEMを選ぶ</a>
+          </div>
+        </section>
+
       </section>
     </main>
   </div>
