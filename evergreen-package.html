@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>EVERGREEN START ZIP｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="product-evergreen.css?v=EVG-04-R1-20260922">
+  <link rel="stylesheet" href="evergreen-package.css?v=EVG-04-R1-20260922">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script defer src="evergreen-package.js?v=EVG-04-R1-20260922"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen">
+    <div class="spinner"></div>
+    <strong>EVERGREEN START ZIP</strong>
+    <p id="loadingText">対象SYSTEMと最新DPRO MASTERを確認しています…</p>
+  </div>
+  <div id="authScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon">鍵</span>
+      <h1>CONTROL CENTERへログインしてください</h1>
+      <p>EVERGREEN START ZIPはDPROスタッフ専用です。</p>
+      <a class="btn primary" href="index.html">CONTROL CENTERへ</a>
+    </div>
+  </div>
+  <div id="errorScreen" class="state-screen hidden">
+    <div class="state-card">
+      <span class="state-icon error">!</span>
+      <h1>START ZIPを作れません</h1>
+      <p id="errorText">接続状態・Evergreen監査状態を確認してください。</p>
+      <div class="state-actions">
+        <button id="retryButton" class="btn primary" type="button">再確認</button>
+        <a class="btn secondary" href="product-evergreen.html">PRODUCT EVERGREENへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <div class="nav-section">
+          <small>DPRO製品</small>
+          <a href="index.html#view-products"><i>製</i>DPRO製品一覧</a>
+          <a href="product-development.html"><i>新</i>新しい製品を作る</a>
+          <a href="product-release-package.html"><i>販</i>商品として公開</a>
+          <a class="active" href="product-evergreen.html"><i>循</i>PRODUCT EVERGREEN</a>
+        </div>
+        <div class="nav-section">
+          <small>品質・管理</small>
+          <a href="master-standard.html"><i>基</i>DPRO基準</a>
+          <a href="factory-v2.html"><i>品</i>FACTORY品質</a>
+          <a href="system-check.html"><i>✓</i>接続確認</a>
+        </div>
+      </nav>
+      <div class="sidebar-note"><strong>EVG-04</strong><span>START ZIP = SAFE HANDOFF</span><small>MASTER・監査差分・Repository情報を1個のZIPへ固定。</small></div>
+      <div class="version">EVG-04 R1<br><span>BRUSHUP START PACKAGE</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button" aria-label="メニューを開く">☰</button>
+        <div class="top-title"><strong>EVERGREEN START ZIP</strong><small>差分だけを安全にブラッシュアップへ渡す</small></div>
+        <div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPROスタッフ</strong><small id="staffRole">確認中</small></div></div>
+      </header>
+
+      <section class="content package-content">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">DPRO PRODUCT EVERGREEN / EVG-04</p>
+            <h1>今のSYSTEMを壊さず、<br>最新基準との差分だけ渡す。</h1>
+            <p>現在のMASTER、監査差分、既存Evidence、公開URL・Repository情報をZIP直下へ収録します。</p>
+          </div>
+          <div class="head-actions">
+            <a class="btn secondary" href="product-evergreen.html">EVERGREENへ戻る</a>
+            <button id="reloadButton" class="btn secondary" type="button">最新情報に更新</button>
+          </div>
+        </div>
+
+        <div class="policy-grid package-policy">
+          <article><strong>FINAL LOCKを自動解除しない</strong><span>重大欠陥が証明された場合だけ人判断で再開。</span></article>
+          <article><strong>UNKNOWNをFAIL扱いしない</strong><span>Evidence未確認と不具合を明確に分離。</span></article>
+          <article><strong>差分だけを修正</strong><span>既にACCEPT済みの領域は無条件に再実装しない。</span></article>
+          <article><strong>新MASTERで自動STALE</strong><span>MASTERや監査対象が変われば旧START ZIPを再生成。</span></article>
+        </div>
+
+        <section id="systemPanel" class="package-panel"></section>
+        <div id="metrics" class="package-metrics"></div>
+
+        <section class="package-panel">
+          <div class="panel-head">
+            <div><p class="eyebrow">ZIP CONTENTS</p><h2>このZIPに入るもの</h2></div>
+            <span id="fileCountBadge" class="pill progress">確認中</span>
+          </div>
+          <div id="fileList" class="file-list"></div>
+        </section>
+
+        <section class="package-panel action-panel">
+          <div>
+            <p class="eyebrow">ONE ACTION</p>
+            <h2>最新状態でBRUSHUP START ZIPを生成</h2>
+            <p id="actionNote">生成直前にDBを再取得し、ZIP SHA256をEvergreen台帳へ記録します。</p>
+          </div>
+          <button id="generateButton" class="btn primary generate-button" type="button">BRUSHUP START ZIPを生成・ダウンロード</button>
+        </section>
+
+        <section id="resultPanel" class="package-panel result-panel hidden">
+          <p class="eyebrow">PACKAGE READY</p>
+          <h2>Evergreen START ZIPを作成しました</h2>
+          <dl class="result-grid">
+            <div><dt>ファイル名</dt><dd id="resultFilename">—</dd></div>
+            <div><dt>ZIP SHA256</dt><dd id="resultSha">—</dd></div>
+            <div><dt>収録ファイル</dt><dd id="resultFiles">—</dd></div>
+            <div><dt>Evergreen登録</dt><dd id="resultGate">—</dd></div>
+          </dl>
+          <div class="next-panel package-next">
+            <strong>次にすること</strong>
+            <span>このZIPを新しいChatGPTチャットへ1個アップロードしてください。過去の経緯を説明し直さず、DRIFT_AND_FACT_LOCKから再開できます。</span>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>

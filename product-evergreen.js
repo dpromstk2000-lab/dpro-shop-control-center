@@ -14,6 +14,7 @@
     systems: [],
     currentRun: null,
     standardItems: new Map(),
+    handoffs: new Map(),
     selected: null,
   };
 
@@ -202,16 +203,17 @@
   }
 
   async function loadAll() {
-    const [summaryResult, systemsResult, runResult, standardsResult] = await Promise.all([
+    const [summaryResult, systemsResult, runResult, standardsResult, handoffResult] = await Promise.all([
       state.supabase.from("cc_v_dpro_evergreen_summary").select("*").maybeSingle(),
       state.supabase.from("cc_v_dpro_evergreen_current").select("*"),
       state.supabase.from("cc_evergreen_audit_runs").select("*").order("created_at",{ascending:false}).limit(1).maybeSingle(),
       state.supabase.from("cc_standard_items")
         .select("item_code,category,item_name,requirement_type,is_blocking_delivery,sort_order,standard_version_id")
         .order("sort_order",{ascending:true}),
+      state.supabase.from("cc_v_dpro_evergreen_handoff_status").select("*"),
     ]);
 
-    for (const result of [summaryResult, systemsResult, runResult, standardsResult]) {
+    for (const result of [summaryResult, systemsResult, runResult, standardsResult, handoffResult]) {
       if (result.error) throw result.error;
     }
 
@@ -224,6 +226,7 @@
       || "";
     const standards = (standardsResult.data || []).filter((x) => !currentStandardId || x.standard_version_id === currentStandardId);
     state.standardItems = new Map(standards.map((x) => [x.item_code, x]));
+    state.handoffs = new Map((handoffResult.data || []).map((x) => [x.system_code, x]));
 
     renderSummary();
     renderList();
@@ -294,7 +297,7 @@
     $$("[data-start-zip]").forEach((b) => b.addEventListener("click", () => {
       const row = state.systems.find((x) => x.system_code === b.dataset.startZip);
       if (!row) return;
-      toast(`「${row.product_name}」のBRUSHUP START ZIPはEVG-04で有効化します。現在は監査状態の確認までです。`);
+      location.href = `evergreen-package.html?system=${encodeURIComponent(row.system_code)}`;
     }));
   }
 
@@ -307,6 +310,8 @@
     const blocking = Number(row.blocking_unknown_count || 0)
       + Number(row.blocking_review_count || 0)
       + Number(row.blocking_fail_count || 0);
+    const handoff = state.handoffs.get(row.system_code) || {};
+    const zipLabel = handoff.handoff_current ? "START ZIP READY" : (handoff.handoff_exists ? "START ZIP再生成" : "BRUSHUP START ZIP");
 
     return `<article class="system-row">
       <div class="system-main">
@@ -335,7 +340,7 @@
       </div>
       <div class="row-actions">
         <button class="row-btn" type="button" data-detail-system="${esc(row.system_code)}">詳細</button>
-        <button class="row-btn primary" type="button" data-start-zip="${esc(row.system_code)}">BRUSHUP START ZIP</button>
+        <button class="row-btn primary" type="button" data-start-zip="${esc(row.system_code)}">${esc(zipLabel)}</button>
       </div>
     </article>`;
   }
@@ -452,7 +457,7 @@
     `;
 
     $("[data-detail-start-zip]")?.addEventListener("click", () => {
-      toast(`「${row.product_name}」のSTART ZIP生成は次工程EVG-04で有効化します。`);
+      location.href = `evergreen-package.html?system=${encodeURIComponent(row.system_code)}`;
     });
   }
 
