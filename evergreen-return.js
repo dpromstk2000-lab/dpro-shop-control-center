@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const BUILD="DPRO-EVERGREEN-RETURN-EVG07-HOTFIX1-DROP-20260922";
+  const BUILD="DPRO-EVERGREEN-RETURN-EVG07-HOTFIX2-FEEDBACK-20260922";
   const API_BASE="https://dpro-shop-control-center-api.dpromstk2000.workers.dev";
   const $=id=>document.getElementById(id);
   const state={supabase:null,session:null,staff:null,aal2:false,file:null,zipSha:null,fileCount:0,payload:null,validated:false};
@@ -56,15 +56,64 @@
     return Array.from(dt.types || []).includes("Files");
   }
 
+  function setFileState(kind,title,meta){
+    const box=$("fileSelectionState");
+    const badge=$("fileStateBadge");
+    const name=$("selectedFileName");
+    const detail=$("selectedFileMeta");
+    if(!box||!badge||!name||!detail)return;
+    box.className=`file-selection-state ${kind||"idle"}`;
+    badge.className=`file-state-badge ${kind||"idle"}`;
+    badge.textContent=
+      kind==="checking"?"検証中":
+      kind==="pass"?"検証PASS":
+      kind==="error"?"検証NG":
+      kind==="selected"?"選択済み":"未選択";
+    name.textContent=title||"まだRETURN ZIPは選択されていません";
+    detail.textContent=meta||"ZIPを選ぶと、ここにファイル名と検証状態が表示されます。";
+  }
+
+  function selectReturnFile(){
+    const input=$("returnFile");
+    if(!input)return;
+    input.value="";
+    input.click();
+  }
+
+  function handlePickedFile(file){
+    if(!file)return;
+    setFileState(
+      "selected",
+      file.name,
+      `${Math.max(1,Math.round(file.size/1024))} KB｜選択しました。これから自動検証します。`
+    );
+    readReturn(file);
+  }
+
   function bind(){
     $("retryButton")?.addEventListener("click",()=>location.reload());
     $("menuButton")?.addEventListener("click",()=>$("sidebar")?.classList.toggle("open"));
     $("returnFile")?.addEventListener("change",e=>{
       const f=e.target.files?.[0];
-      if(f) readReturn(f);
+      if(f) handlePickedFile(f);
+    });
+    $("chooseReturnButton")?.addEventListener("click",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      selectReturnFile();
     });
 
     const dz=$("dropZone");
+    dz?.addEventListener("click",e=>{
+      if(e.target.closest("#chooseReturnButton"))return;
+      selectReturnFile();
+    });
+    dz?.addEventListener("keydown",e=>{
+      if(e.key==="Enter"||e.key===" "){
+        e.preventDefault();
+        selectReturnFile();
+      }
+    });
 
     const preventWindowFileOpen=(e)=>{
       if(!hasFileDrag(e.dataTransfer)) return;
@@ -96,7 +145,7 @@
         setValidation("ファイルを取得できませんでした。Windowsのダウンロードフォルダ/エクスプローラーからZIPをドロップするか、枠をクリックして選択してください。",true);
         return;
       }
-      readReturn(f);
+      handlePickedFile(f);
     };
 
     ["dragenter","dragover"].forEach(ev=>dz?.addEventListener(ev,activate,true));
@@ -119,7 +168,12 @@
     try{
       if(!/\.zip$/i.test(file.name))throw new Error("ZIPファイルを選択してください。");
       if(file.size>10*1024*1024)throw new Error("RETURN ZIPは10MB以下にしてください。");
-      setValidation("ZIP内のMANIFEST・SHA256・RETURN JSONを確認しています…");
+      setFileState(
+        "checking",
+        file.name,
+        "ZIPを受け取りました。MANIFEST・SHA256・対象SYSTEM・監査IDを自動検証しています…"
+      );
+      setValidation("検証中｜ZIP内のMANIFEST・SHA256・RETURN JSONを確認しています…");
       const bytes=await file.arrayBuffer();
       state.zipSha=await sha256Bytes(bytes);
       const zip=await JSZip.loadAsync(bytes);
@@ -151,10 +205,27 @@
       if(!Array.isArray(payload.feature_updates)||!Array.isArray(payload.audit_item_updates))throw new Error("RETURN更新配列を確認してください。");
 
       state.payload=payload;state.fileCount=names.length;state.validated=true;
+      setFileState(
+        "pass",
+        file.name,
+        `検証PASS｜${names.length} files｜対象 ${payload.source.system_code}｜この時点ではまだDBへ反映していません。`
+      );
       setValidation(`検証PASS｜${file.name}｜${names.length} files｜ZIP SHA256 ${state.zipSha.slice(0,16)}…`);
       renderPreview();
+      window.setTimeout(()=>{
+        $("previewPanel")?.scrollIntoView({behavior:"smooth",block:"start"});
+      },120);
     }catch(e){
-      console.error(e);setValidation(e?.message||"RETURN ZIPを検証できませんでした。",true);
+      console.error(e);
+      setFileState(
+        "error",
+        file?.name||"RETURN ZIP",
+        e?.message||"RETURN ZIPを検証できませんでした。"
+      );
+      setValidation(e?.message||"RETURN ZIPを検証できませんでした。",true);
+      window.setTimeout(()=>{
+        $("fileSelectionState")?.scrollIntoView({behavior:"smooth",block:"center"});
+      },80);
     }
   }
 

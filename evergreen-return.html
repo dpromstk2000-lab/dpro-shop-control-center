@@ -11,10 +11,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
   <title>RETURN ZIP取込｜DPRO PRODUCT EVERGREEN</title>
   <link rel="stylesheet" href="product-evergreen.css?v=EVG-07-R1-20260922">
-  <link rel="stylesheet" href="evergreen-return.css?v=EVG-07-R1-20260922">
+  <link rel="stylesheet" href="evergreen-return.css?v=EVG-07-HOTFIX2-FEEDBACK-20260922">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script defer src="evergreen-return.js?v=EVG-07-HOTFIX1-DROP-20260922"></script>
+  <script defer src="evergreen-return.js?v=EVG-07-HOTFIX2-FEEDBACK-20260922"></script>
 </head>
 <body>
   <div id="loadingScreen" class="state-screen">
@@ -120,12 +120,21 @@
             <span id="aalBadge" class="pill progress">AAL確認中</span>
           </div>
 
-          <label id="dropZone" class="drop-zone" for="returnFile">
+          <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="RETURN ZIPを選択">
             <input id="returnFile" type="file" accept=".zip,application/zip" hidden>
-            <strong>RETURN ZIPをここへ</strong>
-            <span>Windowsのダウンロードフォルダ/エクスプローラーからドロップ、またはここをクリックしてZIPを選択</span>
+            <strong>RETURN ZIPを選択</strong>
+            <span>まずは下のボタンからZIPを選んでください。ドラッグ＆ドロップも使えます。</span>
+            <button id="chooseReturnButton" class="btn primary return-choose-btn" type="button">RETURN ZIPを選択</button>
             <small>最大10MB / ZIP直下 / EVERGREEN_RETURN.json 必須</small>
-          </label>
+          </div>
+
+          <div id="fileSelectionState" class="file-selection-state">
+            <span id="fileStateBadge" class="file-state-badge idle">未選択</span>
+            <div>
+              <strong id="selectedFileName">まだRETURN ZIPは選択されていません</strong>
+              <small id="selectedFileMeta">ZIPを選ぶと、ここにファイル名と検証状態が表示されます。</small>
+            </div>
+          </div>
 
           <div id="validationState" class="validation-state hidden"></div>
         </section>
