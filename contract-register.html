@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b4e3e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'">
+  <title>実契約登録｜DPRO SHOP CONTROL CENTER</title>
+  <link rel="stylesheet" href="setup.css?v=CC-PAID-CONTRACT-R1-20260924">
+  <link rel="stylesheet" href="start.css?v=CC-PAID-CONTRACT-R1-20260924">
+  <style>
+    .contract-form{display:grid;gap:18px}.form-card{background:#fff;border:1px solid #dce7e2;border-radius:20px;padding:20px}
+    .form-card h2{margin:0 0 4px}.form-card>p{margin:0 0 16px;color:#5d6f68}.form-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .form-grid2 label,.service-row label{display:grid;gap:6px;font-weight:700}.form-grid2 input,.form-grid2 select,.service-row input{width:100%;box-sizing:border-box;border:1px solid #cddbd5;border-radius:12px;padding:12px;background:#fff}
+    .wide{grid-column:1/-1}.service-table{display:grid;gap:10px}.service-row{display:grid;grid-template-columns:minmax(220px,1fr) 140px 140px;gap:10px;align-items:end;padding:12px;border:1px solid #e0e9e5;border-radius:14px}
+    .service-name{display:flex;gap:10px;align-items:center;font-weight:800}.service-name small{display:block;color:#6b7d76;font-weight:500}
+    .totals{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}.total-card{background:#eff7f3;border-radius:14px;padding:12px 16px}.total-card strong{display:block;font-size:22px}
+    .confirm-line{display:flex!important;grid-template-columns:auto 1fr!important;gap:10px!important;align-items:flex-start!important;padding:14px;background:#f7faf8;border-radius:14px}.confirm-line input{width:auto!important;margin-top:4px}
+    .action-bar{position:sticky;bottom:12px;background:rgba(255,255,255,.96);border:1px solid #dce7e2;border-radius:18px;padding:14px;display:flex;gap:12px;justify-content:flex-end;box-shadow:0 12px 30px rgba(25,65,50,.12)}
+    .result-card{padding:18px;border-radius:18px;background:#eff8f2;border:1px solid #bcd9c6}.result-card.error{background:#fff1f1;border-color:#efb8b8}
+    .result-card h3{margin-top:0}.result-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .note-box{padding:12px 14px;border-radius:14px;background:#fff8e7;border:1px solid #eed9a1;color:#5d4a1f;margin-top:12px}
+    @media(max-width:760px){.form-grid2,.service-row{grid-template-columns:1fr}.wide{grid-column:auto}.action-bar{position:static;flex-direction:column}}
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js?v=CC-PAID-CONTRACT-R1-20260924"></script>
+  <script defer src="contract-register.js?v=CC-PAID-CONTRACT-R1-20260924"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="state-screen"><div class="spinner"></div><strong>DPRO 実契約登録</strong><p>安全な接続を確認しています…</p></div>
+  <div id="authScreen" class="state-screen hidden"><div class="state-card"><span class="state-icon">鍵</span><h1>CONTROL CENTERへログインしてください</h1><p>実契約登録は二段階認証済みの管理責任者だけが利用できます。</p><a class="btn primary" href="index.html">CONTROL CENTERへ</a></div></div>
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="index.html"><span>D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></a>
+      <nav>
+        <a href="index.html"><i>⌂</i>ダッシュボード</a>
+        <a href="start.html"><i>始</i>契約開始ナビ</a>
+        <a class="active" href="contract-register.html?preset=green-kasuya"><i>契</i>実契約登録</a>
+        <a href="delivery.html"><i>納</i>制作・納品</a>
+        <a href="customer-workspace.html"><i>導</i>お客様導入・運用</a>
+      </nav>
+      <div class="sidebar-note"><strong>PAID CONTRACT</strong><span>R1</span><small>顧客・店舗・契約・サービスを一括登録</small></div>
+      <div class="version">CONTROL CENTER<br><span>PAID CONTRACT R1</span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><button id="menuButton" class="menu-button" type="button">☰</button><div><strong>実契約登録</strong><small>正式契約を管理センターへ登録</small></div><div class="staff-chip"><span id="staffInitial">D</span><div><strong id="staffName">DPRO管理者</strong><small id="staffRole">確認中</small></div></div></header>
+      <section class="content">
+        <div class="page-head start-page-head"><div><p class="eyebrow">REAL CUSTOMER / PAID CONTRACT</p><h1>実顧客を、<br>正式な契約案件として登録。</h1><p>デモ顧客は本番化せず、実顧客・店舗・契約・サービスを新規作成します。登録後は制作案件も同時に作成し、「契約開始ナビ」へ進みます。</p></div><div class="head-actions"><a class="btn secondary" href="start.html">契約開始ナビへ戻る</a></div></div>
+        <div class="start-rule"><strong>安全ルール</strong><span>重複候補は登録を止めます。料金はサービス明細の合計から自動計算します。開始日が未確定なら「契約済み・開始日確認中」で先行登録できます。</span></div>
+        <form id="contractForm" class="contract-form">
+          <section class="form-card">
+            <h2>1. お客様・店舗</h2><p>実際に納品する店舗情報を登録します。</p>
+            <div class="form-grid2">
+              <label>表示名<input id="displayName" required maxlength="160"></label>
+              <label>店舗名<input id="siteName" required maxlength="160"></label>
+              <label>屋号<input id="tradeName" maxlength="160"></label>
+              <label>法人名（任意）<input id="legalName" maxlength="160"></label>
+              <label>店長・責任者<input id="managerName" maxlength="120"></label>
+              <label>電話番号<input id="mainPhone" inputmode="tel"></label>
+              <label>郵便番号<input id="postalCode" inputmode="numeric"></label>
+              <label>メール（任意）<input id="mainEmail" type="email"></label>
+              <label class="wide">住所<input id="address"></label>
+            </div>
+          </section>
+          <section class="form-card">
+            <h2>2. 契約</h2><p>契約開始日が未確定なら「契約済み・開始日確認中」で安全に先行登録できます。</p>
+            <div class="form-grid2">
+              <label class="wide">契約名<input id="contractName" required></label>
+              <label>見積番号<input id="quoteNumber"></label>
+              <label>消費税<input value="税込" readonly></label>
+              <label>契約状態<select id="contractStatus"><option value="pending">契約済み・開始日確認中</option><option value="active">契約開始済み</option></select></label>
+              <label>契約開始日<input id="startsOn" type="date"></label>
+              <label class="wide confirm-line"><input id="ownerConfirmed" type="checkbox"><span>オーナー様による契約内容の了承を確認済み</span></label>
+              <label class="wide confirm-line"><input id="createProject" type="checkbox" checked><span>登録後にDPRO GREEN「本番導入」制作案件も同時作成する</span></label>
+            </div>
+            <div class="note-box">「契約開始済み」を選ぶ場合だけ、契約開始日が必須です。開始日がまだ確定していない場合は上のままで進められます。</div>
+          </section>
+          <section class="form-card">
+            <h2>3. 契約サービス</h2><p>初期費用・月額は税込金額です。チェックしたサービスだけ契約明細になります。</p>
+            <div id="serviceTable" class="service-table"></div>
+            <div class="totals">
+              <div class="total-card"><span>初期導入費用</span><strong id="setupTotal">0円</strong></div>
+              <div class="total-card"><span>月額運用・保守</span><strong id="monthlyTotal">0円</strong></div>
+            </div>
+          </section>
+          <div id="result" class="hidden"></div>
+          <div class="action-bar"><a class="btn secondary" href="start.html">キャンセル</a><button id="submitButton" class="btn primary" type="submit">実契約を登録</button></div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+</body>
+</html>
