@@ -401,6 +401,29 @@
                 </div>
                 <p class="setup-note">パスワードは入力・保存しません。OwnerのAuth作成後はUser IDだけを記録します。</p>
                 <button class="btn primary setup-save" type="submit">Owner情報を保存</button>
+
+                <section class="owner-activation-issuer" aria-labelledby="ownerActivationTitle">
+                  <div class="owner-activation-head">
+                    <div>
+                      <strong id="ownerActivationTitle">Owner初期設定URL</strong>
+                      <span>Owner本人へ渡す一回限りURLを発行します。新規発行すると以前の未使用URLは無効になります。</span>
+                    </div>
+                    <span id="ownerActivationStatus" class="badge">未発行</span>
+                  </div>
+
+                  <div class="owner-activation-actions">
+                    <button id="issueOwnerActivationButton" class="btn secondary" type="button">初期設定URLを発行</button>
+                    <button id="copyOwnerActivationButton" class="btn secondary hidden" type="button">URLをコピー</button>
+                  </div>
+
+                  <label id="ownerActivationUrlWrap" class="owner-activation-url hidden">
+                    <span>発行URL</span>
+                    <input id="ownerActivationUrl" readonly>
+                  </label>
+
+                  <p id="ownerActivationExpiry" class="setup-note hidden"></p>
+                  <p class="setup-note">発行にはCONTROL CENTERのAAL2（二段階認証）と管理責任者／技術管理者権限が必要です。生トークンはDBへ保存しません。</p>
+                </section>
               </form>
 
               <form id="setupSystemForm" class="setup-panel hidden" data-setup-panel="system">

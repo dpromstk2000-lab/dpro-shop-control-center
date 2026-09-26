@@ -1,8 +1,9 @@
 (() => {
   "use strict";
 
-  const BUILD = "DPRO-CUSTOMER-WORKSPACE-CO08D3-START-ZIP-DRY-RUN-UI-R1-20260922";
+  const BUILD = "DPRO-CUSTOMER-WORKSPACE-OWNER-ACTIVATION-ISSUER-R1-20260926";
   const CONFIG = window.DPRO_CONTROL_CENTER_CONFIG || {};
+  const OWNER_AUTH_API = "https://dpro-owner-auth-general.dpromstk2000.workers.dev";
   const $ = (id) => document.getElementById(id);
 
   const state = {
@@ -27,6 +28,7 @@
     goLiveGate: null,
     operationState: null,
     dryRunResult: null,
+    ownerActivation: null,
   };
 
   const roleLabels = {
@@ -1531,6 +1533,7 @@
     setInput("setupOwnerEmail",w.owner_email||"");
     setInput("setupOwnerPhone",w.owner_phone_normalized||"");
     setInput("setupOwnerAuthId",w.owner_auth_user_id||"");
+    renderOwnerActivationIssuer(w);
 
     setInput("setupSystemName",w.system_name||state.namePlan?.system_name||w.effective_system_name||w.product_name_snapshot||"");
     setInput("setupFacilityCode",w.facility_code||s.facility_code||"");
@@ -1588,6 +1591,162 @@
     if (!webRequired) $("setupWebsiteForm").querySelectorAll("input,select,button.setup-save").forEach((el)=>el.disabled=true);
     if (!lineRequired) $("setupLineForm").querySelectorAll("input,select,button.setup-save").forEach((el)=>el.disabled=true);
     $("refreshNamePlanButton").disabled=!confirmed;
+  }
+
+
+  function ownerActivationBaseUrl(w) {
+    const ownerUrl=String(w?.owner_url||inputValue("setupOwnerUrl")||"").trim();
+    if (!ownerUrl) return "";
+    try {
+      const u=new URL(ownerUrl,location.href);
+      const parts=u.pathname.split("/");
+      const last=parts.pop()||"";
+      if (/^owner(?:-login|-qa-preview|-activate)?\.html$/i.test(last)) {
+        parts.push("owner-activate.html");
+      } else {
+        if (last) parts.push(last);
+        if (!u.pathname.endsWith("/")) parts.pop();
+        parts.push("owner-activate.html");
+      }
+      u.pathname=parts.join("/") || "/owner-activate.html";
+      u.search="";
+      u.hash="";
+      return u.toString();
+    } catch {
+      return "";
+    }
+  }
+
+  function renderOwnerActivationIssuer(w) {
+    const button=$("issueOwnerActivationButton");
+    const copy=$("copyOwnerActivationButton");
+    const status=$("ownerActivationStatus");
+    const wrap=$("ownerActivationUrlWrap");
+    const input=$("ownerActivationUrl");
+    const expiry=$("ownerActivationExpiry");
+    if (!button || !copy || !status || !wrap || !input || !expiry) return;
+
+    const technical=canTechnicalWrite();
+    const base=ownerActivationBaseUrl(w);
+    button.disabled=!technical || !w?.owner_name || !w?.owner_email || !w?.facility_code || !base;
+    button.title=!technical ? "管理責任者 / 技術管理者のみ発行できます。" : "";
+
+    const a=state.ownerActivation;
+    const same=a && a.caseId===w.onboarding_case_id;
+    if (!same) {
+      status.textContent="未発行";
+      status.className="badge";
+      wrap.classList.add("hidden");
+      copy.classList.add("hidden");
+      expiry.classList.add("hidden");
+      input.value="";
+      return;
+    }
+
+    status.textContent="発行済";
+    status.className="badge green";
+    input.value=a.url||"";
+    wrap.classList.remove("hidden");
+    copy.classList.remove("hidden");
+    expiry.textContent=a.expiresAt ? `有効期限：${new Date(a.expiresAt).toLocaleString("ja-JP")}` : "";
+    expiry.classList.toggle("hidden",!a.expiresAt);
+  }
+
+  async function issueOwnerActivationInvite() {
+    const w=workspaceFor(state.selectedCaseId);
+    if (!w) return toast("Customer Workspaceを確認できませんでした。",true);
+    if (!canTechnicalWrite()) return toast("Owner初期設定URLは管理責任者 / 技術管理者のみ発行できます。",true);
+
+    const ownerName=inputValue("setupOwnerName") || w.owner_name || "";
+    const facilityCode=inputValue("setupFacilityCode") || w.facility_code || "";
+    const systemCode=String(w.effective_system_code||w.product_system_code||w.system_code||"").trim().toUpperCase();
+    const facilityName=String(w.client_name||"").trim();
+    const base=ownerActivationBaseUrl(w);
+
+    if (!ownerName || !facilityCode || !systemCode || !facilityName || !base) {
+      return toast("Owner氏名・SYSTEM CODE・facility_code・Owner URLを確認してください。",true);
+    }
+
+    const button=$("issueOwnerActivationButton");
+    const old=button?.textContent||"初期設定URLを発行";
+
+    try {
+      if (button) {
+        button.disabled=true;
+        button.textContent="発行中…";
+      }
+
+      const sessionResult=await state.supabase.auth.getSession();
+      const accessToken=sessionResult?.data?.session?.access_token;
+      if (!accessToken) throw new Error("CONTROL CENTERへ再ログインしてください。");
+
+      const response=await fetch(`${OWNER_AUTH_API}/admin/activation/invite`,{
+        method:"POST",
+        headers:{
+          "Authorization":`Bearer ${accessToken}`,
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({
+          systemCode,
+          facilityCode,
+          facilityName,
+          ownerName,
+          expiresInHours:168,
+        }),
+        cache:"no-store",
+      });
+
+      const data=await response.json().catch(()=>({}));
+      if (!response.ok || data.ok===false) {
+        const message=data.message||data.error||`HTTP ${response.status}`;
+        if (data.error==="CONTROL_CENTER_AAL2_REQUIRED") {
+          throw new Error("Owner初期設定URLの発行にはCONTROL CENTERの二段階認証が必要です。");
+        }
+        throw new Error(message);
+      }
+
+      if (!data.activationToken) throw new Error("初期設定トークンを取得できませんでした。");
+
+      const u=new URL(base);
+      u.searchParams.set("token",data.activationToken);
+      u.searchParams.set("next","./owner.html");
+
+      state.ownerActivation={
+        caseId:w.onboarding_case_id,
+        url:u.toString(),
+        expiresAt:data.expiresAt||null,
+      };
+
+      renderOwnerActivationIssuer(w);
+      toast("Owner初期設定URLを発行しました。Owner本人へ渡す前にURLをコピーしてください。");
+    } catch(error) {
+      console.error(BUILD,error);
+      toast(error?.message||"Owner初期設定URLを発行できませんでした。",true);
+    } finally {
+      if (button) {
+        button.disabled=false;
+        button.textContent=old;
+        renderOwnerActivationIssuer(w);
+      }
+    }
+  }
+
+  async function copyOwnerActivationUrl() {
+    const w=workspaceFor(state.selectedCaseId);
+    const a=state.ownerActivation;
+    if (!w || !a || a.caseId!==w.onboarding_case_id || !a.url) {
+      return toast("先に初期設定URLを発行してください。",true);
+    }
+
+    try {
+      await navigator.clipboard.writeText(a.url);
+      toast("Owner初期設定URLをコピーしました。");
+    } catch {
+      const input=$("ownerActivationUrl");
+      input?.focus();
+      input?.select();
+      toast("自動コピーできませんでした。URL欄を選択してコピーしてください。",true);
+    }
   }
 
   function ownerPayloadFromSetup() {
@@ -1917,6 +2076,8 @@
     document.querySelectorAll("[data-setup-step]").forEach((button)=>button.addEventListener("click",()=>{ const w=workspaceFor(state.selectedCaseId); if (!w) return; if (!setupStepApplicable(w,button.dataset.setupStep)) return toast("今回の契約では対象外です。"); switchSetupStep(button.dataset.setupStep); }));
     $("refreshNamePlanButton")?.addEventListener("click",async()=>{ try{ await loadSetupNamePlan(state.selectedCaseId); renderSetupWizard(); toast("名前候補を再生成しました。"); }catch(error){ console.error(BUILD,error); toast(error?.message||"名前候補を生成できませんでした。",true); } });
     $("setupOwnerForm")?.addEventListener("submit",saveOwnerSetup);
+    $("issueOwnerActivationButton")?.addEventListener("click",issueOwnerActivationInvite);
+    $("copyOwnerActivationButton")?.addEventListener("click",copyOwnerActivationUrl);
     $("setupSystemForm")?.addEventListener("submit",saveSystemSetup);
     $("setupSupabaseForm")?.addEventListener("submit",saveSupabaseSetup);
     $("setupGithubForm")?.addEventListener("submit",saveGithubSetup);

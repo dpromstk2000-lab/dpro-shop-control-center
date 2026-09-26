@@ -318,3 +318,40 @@
   .hold-control{grid-template-columns:1fr}
   .workspace-detail{padding:14px}
 }
+
+
+/* OWNER ACTIVATION ISSUER / R1 / 2026-09-26 */
+.owner-activation-issuer{
+  margin-top:16px;
+  padding:16px;
+  border:1px solid #cfe2d9;
+  border-radius:16px;
+  background:#f7fbf9;
+  display:grid;
+  gap:12px;
+}
+.owner-activation-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+.owner-activation-head>div{display:grid;gap:4px}
+.owner-activation-head strong{font-size:15px;color:#12382d}
+.owner-activation-head span{font-size:12px;color:#61746b}
+.owner-activation-actions{display:flex;gap:10px;flex-wrap:wrap}
+.owner-activation-url{display:grid;gap:6px}
+.owner-activation-url span{font-size:12px;font-weight:800;color:#40594e}
+.owner-activation-url input{
+  width:100%;
+  min-height:44px;
+  border:1px solid #c9d9d1;
+  border-radius:10px;
+  padding:10px 12px;
+  background:#fff;
+  color:#12382d;
+}
+@media (max-width:720px){
+  .owner-activation-head{display:grid}
+  .owner-activation-actions .btn{width:100%}
+}
