@@ -1800,10 +1800,12 @@
   async function saveSupabaseSetup(event) {
     event.preventDefault();
     if (!inputValue("setupSupabaseRef")) return toast("Supabase Project Refを入力してください。",true);
+    const inviteStatus=inputValue("setupSupabaseInvite");
     const supabase={
       project_name:inputValue("setupSupabaseName"),project_ref:inputValue("setupSupabaseRef"),
       dashboard_url:inputValue("setupSupabaseDashboard"),owner_label:inputValue("setupSupabaseOwnerLabel"),
-      region:inputValue("setupSupabaseRegion"),invitation_status:inputValue("setupSupabaseInvite"),
+      region:inputValue("setupSupabaseRegion"),invitation_status:inviteStatus,
+      connection_status:inviteStatus==="accepted" ? "connected" : "waiting",
       dpro_role:inputValue("setupSupabaseRole"),schema_name:inputValue("setupSupabaseSchema"),
       tenant_code:inputValue("setupTenantCode"),
     };
