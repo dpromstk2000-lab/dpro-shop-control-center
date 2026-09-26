@@ -1,0 +1,38 @@
+name: DPRO Control Center Supabase Connection Status Fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch Supabase connection status save
+        shell: bash
+        run: |
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwID0gUGF0aCgiY3VzdG9tZXItd29ya3NwYWNlLmpzIikKcyA9IHAucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpCgpvbGQgPSAnICAgIGNvbnN0IHN1cGFiYXNlPXtcbiAgICAgIHByb2plY3RfbmFtZTppbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlTmFtZSIpLHByb2plY3RfcmVmOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VSZWYiKSxcbiAgICAgIGRhc2hib2FyZF91cmw6aW5wdXRWYWx1ZSgic2V0dXBTdXBhYmFzZURhc2hib2FyZCIpLG93bmVyX2xhYmVsOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VPd25lckxhYmVsIiksXG4gICAgICByZWdpb246aW5wdXRWYWx1ZSgic2V0dXBTdXBhYmFzZVJlZ2lvbiIpLGludml0YXRpb25fc3RhdHVzOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VJbnZpdGUiKSxcbiAgICAgIGRwcm9fcm9sZTppbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlUm9sZSIpLHNjaGVtYV9uYW1lOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VTY2hlbWEiKSxcbiAgICAgIHRlbmFudF9jb2RlOmlucHV0VmFsdWUoInNldHVwVGVuYW50Q29kZSIpLFxuICAgIH07JwpuZXcgPSAnICAgIGNvbnN0IGludml0ZVN0YXR1cz1pbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlSW52aXRlIik7XG4gICAgY29uc3Qgc3VwYWJhc2U9e1xuICAgICAgcHJvamVjdF9uYW1lOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VOYW1lIikscHJvamVjdF9yZWY6aW5wdXRWYWx1ZSgic2V0dXBTdXBhYmFzZVJlZiIpLFxuICAgICAgZGFzaGJvYXJkX3VybDppbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlRGFzaGJvYXJkIiksb3duZXJfbGFiZWw6aW5wdXRWYWx1ZSgic2V0dXBTdXBhYmFzZU93bmVyTGFiZWwiKSxcbiAgICAgIHJlZ2lvbjppbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlUmVnaW9uIiksaW52aXRhdGlvbl9zdGF0dXM6aW52aXRlU3RhdHVzLFxuICAgICAgY29ubmVjdGlvbl9zdGF0dXM6aW52aXRlU3RhdHVzPT09ImFjY2VwdGVkIiA/ICJjb25uZWN0ZWQiIDogIndhaXRpbmciLFxuICAgICAgZHByb19yb2xlOmlucHV0VmFsdWUoInNldHVwU3VwYWJhc2VSb2xlIiksc2NoZW1hX25hbWU6aW5wdXRWYWx1ZSgic2V0dXBTdXBhYmFzZVNjaGVtYSIpLFxuICAgICAgdGVuYW50X2NvZGU6aW5wdXRWYWx1ZSgic2V0dXBUZW5hbnRDb2RlIiksXG4gICAgfTsnCgppZiBvbGQgbm90IGluIHM6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJFUlJPUjogdGFyZ2V0IFN1cGFiYXNlIHNldHVwIGJsb2NrIG5vdCBmb3VuZCIpCgpzID0gcy5yZXBsYWNlKG9sZCwgbmV3LCAxKQoKY2hlY2tzID0gewogICAgImludml0ZV9zdGF0dXNfdmFyIjogJ2NvbnN0IGludml0ZVN0YXR1cz1pbnB1dFZhbHVlKCJzZXR1cFN1cGFiYXNlSW52aXRlIik7JyBpbiBzLAogICAgImNvbm5lY3Rpb25fc3RhdHVzIjogJ2Nvbm5lY3Rpb25fc3RhdHVzOmludml0ZVN0YXR1cz09PSJhY2NlcHRlZCIgPyAiY29ubmVjdGVkIiA6ICJ3YWl0aW5nIicgaW4gcywKfQpwcmludCgiQ0hFQ0tTOiIsIGNoZWNrcykKYmFkPVtrIGZvciBrLHYgaW4gY2hlY2tzLml0ZW1zKCkgaWYgbm90IHZdCmlmIGJhZDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIkZBSUxFRDogIisiLCAiLmpvaW4oYmFkKSkKCnAud3JpdGVfdGV4dChzLCBlbmNvZGluZz0idXRmLTgiKQo=' | base64 -d > /tmp/patch_supabase_status.py
+          python /tmp/patch_supabase_status.py
+
+      - name: Verify
+        run: |
+          git diff --check
+          grep -q 'connection_status:inviteStatus==="accepted" ? "connected" : "waiting"' customer-workspace.js
+
+      - name: Commit
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required."
+            exit 0
+          fi
+          git config user.name "DPRO Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add customer-workspace.js
+          git commit -m "Persist Supabase connection status after accepted invite"
+          git push
