@@ -1,0 +1,36 @@
+name: DPRO Owner Auth CSP Patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch Customer Workspace CSP
+        shell: bash
+        run: |
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwYXRoID0gUGF0aCgiY3VzdG9tZXItd29ya3NwYWNlLmh0bWwiKQp0ZXh0ID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKCm9sZCA9ICIiImNvbm5lY3Qtc3JjICdzZWxmJyBodHRwczovLyouc3VwYWJhc2UuY28gaHR0cHM6Ly9kcHJvLXNob3AtY29udHJvbC1jZW50ZXItYXBpLmRwcm9tc3RrMjAwMC53b3JrZXJzLmRldjsiIiIKbmV3ID0gIiIiY29ubmVjdC1zcmMgJ3NlbGYnIGh0dHBzOi8vKi5zdXBhYmFzZS5jbyBodHRwczovL2Rwcm8tc2hvcC1jb250cm9sLWNlbnRlci1hcGkuZHByb21zdGsyMDAwLndvcmtlcnMuZGV2IGh0dHBzOi8vZHByby1vd25lci1hdXRoLWdlbmVyYWwuZHByb21zdGsyMDAwLndvcmtlcnMuZGV2OyIiIgoKaWYgbmV3IGluIHRleHQ6CiAgICBwcmludCgiQ1NQIGFscmVhZHkgdXBkYXRlZC4iKQplbGlmIG9sZCBpbiB0ZXh0OgogICAgdGV4dCA9IHRleHQucmVwbGFjZShvbGQsIG5ldywgMSkKICAgIHBhdGgud3JpdGVfdGV4dCh0ZXh0LCBlbmNvZGluZz0idXRmLTgiKQogICAgcHJpbnQoIkNTUCB1cGRhdGVkLiIpCmVsc2U6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJFUlJPUjogZXhwZWN0ZWQgQ1NQIGNvbm5lY3Qtc3JjIHdhcyBub3QgZm91bmQuIikK' | base64 -d > /tmp/patch_owner_auth_csp.py
+          python /tmp/patch_owner_auth_csp.py
+
+      - name: Verify diff
+        run: git diff --check && git diff --stat
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required."
+            exit 0
+          fi
+          git config user.name "DPRO Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add customer-workspace.html
+          git commit -m "Allow Owner Auth Worker in Customer Workspace CSP"
+          git push
