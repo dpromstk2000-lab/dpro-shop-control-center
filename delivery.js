@@ -1245,6 +1245,18 @@
     toast("制作指示書をTEXT保存しました。");
   }
 
+  function currentDetailScrollTop() {
+    return document.querySelector("#detailModal .detail-card")?.scrollTop || 0;
+  }
+
+  async function reopenProjectPreservingDetailScroll(projectId, scrollTop) {
+    await loadBaseData();
+    await openProject(projectId);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const card = document.querySelector("#detailModal .detail-card");
+    if (card) card.scrollTop = scrollTop;
+  }
+
   function bindDetailActions() {
     $("openHandoffButton")?.addEventListener("click", openHandoffModal);
     $("detailSystemInput")?.addEventListener("change", () => {
@@ -1386,6 +1398,7 @@
       input.addEventListener("change", async () => {
         const projectId = state.currentProject.project.id;
         const featureCode = input.dataset.feature;
+        const scrollTop = currentDetailScrollTop();
         input.disabled = true;
         try {
           const { error } = await state.supabase
@@ -1402,8 +1415,7 @@
           const { error: rpcError } = await state.supabase.rpc("cc_center1_refresh_project", { p_project_id: projectId });
           if (rpcError) throw rpcError;
 
-          await loadBaseData();
-          await openProject(projectId);
+          await reopenProjectPreservingDetailScroll(projectId, scrollTop);
           toast("Feature Flagと標準チェックを更新しました。");
         } catch (error) {
           input.checked = !input.checked;
@@ -1418,6 +1430,7 @@
         const id = button.dataset.saveStep;
         const select = document.querySelector(`[data-step-status="${id}"]`);
         const status = select.value;
+        const scrollTop = currentDetailScrollTop();
         button.disabled = true;
         button.textContent = "保存中…";
         try {
@@ -1431,8 +1444,7 @@
           const { error } = await state.supabase.from("cc_delivery_steps").update(payload).eq("id", id);
           if (error) throw error;
           const projectId = state.currentProject.project.id;
-          await loadBaseData();
-          await openProject(projectId);
+          await reopenProjectPreservingDetailScroll(projectId, scrollTop);
           toast("制作STEPを更新しました。");
         } catch (error) {
           toast(error.message || "制作STEPを保存できませんでした。", true);
@@ -1448,6 +1460,7 @@
         const id = button.dataset.saveCheck;
         const select = document.querySelector(`[data-check-status="${id}"]`);
         const status = select.value;
+        const scrollTop = currentDetailScrollTop();
         button.disabled = true;
         button.textContent = "保存中…";
         try {
@@ -1461,8 +1474,7 @@
             .eq("id", id);
           if (error) throw error;
           const projectId = state.currentProject.project.id;
-          await loadBaseData();
-          await openProject(projectId);
+          await reopenProjectPreservingDetailScroll(projectId, scrollTop);
           toast("DPRO標準チェックを更新しました。");
         } catch (error) {
           toast(error.message || "標準チェックを保存できませんでした。", true);
