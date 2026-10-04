@@ -1,0 +1,12 @@
+/* CONTROL CENTER MULTI-WORKER R1 / 2026-10-04
+ * APPEND THIS BLOCK TO THE VERY END OF config.js
+ */
+(() => {
+  "use strict";
+  if (document.querySelector('script[data-cc-multi-worker-r1="true"]')) return;
+  const script = document.createElement("script");
+  script.src = "./control-center-multi-worker-r1.js?v=CONTROL-CENTER-MULTI-WORKER-R1-20261004";
+  script.defer = true;
+  script.dataset.ccMultiWorkerR1 = "true";
+  document.head.appendChild(script);
+})();
