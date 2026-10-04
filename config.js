@@ -549,3 +549,19 @@ window.DPRO_CC_SHELL_V2_ACTIVE = true;
     setTimeout(verify, 0);
   }
 })();
+
+/* CONTROL CENTER MULTI-WORKER R2 / activated 2026-10-04 */
+(() => {
+  "use strict";
+  const install = () => {
+    if (document.querySelector('script[data-cc-multi-worker-r2="true"]')) return;
+    const script = document.createElement("script");
+    script.src = "./control-center-multi-worker-r2.js?v=CONTROL-CENTER-MULTI-WORKER-R2-20261004";
+    script.defer = true;
+    script.dataset.ccMultiWorkerR2 = "true";
+    document.head.appendChild(script);
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once:true });
+  else install();
+})();
+
