@@ -1,0 +1,79 @@
+name: CONTROL CENTER Infrastructure Tabs R81.1 Fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write infrastructure tab fallback
+        shell: python
+        env:
+          INFRA_TABS_JS_B64: "KCgpID0+IHsKICAidXNlIHN0cmljdCI7CgogIGNvbnN0IFZFUlNJT04gPSAiQ09OVFJPTC1DRU5URVItSU5GUkEtVEFCUy1SODEuMS0yMDI2MTAwNiI7CiAgaWYgKHdpbmRvdy5fX0RQUk9fQ0NfSU5GUkFfVEFCU19SODExX18gPT09IFZFUlNJT04pIHJldHVybjsKICB3aW5kb3cuX19EUFJPX0NDX0lORlJBX1RBQlNfUjgxMV9fID0gVkVSU0lPTjsKCiAgY29uc3QgVkFMSUQgPSBuZXcgU2V0KFsic3lzdGVtcyIsICJzdXBhYmFzZSIsICJ3b3JrZXJzIiwgImdpdGh1YiIsICJyZWxlYXNlcyIsICJoZWFsdGgiXSk7CgogIGZ1bmN0aW9uIHNob3codGFiLCB1cGRhdGVVcmwgPSB0cnVlKSB7CiAgICBpZiAoIVZBTElELmhhcyh0YWIpKSByZXR1cm4gZmFsc2U7CgogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgiLmluZnJhc3RydWN0dXJlLXRhYiIpLmZvckVhY2goKGJ1dHRvbikgPT4gewogICAgICBjb25zdCBhY3RpdmUgPSBidXR0b24uZGF0YXNldC5pbmZyYVRhYiA9PT0gdGFiOwogICAgICBidXR0b24uY2xhc3NMaXN0LnRvZ2dsZSgiYWN0aXZlIiwgYWN0aXZlKTsKICAgICAgYnV0dG9uLnNldEF0dHJpYnV0ZSgiYXJpYS1zZWxlY3RlZCIsIGFjdGl2ZSA/ICJ0cnVlIiA6ICJmYWxzZSIpOwogICAgfSk7CgogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgiLmluZnJhLXBhbmVsIikuZm9yRWFjaCgocGFuZWwpID0+IHsKICAgICAgcGFuZWwuY2xhc3NMaXN0LmFkZCgiaGlkZGVuIik7CiAgICB9KTsKCiAgICBjb25zdCB0YXJnZXQgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZChgaW5mcmEtcGFuZWwtJHt0YWJ9YCk7CiAgICBpZiAoIXRhcmdldCkgcmV0dXJuIGZhbHNlOwogICAgdGFyZ2V0LmNsYXNzTGlzdC5yZW1vdmUoImhpZGRlbiIpOwoKICAgIGlmICh1cGRhdGVVcmwpIHsKICAgICAgY29uc3QgdXJsID0gbmV3IFVSTChsb2NhdGlvbi5ocmVmKTsKICAgICAgdXJsLnNlYXJjaFBhcmFtcy5zZXQoImluZnJhX3RhYiIsIHRhYik7CiAgICAgIGhpc3RvcnkucmVwbGFjZVN0YXRlKG51bGwsICIiLCB1cmwucGF0aG5hbWUgKyB1cmwuc2VhcmNoICsgdXJsLmhhc2gpOwogICAgfQoKICAgIGRvY3VtZW50LmRvY3VtZW50RWxlbWVudC5kYXRhc2V0LmNjSW5mcmFUYWIgPSB0YWI7CiAgICByZXR1cm4gdHJ1ZTsKICB9CgogIGRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoImNsaWNrIiwgKGV2ZW50KSA9PiB7CiAgICBjb25zdCBidXR0b24gPSBldmVudC50YXJnZXQuY2xvc2VzdD8uKCIuaW5mcmFzdHJ1Y3R1cmUtdGFiW2RhdGEtaW5mcmEtdGFiXSIpOwogICAgaWYgKCFidXR0b24pIHJldHVybjsKCiAgICBjb25zdCB0YWIgPSBidXR0b24uZGF0YXNldC5pbmZyYVRhYiB8fCAiIjsKICAgIGlmICghVkFMSUQuaGFzKHRhYikpIHJldHVybjsKCiAgICBzaG93KHRhYiwgdHJ1ZSk7CiAgfSwgdHJ1ZSk7CgogIGZ1bmN0aW9uIHJlc3RvcmUoKSB7CiAgICBjb25zdCB0YWIgPSBuZXcgVVJMU2VhcmNoUGFyYW1zKGxvY2F0aW9uLnNlYXJjaCkuZ2V0KCJpbmZyYV90YWIiKTsKICAgIGlmIChWQUxJRC5oYXModGFiKSkgc2hvdyh0YWIsIGZhbHNlKTsKICB9CgogIGlmIChkb2N1bWVudC5yZWFkeVN0YXRlID09PSAibG9hZGluZyIpIHsKICAgIGRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoIkRPTUNvbnRlbnRMb2FkZWQiLCByZXN0b3JlLCB7IG9uY2U6IHRydWUgfSk7CiAgfSBlbHNlIHsKICAgIHJlc3RvcmUoKTsKICB9Cn0pKCk7Cg=="
+        run: |
+          import os
+          import base64
+          from pathlib import Path
+
+          payload = base64.b64decode(os.environ["INFRA_TABS_JS_B64"])
+          Path("control-center-infra-tabs-r81.js").write_bytes(payload)
+
+      - name: Force fresh CONTROL CENTER assets
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("index.html")
+          text = path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              "config.js?v=DPRO-CC-UI-V2-PHASE2D-CACHEGUARD-R1-20260921",
+              "config.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006"
+          )
+          text = text.replace(
+              "app-ui-v2-phase2d-r1.js?v=DPRO-CC-UI-V2-PHASE2D-R1-20260921",
+              "app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006"
+          )
+
+          fallback = '<script defer src="control-center-infra-tabs-r81.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006"></script>'
+          if fallback not in text:
+              anchor = '<script defer src="app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006"></script>'
+              if anchor not in text:
+                  raise SystemExit("app script anchor not found")
+              text = text.replace(anchor, anchor + "\n  " + fallback, 1)
+
+          path.write_text(text, encoding="utf-8")
+
+      - name: Validate
+        shell: bash
+        run: |
+          node --check control-center-infra-tabs-r81.js
+          grep -q 'CONTROL-CENTER-INFRA-TABS-R81-1-20261006' index.html
+          grep -q 'control-center-infra-tabs-r81.js' index.html
+          grep -q 'data-infra-tab="workers"' index.html
+          grep -q 'id="infra-panel-workers"' index.html
+
+      - name: Remove superseded invalid R81 workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/control-center-infra-tabs-r81.yml
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Fix CONTROL CENTER infrastructure tabs R81.1"
+          git push
