@@ -21,7 +21,7 @@ window.DPRO_CC_SHELL_V2_ACTIVE = true;
   }
   if (!document.querySelector('script[data-dpro-cc-shell-v2="true"]')) {
     const script = document.createElement("script");
-    script.src = "./cc-shell-v2.js?v=DPRO-CC-UI-V2-CO02-CUSTOMER-WORKSPACE-R1-20260921";
+    script.src = "./cc-shell-v2.js?v=CONTROL-CENTER-DEEPLINK-R83-20261006";
     script.defer = true;
     script.dataset.dproCcShellV2 = "true";
     document.head.appendChild(script);

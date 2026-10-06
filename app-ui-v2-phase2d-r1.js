@@ -1,4 +1,5 @@
 window.DPRO_CC_APP_BUILD = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";
+window.DPRO_CC_NATIVE_DEEPLINK = true;
 (() => {
   "use strict";
 
@@ -295,7 +296,18 @@ window.DPRO_CC_APP_BUILD = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";
     showOnly("appShell");
     await loadClients();
     await loadDashboard();
-    activateView("dashboard");
+
+    const deepView = location.hash.replace(/^#view-/, "");
+    const allowedDeepViews = new Set([
+      "dashboard", "clients", "contracts", "line", "websites",
+      "systems", "products", "tasks", "support", "security"
+    ]);
+    const requestedInfraTab = new URLSearchParams(location.search).get("infra_tab");
+    if (["systems", "supabase", "workers", "github", "releases", "health"].includes(requestedInfraTab)) {
+      state.infraTab = requestedInfraTab;
+    }
+
+    await activateView(allowedDeepViews.has(deepView) ? deepView : "dashboard");
   }
 
   async function signOut() {

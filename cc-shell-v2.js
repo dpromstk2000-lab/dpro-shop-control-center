@@ -380,6 +380,7 @@
   };
 
   const ensureDeepLink = () => {
+    if (window.DPRO_CC_NATIVE_DEEPLINK === true) return;
     if (pageName() !== "index.html") return;
     const view = location.hash.replace(/^#view-/, "");
     if (!view) return;
