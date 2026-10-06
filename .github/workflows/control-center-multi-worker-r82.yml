@@ -1,0 +1,99 @@
+name: CONTROL CENTER Multi-Worker R82 Fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch Multi-Worker auth, permissions and visible errors
+        shell: python
+        run: |
+          from pathlib import Path
+
+          mw_path = Path("control-center-multi-worker-r2.js")
+          config_path = Path("config.js")
+          index_path = Path("index.html")
+
+          mw = mw_path.read_text(encoding="utf-8")
+          config = config_path.read_text(encoding="utf-8")
+          index = index_path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  'const VERSION = "CONTROL-CENTER-MULTI-WORKER-R2-20261004";',
+                  'const VERSION = "CONTROL-CENTER-MULTI-WORKER-R2.1-20261006";'
+              ),
+              (
+                  'const canWrite = () => ["admin","technical_admin","owner","super_admin"].includes(String(state.staff?.role||""));',
+                  'const canWrite = () => ["owner_admin","technical_admin"].includes(String(state.staff?.role_key||state.staff?.role||""));'
+              ),
+              (
+                  'state.supabase=window.supabase.createClient(supabaseUrl,anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});',
+                  'state.supabase=window.supabase.createClient(supabaseUrl,anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:pub.sessionStorageKey||"dpro-control-center-auth-v1"}});'
+              ),
+              (
+                  'catch(e){ console.error("CONTROL CENTER Multi-Worker R2",e); }',
+                  'catch(e){ console.error("CONTROL CENTER Multi-Worker R2",e); const root=$("workerOverview"); if(root){ root.innerHTML=\'<div class="empty-state"><strong>Worker台帳を読み込めません</strong><br><span>\'+esc(e?.message||String(e))+\'</span></div>\'; } }'
+              ),
+          ]
+
+          for old, new in replacements:
+              if old in mw:
+                  mw = mw.replace(old, new, 1)
+              elif new not in mw:
+                  raise SystemExit("Expected Multi-Worker source pattern was not found: " + old[:80])
+
+          old_loader = './control-center-multi-worker-r2.js?v=CONTROL-CENTER-MULTI-WORKER-R2-20261004'
+          new_loader = './control-center-multi-worker-r2.js?v=CONTROL-CENTER-MULTI-WORKER-R2-1-20261006'
+          if old_loader in config:
+              config = config.replace(old_loader, new_loader, 1)
+          elif new_loader not in config:
+              raise SystemExit("Multi-Worker loader pattern not found in config.js")
+
+          old_config_tag = 'config.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006'
+          new_config_tag = 'config.js?v=CONTROL-CENTER-MULTI-WORKER-R82-20261006'
+          if old_config_tag in index:
+              index = index.replace(old_config_tag, new_config_tag, 1)
+          elif new_config_tag not in index:
+              raise SystemExit("CONTROL CENTER config cache tag not found in index.html")
+
+          mw_path.write_text(mw, encoding="utf-8")
+          config_path.write_text(config, encoding="utf-8")
+          index_path.write_text(index, encoding="utf-8")
+
+      - name: Validate
+        shell: bash
+        run: |
+          node --check control-center-multi-worker-r2.js
+          node --check config.js
+          grep -q 'CONTROL-CENTER-MULTI-WORKER-R2.1-20261006' control-center-multi-worker-r2.js
+          grep -q 'role_key' control-center-multi-worker-r2.js
+          grep -q 'dpro-control-center-auth-v1' control-center-multi-worker-r2.js
+          grep -q 'Worker台帳を読み込めません' control-center-multi-worker-r2.js
+          grep -q 'CONTROL-CENTER-MULTI-WORKER-R82-20261006' index.html
+
+      - name: Remove superseded R81.1 patch workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/control-center-infra-tabs-r81-1.yml
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Fix CONTROL CENTER Multi-Worker runtime R82"
+          git push
