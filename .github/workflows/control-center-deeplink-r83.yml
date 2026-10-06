@@ -1,0 +1,120 @@
+name: CONTROL CENTER Deep Link R83 Fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix authenticated deep-link startup order
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app_path = Path("app-ui-v2-phase2d-r1.js")
+          shell_path = Path("cc-shell-v2.js")
+          config_path = Path("config.js")
+          index_path = Path("index.html")
+
+          app = app_path.read_text(encoding="utf-8")
+          shell = shell_path.read_text(encoding="utf-8")
+          config = config_path.read_text(encoding="utf-8")
+          index = index_path.read_text(encoding="utf-8")
+
+          native_flag = 'window.DPRO_CC_NATIVE_DEEPLINK = true;'
+          if native_flag not in app:
+              first = 'window.DPRO_CC_APP_BUILD = "DPRO-CC-UI-V2-PHASE2D-R1-20260921";'
+              if first not in app:
+                  raise SystemExit("App build marker not found")
+              app = app.replace(first, first + "\n" + native_flag, 1)
+
+          old_enter = '''    showOnly("appShell");
+              await loadClients();
+              await loadDashboard();
+              activateView("dashboard");'''
+          new_enter = '''    showOnly("appShell");
+              await loadClients();
+              await loadDashboard();
+
+              const deepView = location.hash.replace(/^#view-/, "");
+              const allowedDeepViews = new Set([
+                "dashboard", "clients", "contracts", "line", "websites",
+                "systems", "products", "tasks", "support", "security"
+              ]);
+              const requestedInfraTab = new URLSearchParams(location.search).get("infra_tab");
+              if (["systems", "supabase", "workers", "github", "releases", "health"].includes(requestedInfraTab)) {
+                state.infraTab = requestedInfraTab;
+              }
+
+              await activateView(allowedDeepViews.has(deepView) ? deepView : "dashboard");'''
+          if old_enter in app:
+              app = app.replace(old_enter, new_enter, 1)
+          elif 'allowedDeepViews = new Set' not in app:
+              raise SystemExit("enterApplication target not found")
+
+          old_deep = '''  const ensureDeepLink = () => {
+              if (pageName() !== "index.html") return;'''
+          new_deep = '''  const ensureDeepLink = () => {
+              if (window.DPRO_CC_NATIVE_DEEPLINK === true) return;
+              if (pageName() !== "index.html") return;'''
+          if old_deep in shell:
+              shell = shell.replace(old_deep, new_deep, 1)
+          elif 'window.DPRO_CC_NATIVE_DEEPLINK === true' not in shell:
+              raise SystemExit("cc-shell ensureDeepLink target not found")
+
+          old_shell_src = './cc-shell-v2.js?v=DPRO-CC-UI-V2-CO02-CUSTOMER-WORKSPACE-R1-20260921'
+          new_shell_src = './cc-shell-v2.js?v=CONTROL-CENTER-DEEPLINK-R83-20261006'
+          if old_shell_src in config:
+              config = config.replace(old_shell_src, new_shell_src, 1)
+          elif new_shell_src not in config:
+              raise SystemExit("cc-shell cache key target not found")
+
+          old_app_src = 'app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-INFRA-TABS-R81-1-20261006'
+          new_app_src = 'app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-DEEPLINK-R83-20261006'
+          if old_app_src in index:
+              index = index.replace(old_app_src, new_app_src, 1)
+          elif new_app_src not in index:
+              raise SystemExit("app cache key target not found")
+
+          app_path.write_text(app, encoding="utf-8")
+          shell_path.write_text(shell, encoding="utf-8")
+          config_path.write_text(config, encoding="utf-8")
+          index_path.write_text(index, encoding="utf-8")
+
+      - name: Validate
+        shell: bash
+        run: |
+          node --check app-ui-v2-phase2d-r1.js
+          node --check cc-shell-v2.js
+          node --check config.js
+          grep -q 'DPRO_CC_NATIVE_DEEPLINK = true' app-ui-v2-phase2d-r1.js
+          grep -q 'allowedDeepViews = new Set' app-ui-v2-phase2d-r1.js
+          grep -q 'requestedInfraTab' app-ui-v2-phase2d-r1.js
+          grep -q 'DPRO_CC_NATIVE_DEEPLINK === true' cc-shell-v2.js
+          grep -q 'CONTROL-CENTER-DEEPLINK-R83-20261006' config.js
+          grep -q 'CONTROL-CENTER-DEEPLINK-R83-20261006' index.html
+
+      - name: Remove superseded R82 workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/control-center-multi-worker-r82.yml
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Fix CONTROL CENTER authenticated deep links R83"
+          git push
