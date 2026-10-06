@@ -556,7 +556,7 @@ window.DPRO_CC_SHELL_V2_ACTIVE = true;
   const install = () => {
     if (document.querySelector('script[data-cc-multi-worker-r2="true"]')) return;
     const script = document.createElement("script");
-    script.src = "./control-center-multi-worker-r2.js?v=CONTROL-CENTER-MULTI-WORKER-R2-20261004";
+    script.src = "./control-center-multi-worker-r2.js?v=CONTROL-CENTER-MULTI-WORKER-R2-1-20261006";
     script.defer = true;
     script.dataset.ccMultiWorkerR2 = "true";
     document.head.appendChild(script);

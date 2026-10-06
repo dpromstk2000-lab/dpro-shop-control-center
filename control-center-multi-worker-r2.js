@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "CONTROL-CENTER-MULTI-WORKER-R2-20261004";
+  const VERSION = "CONTROL-CENTER-MULTI-WORKER-R2.1-20261006";
   if (window.__DPRO_CC_MULTI_WORKER_R2__ === VERSION) return;
   window.__DPRO_CC_MULTI_WORKER_R2__ = VERSION;
 
@@ -22,7 +22,7 @@
   const normalizeWorkerUrl = (v) => { try { const u=new URL(String(v||"").trim()); if(!["https:","http:"].includes(u.protocol))return ""; u.pathname=u.pathname.replace(/\/api\/health\/?$/i,"").replace(/\/$/,""); u.search="";u.hash="";return u.href.replace(/\/$/,""); } catch { return ""; } };
   const healthFromWorker = (v) => { const b=normalizeWorkerUrl(v); return b?`${b}/api/health`:""; };
   const roleLabel = (r) => ROLE_LABELS[r] || r || "その他";
-  const canWrite = () => ["admin","technical_admin","owner","super_admin"].includes(String(state.staff?.role||""));
+  const canWrite = () => ["owner_admin","technical_admin"].includes(String(state.staff?.role_key||state.staff?.role||""));
 
   function ensureStyle(){
     if($("ccmw-r2-style")) return;
@@ -58,7 +58,7 @@
     const anonKey=pub.supabaseAnonKey||pub.supabase_anon_key;
     if(!supabaseUrl||!anonKey) throw new Error("Supabase公開設定を確認できません。");
     if(!window.supabase?.createClient) throw new Error("Supabase clientが読み込まれていません。");
-    state.supabase=window.supabase.createClient(supabaseUrl,anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+    state.supabase=window.supabase.createClient(supabaseUrl,anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storageKey:pub.sessionStorageKey||"dpro-control-center-auth-v1"}});
     const {data:{session}}=await state.supabase.auth.getSession();
     state.session=session||null;
     if(!state.session) throw new Error("管理センターへログインしてください。");
@@ -217,7 +217,7 @@
 
   async function refresh(){
     try{ await loadData(); renderWorkers(); enhanceSystems(); document.documentElement.dataset.ccMultiWorkerR2=VERSION; }
-    catch(e){ console.error("CONTROL CENTER Multi-Worker R2",e); }
+    catch(e){ console.error("CONTROL CENTER Multi-Worker R2",e); const root=$("workerOverview"); if(root){ root.innerHTML='<div class="empty-state"><strong>Worker台帳を読み込めません</strong><br><span>'+esc(e?.message||String(e))+'</span></div>'; } }
   }
 
   async function boot(){
