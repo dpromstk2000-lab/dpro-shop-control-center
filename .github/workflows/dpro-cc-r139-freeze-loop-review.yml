@@ -1,0 +1,179 @@
+name: DPRO CC R139 Freeze Loop Guard Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PREPARE_R139_FREEZE_REVIEW to create an isolated candidate branch
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dpro-cc-r139-freeze-review
+  cancel-in-progress: false
+
+jobs:
+  r139-review-only:
+    if: ${{ github.event.inputs.confirmation == 'PREPARE_R139_FREEZE_REVIEW' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main without changing runtime files
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Guard main source and prevent branch overwrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.ref }}" = 'refs/heads/main'
+          git diff --quiet
+          test "$(git hash-object control-center-multi-worker-r2.js)" = 'f5be359442201fd7e831482176697d50a65c53b7'
+          test "$(git hash-object center10-main-scope-r4.js)" = 'b464078c42970d275b1b5064542af68e3d2dadec'
+          if git ls-remote --exit-code --heads origin refs/heads/r139-control-center-freeze-loop-guard-20261011 >/dev/null 2>&1; then
+            echo 'R139_REVIEW_BRANCH_EXISTS: refuse overwrite'
+            exit 1
+          fi
+
+      - name: Patch only three observer feedback sites in two scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          def file_sha(path):
+              return subprocess.check_output(['git','hash-object',str(path)], text=True).strip()
+
+          def exactly_once(source, old, path):
+              count=source.count(old)
+              assert count == 1, f'{path}: expected exactly one match, found {count}'
+
+          worker=Path('control-center-multi-worker-r2.js')
+          dash=Path('center10-main-scope-r4.js')
+          assert worker.is_file() and dash.is_file(), 'SOURCE_FILES_MISSING'
+          assert file_sha(worker)=='f5be359442201fd7e831482176697d50a65c53b7','WORKER_SOURCE_DRIFT_STOP'
+          assert file_sha(dash)=='b464078c42970d275b1b5064542af68e3d2dadec','DASHBOARD_SOURCE_DRIFT_STOP'
+          w=worker.read_text(encoding='utf-8')
+          d=dash.read_text(encoding='utf-8')
+
+          old_worker='''    const observer=new MutationObserver(()=>{ if(!state.rendering){ renderWorkers(); enhanceSystems(); } });
+              if(workerRoot) observer.observe(workerRoot,{childList:true,subtree:true}); if(systemRoot) observer.observe(systemRoot,{childList:true,subtree:true});'''
+          new_worker='''    // R139: own DOM writes must never trigger a fresh observer-driven render.
+              let observer;
+              const observeRoots=()=>{
+                if(workerRoot) observer.observe(workerRoot,{childList:true,subtree:true});
+                if(systemRoot) observer.observe(systemRoot,{childList:true,subtree:true});
+              };
+              observer=new MutationObserver(()=>{
+                if(state.rendering) return;
+                observer.disconnect();
+                try { renderWorkers(); enhanceSystems(); }
+                finally { observeRoots(); }
+              });
+              observeRoots();'''
+          exactly_once(w,old_worker,str(worker))
+          w=w.replace(old_worker,new_worker)
+
+          old_dashboard='''      state.dashboardClientObserver = new MutationObserver(() => {
+                  if (!state.loaded) return;
+                  clearTimeout(state.refreshTimer);
+                  state.refreshTimer = setTimeout(() => {
+                    renderDashboardTasks();
+                    renderDashboardClients();
+                  },80);
+                });'''
+          new_dashboard='''      state.dashboardClientObserver = new MutationObserver(() => {
+                  if (!state.loaded) return;
+                  clearTimeout(state.refreshTimer);
+                  state.refreshTimer = setTimeout(() => {
+                    // R139: detach while rendering this observer's own target.
+                    state.dashboardClientObserver.disconnect();
+                    try {
+                      renderDashboardTasks();
+                      renderDashboardClients();
+                    } finally {
+                      state.dashboardClientObserver.observe(dashboardClients,{childList:true,subtree:true});
+                    }
+                  },80);
+                });'''
+          exactly_once(d,old_dashboard,str(dash))
+          d=d.replace(old_dashboard,new_dashboard)
+
+          # R139: the detail observer must not remove/recreate an unchanged demo note.
+          old_note='''    detail.querySelector(".c10-r4-scope-note[data-detail]")?.remove();'''
+          new_note='''    const existingNote = detail.querySelector(".c10-r4-scope-note[data-detail]");'''
+          old_demo_guard='''    if (!client || !isDemoClient(client)) return;'''
+          new_demo_guard='''    if (!client || !isDemoClient(client)) { existingNote?.remove(); return; }
+              if (existingNote?.dataset.clientCode === code) return;
+              existingNote?.remove();'''
+          old_note_data='''    note.dataset.detail = "true";'''
+          new_note_data='''    note.dataset.detail = "true";
+              note.dataset.clientCode = code;'''
+          for old in [old_note,old_demo_guard,old_note_data]: exactly_once(d,old,str(dash))
+          d=d.replace(old_note,new_note)
+          d=d.replace(old_demo_guard,new_demo_guard)
+          d=d.replace(old_note_data,new_note_data)
+
+          assert 'observer.disconnect();\n      try { renderWorkers(); enhanceSystems(); }' in w
+          assert 'state.dashboardClientObserver.disconnect();\n          try {' in d
+          assert 'existingNote?.dataset.clientCode === code' in d
+          assert 'note.dataset.clientCode = code;' in d
+          assert old_worker not in w and old_dashboard not in d
+          assert w.count('function renderWorkers()')==1
+          assert d.count('function markClientDetail()')==1
+          assert d.count('function renderDashboardClients()')==1
+          worker.write_text(w,encoding='utf-8')
+          dash.write_text(d,encoding='utf-8')
+          print('R139_SOURCE_PATCH_OK: two files only; three isolated self-loop guards')
+          PY
+
+      - name: Syntax and exact-scope QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check control-center-multi-worker-r2.js
+          node --check center10-main-scope-r4.js
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          names=set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())
+          expected={'control-center-multi-worker-r2.js','center10-main-scope-r4.js'}
+          assert names==expected, f'WRONG_FILES_CHANGED: {names}'
+          summary=subprocess.check_output(['git','diff','--stat'],text=True)
+          print('R139_SCOPE_QA_SUCCESS',summary)
+          PY
+
+      - name: Create review branch only never push main
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH=r139-control-center-freeze-loop-guard-20261011
+          git switch -c "$BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- control-center-multi-worker-r2.js center10-main-scope-r4.js
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git commit -m 'R139 review only: prevent control center observer render loops'
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo 'R139_REVIEW_BRANCH_CREATED: MAIN_UNCHANGED'
+
+      - name: Review links and safety summary
+        if: success()
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## R139 REVIEW CANDIDATE SUCCESS — MAIN RUNTIME UNCHANGED
+          - Three MutationObserver feedback guards in exactly **two frontend JS files**.
+          - No Worker API, Supabase, customer data, LINE, auth or database migrations.
+          - No automatic merge to main. **Review before production publishing.**
+          - [Compare R139 candidate with main](https://github.com/dpromstk2000-lab/dpro-shop-control-center/compare/main...r139-control-center-freeze-loop-guard-20261011?expand=1)
+          EOF
