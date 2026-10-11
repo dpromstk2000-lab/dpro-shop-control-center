@@ -1,0 +1,90 @@
+# R138 safe preview, manually invoked. No live branch update, database writes, Worker deploy or LINE.
+name: DPRO TAX R138 Control Center Official Links Candidate
+'on':
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type PREPARE_R138_TAX_LINK to create a review-only branch. main will NOT be changed.'
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: r138-control-center-tax-preview
+  cancel-in-progress: false
+jobs:
+  prepare-readonly-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Confirm manual execution on main
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "${{ github.event_name }}" = workflow_dispatch
+          test "${{ github.ref }}" = refs/heads/main
+          test "$CONFIRMATION" = PREPARE_R138_TAX_LINK
+      - name: Checkout control center main for preview only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Guard original and add two official links without changing product catalog/API
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYR138'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import subprocess
+          p=Path('index.html')
+          assert subprocess.check_output(['git','hash-object',str(p)],text=True).strip()=='c920f32f6ef9e0fa6127f990310698562132c62d','INDEX_DRIFT_REFUSE_UPDATE'
+          original=p.read_text(encoding='utf-8')
+          anchor='<div class="automation-note product-policy-note"><strong>標準方針</strong><span>GREENを基準実装として維持し、他の完成済み製品は契約成立時に顧客環境へ共通アダプターを適用します。全製品の今すぐの一斉改修は行いません。</span></div>'
+          card='\n          <!-- R138: read-only DPRO TAX public official guidance; no API writes. -->\n          <section class="panel" aria-labelledby="taxOfficialDemoHeading">\n            <div class="panel-head"><div>\n              <h2 id="taxOfficialDemoHeading">DPRO TAX｜公式紹介・体験デモ</h2>\n              <p>社内の案内確認用。お客様へはDPRO SHOP公式ページをご案内してください。</p>\n            </div></div>\n            <p>完全架空データの体験版です。実際の予約・送信・LINE連携や顧客データの取得は行いません。</p>\n            <div class="page-actions">\n              <a class="btn btn-primary" href="https://dpro-shop.com/systems/tax-accounting" target="_blank" rel="noopener noreferrer">公式製品紹介を開く</a>\n              <a class="btn btn-secondary" href="https://dpro-shop.com/systems/tax-demo/" target="_blank" rel="noopener noreferrer">架空デモを開く</a>\n            </div>\n          </section>'
+          assert original.count(anchor)==1,'PRODUCT_POLICY_ANCHOR_DRIFT'
+          assert 'id="taxOfficialDemoHeading"' not in original,'CARD_ALREADY_EXISTS'
+          updated=original.replace(anchor,anchor+card)
+          assert updated.replace(card,'')==original,'OUTSIDE_CARD_CHANGE'
+          assert updated.count('https://dpro-shop.com/systems/tax-accounting')==1
+          assert updated.count('https://dpro-shop.com/systems/tax-demo/')==1
+          assert 'github.io' not in card and 'workers.dev' not in card
+          class LinkParser(HTMLParser):
+            def __init__(self):super().__init__();self.links=[]
+            def handle_starttag(self,tag,attrs):
+              a=dict(attrs)
+              if tag=='a' and a.get('href','').startswith('https://dpro-shop.com/systems/tax-'):self.links.append(a)
+          parser=LinkParser();parser.feed(updated)
+          assert len(parser.links)==2,parser.links
+          assert all(a['target']=='_blank' and set(a['rel'].split()) >= {'noopener','noreferrer'} for a in parser.links)
+          assert original.count('id="view-products"')==1
+          assert original.count('id="productEditorForm"')==1
+          p.write_text(updated,encoding='utf-8')
+          print('R138 HTML SAFE: only read-only link card inserted, two official URLs, original controls unaffected')
+          PYR138
+          git diff --check
+          test "$(git diff --name-only)" = index.html
+      - name: Create only a new review branch; NEVER push to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH=r138-tax-control-center-readonly-links-20261011
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo 'R138_REVIEW_BRANCH_ALREADY_EXISTS: do not overwrite' >&2
+            exit 1
+          fi
+          git add -- index.html
+          test "$(git diff --cached --name-only)" = index.html
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'R138 review only: DPRO TAX official links in products view'
+          git push origin "HEAD:refs/heads/$BRANCH"
+          {
+            echo '## R138 review branch prepared — MAIN UNCHANGED'
+            echo ''
+            echo 'Only index.html adds an official-site link card; no database/Worker/LINE or production changes.'
+            echo ''
+            echo "[Compare with main](https://github.com/dpromstk2000-lab/dpro-shop-control-center/compare/main...$BRANCH?expand=1)"
+          } >> "$GITHUB_STEP_SUMMARY"
