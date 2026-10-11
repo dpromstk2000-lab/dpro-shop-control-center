@@ -562,11 +562,13 @@
     const detail = $("clientDetail");
     if (!detail) return;
 
-    detail.querySelector(".c10-r4-scope-note[data-detail]")?.remove();
+    const existingNote = detail.querySelector(".c10-r4-scope-note[data-detail]");
 
     const code = detail.querySelector(".client-code")?.textContent?.trim() || "";
     const client = state.clients.find((c) => String(c.client_code || "") === code);
-    if (!client || !isDemoClient(client)) return;
+    if (!client || !isDemoClient(client)) { existingNote?.remove(); return; }
+    if (existingNote?.dataset.clientCode === code) return;
+    existingNote?.remove();
 
     const hero = detail.querySelector(".detail-hero");
     if (!hero) return;
@@ -574,6 +576,7 @@
     const note = document.createElement("div");
     note.className = "c10-r4-scope-note";
     note.dataset.detail = "true";
+    note.dataset.clientCode = code;
     note.innerHTML = `
       <strong>DEMO / テスト顧客です。</strong>
       ダッシュボード本番件数・実契約制作・PRODUCTION本番登録の対象外です。
@@ -640,8 +643,14 @@
         if (!state.loaded) return;
         clearTimeout(state.refreshTimer);
         state.refreshTimer = setTimeout(() => {
-          renderDashboardTasks();
-          renderDashboardClients();
+          // R139: detach while rendering this observer's own target.
+          state.dashboardClientObserver.disconnect();
+          try {
+            renderDashboardTasks();
+            renderDashboardClients();
+          } finally {
+            state.dashboardClientObserver.observe(dashboardClients,{childList:true,subtree:true});
+          }
         },80);
       });
       state.dashboardClientObserver.observe(dashboardClients,{childList:true,subtree:true});
