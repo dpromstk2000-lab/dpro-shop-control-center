@@ -224,8 +224,19 @@
     ensureStyle(); ensureModal(); document.addEventListener("click",interceptLegacy,true);
     await refresh();
     const workerRoot=$("workerOverview"), systemRoot=$("systemOverview");
-    const observer=new MutationObserver(()=>{ if(!state.rendering){ renderWorkers(); enhanceSystems(); } });
-    if(workerRoot) observer.observe(workerRoot,{childList:true,subtree:true}); if(systemRoot) observer.observe(systemRoot,{childList:true,subtree:true});
+    // R139: own DOM writes must never trigger a fresh observer-driven render.
+    let observer;
+    const observeRoots=()=>{
+      if(workerRoot) observer.observe(workerRoot,{childList:true,subtree:true});
+      if(systemRoot) observer.observe(systemRoot,{childList:true,subtree:true});
+    };
+    observer=new MutationObserver(()=>{
+      if(state.rendering) return;
+      observer.disconnect();
+      try { renderWorkers(); enhanceSystems(); }
+      finally { observeRoots(); }
+    });
+    observeRoots();
     window.addEventListener("focus",()=>{ refresh(); },{passive:true});
   }
 
