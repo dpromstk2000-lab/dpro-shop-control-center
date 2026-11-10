@@ -17,6 +17,7 @@ window.DPRO_CC_NATIVE_DEEPLINK = true;
     mfaEnrollFactorId: null,
     clients: [],
     dashboard: null,
+    monitoring: null,
     pendingTasks: [],
     currentView: "dashboard",
     lineTab: "accounts",
@@ -320,13 +321,17 @@ window.DPRO_CC_NATIVE_DEEPLINK = true;
   }
 
   async function loadDashboard() {
-    const [summaryResult, taskResult] = await Promise.all([
+    const [summaryResult, taskResult, monitoringResult] = await Promise.all([
       state.supabase.from("cc_v_dashboard_summary").select("*").single(),
       state.supabase.from("cc_v_pending_work").select("*").order("due_at", { ascending: true, nullsFirst: false }).limit(8),
+      state.supabase.from("cc_v_monitoring_summary_r0").select("instance_attention,worker_attention,latest_check_at").single(),
     ]);
     if (summaryResult.error) throw summaryResult.error;
     if (taskResult.error) throw taskResult.error;
     state.dashboard = summaryResult.data;
+    // Monitoring staleness is a separate signal from the latest successful Health result.
+    // A monitoring query failure must never be shown as a healthy zero.
+    state.monitoring = monitoringResult.error ? { unavailable: true } : (monitoringResult.data || { unavailable: true });
     state.pendingTasks = taskResult.data || [];
     renderMetrics();
     renderDashboardTasks();
@@ -335,20 +340,30 @@ window.DPRO_CC_NATIVE_DEEPLINK = true;
 
   function renderMetrics() {
     const d = state.dashboard || {};
+    const m = state.monitoring;
+    const hasMonitoring = !!m && !m.unavailable;
+    const monitoredCount = (value) => hasMonitoring && Number.isFinite(Number(value)) ? Number(value) : null;
+    const instanceAttention = monitoredCount(m?.instance_attention);
+    const workerAttention = monitoredCount(m?.worker_attention);
     const metrics = [
       [d.active_clients, "運用中の顧客", "全契約サービス", ""],
       [d.active_line_accounts, "LINE公式運用", "アカウント数", ""],
-      [d.active_systems, "DPROシステム", "稼働・要確認", d.unhealthy_systems ? "warning" : ""],
+      [d.active_systems, "DPROシステム", "稼働登録", d.unhealthy_systems ? "warning" : ""],
       [d.public_websites, "公開ホームページ", "公開中", ""],
       [d.open_tasks, "未完了タスク", `回答待ち ${d.waiting_client_tasks || 0}件`, d.waiting_client_tasks ? "warning" : ""],
       [d.open_support_cases, "サポート案件", "未解決", d.open_support_cases ? "warning" : ""],
-      [d.unhealthy_systems, "システム異常", "警告・エラー", d.unhealthy_systems ? "danger" : ""],
+      [d.unhealthy_systems, "直近Health異常", "最終判定（監視期限は別）", d.unhealthy_systems ? "danger" : ""],
+      [instanceAttention, "導入先の監視要確認", hasMonitoring ? "異常・監視期限超過を含む／詳細へ" : "監視情報を取得できません／詳細へ", instanceAttention === null || instanceAttention > 0 ? "warning" : "", "monitor-center.html"],
+      [workerAttention, "Worker監視要確認", hasMonitoring ? "異常・監視期限超過を含む／詳細へ" : "監視情報を取得できません／詳細へ", workerAttention === null || workerAttention > 0 ? "warning" : "", "monitor-center.html"],
       [d.sync_errors, "連動エラー", "ホームページ等", d.sync_errors ? "danger" : ""],
       [d.active_reset_requests, "コード復旧中", "申請・発行中", d.active_reset_requests ? "warning" : ""],
     ];
-    $("metricGrid").innerHTML = metrics.map(([value, label, note, tone]) => `
-      <article class="metric-card ${tone}"><b>${Number(value || 0).toLocaleString("ja-JP")}</b><span>${escapeHtml(label)}</span><small>${escapeHtml(note)}</small></article>
-    `).join("");
+    $("metricGrid").innerHTML = metrics.map(([value, label, note, tone, link]) => {
+      const body = `<b>${value === null ? "—" : Number(value || 0).toLocaleString("ja-JP")}</b><span>${escapeHtml(label)}</span><small>${escapeHtml(note)}</small>`;
+      return link
+        ? `<a class="metric-card ${tone}" href="monitor-center.html" style="color:inherit;text-decoration:none;">${body}</a>`
+        : `<article class="metric-card ${tone}">${body}</article>`;
+    }).join("");
   }
 
   function renderDashboardTasks() {
