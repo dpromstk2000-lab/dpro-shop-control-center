@@ -17,6 +17,7 @@
     ["DPRO_FACTORY_STANDARD.json","現行標準項目・Feature Catalog・依存関係・FACTORY固定ルール。"],
     ["REFERENCE_PRODUCT.json","参考製品の製品台帳・Repository・READY・実装Feature・業種テンプレート。"],
     ["FACTORY_CHECKLIST.json","FACTORY V2チェックリストと任意の詳細設計。"],
+    ["DPRO_COMPLETION_PRIORITY_POLICY.txt","完成優先・開発停止条件・SYSTEM FINAL LOCKから商品化への引継ぎルール。"],
     ["STANDARD_LEARNING_RETURN_TEMPLATE.json","制作・ブラッシュアップで見つけた再利用可能な改善をCONTROL CENTERへ返すテンプレート。"],
     ["HANDOFF.txt","ChatGPTへ渡す開発指示・再利用・学習返却ルール。"],
     ["NEXT_ACTION.txt","ZIPを受け取ったChatGPTとユーザーの次の作業。"],
@@ -213,7 +214,8 @@
       "6. 技術仕様はMASTERと参考製品から解決し、ユーザーへは標準から決められない業務判断だけを質問する。",
       "7. 標準製品開発中は実顧客tenant・実患者データ・Secret・本番bindingを作らない。",
       "8. 再利用可能な新しい改善を得た場合はSTANDARD_LEARNING_RETURN_TEMPLATE.jsonを基に学習候補を返す。",
-      "9. 完成後は横断QA → FACTORY FINAL → 製品台帳 → Return ZIPまで進める。",
+      "9. DPRO_COMPLETION_PRIORITY_POLICY.txtを適用し、完成優先方式で安全な制作・検査を一括して進める。",
+      "10. 完成後はSYSTEM FINAL LOCKの証拠ZIPをCENTRALへ返し、商品化・掲載はPRODUCT RELEASE MASTER V1.2に接続する。",
       "",
       "最初にHANDOFF.txtを読み、その指示で作業を開始してください。",
       ""
@@ -240,12 +242,38 @@
       "- FACTORY_CHECKLISTは漏れ防止に使うが、ユーザーへ全項目の手入力を要求しない。",
       "- medical_data=trueの場合、業務に不要な病名・検査結果・処方内容等を保持・表示しない。",
       "- 実顧客tenant、実Owner、実患者、Secret、本番チャネルbindingは標準製品完成前に作らない。",
-      "- 本制作後は横断QA → FINAL 4/4 → 製品台帳登録 → FINAL LOCK/Return ZIPの順で進める。",
+      "- 本制作後は横断QA → FINAL 4/4 → SYSTEM FINAL LOCK/Return ZIPをCENTRALへ返却する。正式商品番号と中央製品台帳登録はCENTRALの権限で実施する。",
+      "- DPRO_COMPLETION_PRIORITY_POLICY.txtを先に読み、顧客固有の追加要求で契約前の標準製品完成を無期限に遅らせない。",
+      "- Official / Product / LP / A4 / ガイド / QRの最終公開とPRODUCT RELEASE COMPLETEは、SYSTEM FINAL LOCK後の別商品化工程で検査する。",
       "",
       "【MASTERへの学習返却】",
       "- 今回の制作/QA/ブラッシュアップで他DPROにも有効な改善を発見した場合、STANDARD_LEARNING_RETURN_TEMPLATE.jsonへ候補を記入する。",
       "- 特定顧客だけの要望はMASTERへ昇格させない。",
       "- CONTROL CENTERでレビュー・承認・昇格後、MASTER SHAが更新され、以後のFACTORY ZIPへ自動収録される。",
+      ""
+    ].join("\n");
+    const completionPriorityPolicy=[
+      "DPRO STANDARD PRODUCT COMPLETION PRIORITY POLICY R1 / 2026-11-10",
+      "",
+      "【目的】契約・導入時に提供できる標準製品を安全に完成させ、販促資料・中央公開までつなげる。顧客固有の要望は原則として契約後に実装する。",
+      "【基準の優先順】CONTROL CENTERの現行MASTER STANDARD / 固定FACTORY V2.0 / 本ファイルの完成優先運用。現行MASTERの安全・認証・権限基準を省略しない。",
+      "",
+      "【SYSTEM完成まで】",
+      "1. 業種の中核業務フロー、必要なOwner/Staff/Customer画面、保存、認証・権限、必要なLINE/WEB入口、デモを先に完成する。",
+      "2. 完成判定は事実に基づく。ローカルPASSだけで商用完成を宣言せず、隔離した実認証・DB書込・権限分離を対象範囲に応じて確認する。",
+      "3. 通常のローカル開発・修正・安全な隔離QA・ZIP更新をバージョンごとに承認確認せず、一連で進める。重要な判断、本番変更、費用、権限変更、顧客データ利用など必要なときだけ停止する。",
+      "4. 契約者専用のカスタマイズ、任意機能、過剰な細部ブラッシュアップはBACKLOGへ分離する。標準完成後の契約導入時に扱う。",
+      "5. 安全性や必須導線の未完了を隠さない。各報告はPASS/FAIL/SKIP、残ブロッカー、次のアクションを明記する。",
+      "6. 会話の大工程・QA完了・VERSION変更時は00_START_HERE、HANDOFF、STATUS、NEXT_ACTIONと最新成果物を含むZIP直下の再開パックを更新する。",
+      "",
+      "【CENTRAL返却と商品化】",
+      "7. SYSTEM FINAL LOCKに達したら、ソース・コミットSHA・実行したQA・不明点を含む証拠ZIPをCENTRALへ返す。開発チャットが中央番号や公開商品件数を変更しない。",
+      "8. CENTRALはFACT LOCK・番号・商品事実を確定し、PRODUCT RELEASE MASTER V1.2による商品化開始ZIPを生成する。",
+      "9. Officialは価値・課題・料金/相談導線、Productは比較・実画面/LIVE DEMO、LP/A4/操作資料は共通の商品事実から派生させる。未実装機能や未確認価格を広告しない。",
+      "10. Official/Product/LP/A4/ガイド/QRを実公開で照合し、HEAD/Actions/Pages/Publicと人の最終確認後にPRODUCT RELEASE COMPLETEとする。",
+      "",
+      "【禁止】既存本番DBや他システムに書き込まない。正式商品番号を推測で発番しない。SYSTEM FINAL LOCKやPRODUCT RELEASE COMPLETEを証拠なしで宣言しない。",
+      "【操作案内】GitHubは用途別ZIPを展開し対象ファイルを指定位置へ、Cloudflareはユーザー指定の手動CMD/Wrangler方式で1コマンドずつ案内する。",
       ""
     ].join("\n");
     const nextAction=[
@@ -258,6 +286,7 @@
       "4. 標準から決められない業務判断だけ、ユーザーへ1つずつ確認する。",
       "5. ブラッシュアップで再利用可能な改善が出たらSTANDARD_LEARNING_RETURN.jsonとしてCONTROL CENTERへ返す。",
       "6. 制作開始後はCONTROL CENTERで制作中へ進め、完成時にFINAL Gateを実施する。",
+      "7. SYSTEM FINAL LOCKの返却後は、CENTRALの商品化・掲載ZIPを使い、Official・Product・LP・A4・ガイド・公開QAまで別工程で完了させる。",
       ""
     ].join("\n");
     return {
@@ -268,6 +297,7 @@
       "DPRO_FACTORY_STANDARD.json":pretty(standard),
       "REFERENCE_PRODUCT.json":pretty(reference),
       "FACTORY_CHECKLIST.json":pretty(checklist),
+      "DPRO_COMPLETION_PRIORITY_POLICY.txt":completionPriorityPolicy,
       "STANDARD_LEARNING_RETURN_TEMPLATE.json":pretty(learningTemplate),
       "HANDOFF.txt":handoff,
       "NEXT_ACTION.txt":nextAction
