@@ -1384,11 +1384,12 @@ window.DPRO_CC_NATIVE_DEEPLINK = true;
     const s=state.product.summary||{};
     const metrics=[
       [s.catalog_products||0,"製品台帳","現行DPRO製品"],
-      [s.completed_products||0,"完成製品","営業・契約対象"],
+      [s.completed_products||0,"完成製品","標準製品の完成数・導入判定は別"],
       [s.production_ready||0,"本番連動済み","GREEN基準実装"],
       [s.adapter_prepared||0,"事前準備済み","デモ・アダプター"],
       [s.on_contract||0,"契約時対応","一斉改修しない"],
       [s.needs_review||0,"要確認","仕様整理"],
+      [state.product.products.filter(x=>x.integration_status==="not_assessed").length,"未評価","連携・導入条件の確認待ち"],
       [s.priority_demos||0,"優先デモ","営業で使用"],
     ];
     $("productMetricGrid").innerHTML=metrics.map(([v,l,n])=>`<article class="metric-card ${l==="要確認"&&Number(v)>0?"danger":""}"><b>${v}</b><span>${l}</span><small>${n}</small></article>`).join("");
@@ -1410,7 +1411,7 @@ window.DPRO_CC_NATIVE_DEEPLINK = true;
   }
   function renderProductCatalog(){
     const rows=filteredProducts();$("productResultCount").textContent=`${rows.length}件を表示`;
-    $("productCatalogBoard").innerHTML=`<table><thead><tr><th>No.</th><th>製品</th><th>カテゴリ</th><th>連動方針</th><th>対応項目</th><th>次の作業</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${x.product_number}</strong><br><span class="client-code">${escapeHtml(x.product_code)}</span></td><td><strong>${escapeHtml(x.product_name)}</strong><br><span class="client-code">${escapeHtml(x.system_code)}</span>${safeUrl(x.product_page_url)?`<br><a class="small-link" href="${escapeHtml(x.product_page_url)}" target="_blank" rel="noopener">製品ページ</a>`:""}${safeUrl(x.demo_url)?` <a class="small-link" href="${escapeHtml(x.demo_url)}" target="_blank" rel="noopener">デモ</a>`:""}</td><td>${escapeHtml(x.category)}</td><td>${pill(productIntegrationLabels[x.integration_status]||x.integration_status,productStatusTone(x.integration_status))}<br><span class="client-code">${x.integration_status==="deferred_until_contract"?"契約後に適用":"標準を維持"}</span></td><td>${capabilityDots(x)}</td><td>${escapeHtml(x.next_action||"—")}</td><td><button class="infra-action" data-product-manifest="${escapeHtml(x.system_code)}">標準書</button>${["owner_admin","technical_admin"].includes(state.staff?.role_key)?` <button class="infra-action" data-product-edit="${escapeHtml(x.system_code)}">編集</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7">該当する製品はありません。</td></tr>'}</tbody></table>`;
+    $("productCatalogBoard").innerHTML=`<table><thead><tr><th>No.</th><th>製品</th><th>カテゴリ</th><th>連動方針</th><th>対応項目</th><th>次の作業</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${x.product_number}</strong><br><span class="client-code">${escapeHtml(x.product_code)}</span></td><td><strong>${escapeHtml(x.product_name)}</strong><br><span class="client-code">${escapeHtml(x.system_code)}</span>${safeUrl(x.product_page_url)?`<br><a class="small-link" href="${escapeHtml(x.product_page_url)}" target="_blank" rel="noopener">製品ページ</a>`:""}${safeUrl(x.demo_url)?` <a class="small-link" href="${escapeHtml(x.demo_url)}" target="_blank" rel="noopener">デモ</a>`:""}</td><td>${escapeHtml(x.category)}</td><td>${pill(productIntegrationLabels[x.integration_status]||x.integration_status,productStatusTone(x.integration_status))}<br><span class="client-code">${x.integration_status==="not_assessed"?"連携・READY監査待ち":x.integration_status==="deferred_until_contract"?"契約時設定が必要":"状態を確認"}</span></td><td>${capabilityDots(x)}</td><td>${escapeHtml(x.next_action||"—")}</td><td><button class="infra-action" data-product-manifest="${escapeHtml(x.system_code)}">標準書</button>${["owner_admin","technical_admin"].includes(state.staff?.role_key)?` <button class="infra-action" data-product-edit="${escapeHtml(x.system_code)}">編集</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7">該当する製品はありません。</td></tr>'}</tbody></table>`;
     bindProductRowActions();
   }
   function renderProductStandard(){
