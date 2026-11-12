@@ -1,0 +1,100 @@
+name: 'DPRO CENTRAL | 製品READY表示の適正化 V1.6'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/dpro-central-readiness-ui-v16.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dpro-central-readiness-ui-v16
+  cancel-in-progress: false
+jobs:
+  correct-readiness-labels:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out the exact main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Check sources and make a minimal patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          
+          # Git blob SHA is the actual GitHub blob hash (git hash-object), not SHA256.
+          files = {
+              'app-ui-v2-phase2d-r1.js': '5dd35d654603c2fe6e8358b56e77c03428388559',
+              'index.html': 'c32ea52a9f3ed324bb0fe12b586318e8d7d61b61',
+          }
+          replacements = {
+              'app-ui-v2-phase2d-r1.js': [
+                  ('[s.completed_products||0,"完成製品","営業・契約対象"],',
+                   '[s.completed_products||0,"完成製品","標準製品の完成数・導入判定は別"],'),
+                  ('[s.needs_review||0,"要確認","仕様整理"],',
+                   '[s.needs_review||0,"要確認","仕様整理"],\n      [state.product.products.filter(x=>x.integration_status==="not_assessed").length,"未評価","連携・導入条件の確認待ち"],'),
+                  ('${x.integration_status==="deferred_until_contract"?"契約後に適用":"標準を維持"}',
+                   '${x.integration_status==="not_assessed"?"連携・READY監査待ち":x.integration_status==="deferred_until_contract"?"契約時設定が必要":"状態を確認"}'),
+              ],
+              'index.html': [
+                  ('app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-DEEPLINK-R83-MONITOR-HOME-R1-20261110',
+                   'app-ui-v2-phase2d-r1.js?v=CONTROL-CENTER-READINESS-UI-V16-20261112'),
+              ],
+          }
+          for name, expected_git_blob in files.items():
+              p = Path(name)
+              if not p.is_file():
+                  raise SystemExit(f'STOP: missing {name}; no changes pushed')
+              old = p.read_text(encoding='utf-8')
+              actual_git_blob = subprocess.check_output(['git', 'hash-object', str(p)],text=True).strip()
+              edits = replacements[name]
+              already_patched = all(old.count(new) == 1 and (old.count(old_s) == 1 if old_s in new else old.count(old_s) == 0) for old_s, new in edits)
+              if already_patched:
+                  print(f'Already patched: {name}')
+                  continue
+              if actual_git_blob != expected_git_blob:
+                  raise SystemExit(f'STOP: {name} differs from tested GitHub source ({actual_git_blob}); review before applying')
+              result = old
+              for before, after in edits:
+                  count = result.count(before)
+                  if count != 1:
+                      raise SystemExit(f'STOP: expected exactly one match in {name}, found {count}; no overwrite')
+                  result = result.replace(before, after, 1)
+              assert result != old
+              p.write_text(result, encoding='utf-8', newline='')
+              print(f'Patched: {name}; {len(old)} -> {len(result)} chars')
+          PY
+      - name: Verify JavaScript syntax, expected text and patch boundaries
+        shell: bash
+        run: |
+          node --check app-ui-v2-phase2d-r1.js
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app-ui-v2-phase2d-r1.js').read_text(encoding='utf-8')
+          h=Path('index.html').read_text(encoding='utf-8')
+          assert s.count('"標準製品の完成数・導入判定は別"')==1
+          assert s.count('"未評価","連携・導入条件の確認待ち"')==1
+          assert s.count('連携・READY監査待ち')==1
+          assert h.count('CONTROL-CENTER-READINESS-UI-V16-20261112')==1
+          print('QA PASS: 4 checks + node --check + git diff --check')
+          PY
+      - name: Commit only two reviewed UI files
+        shell: bash
+        run: |
+          if git diff --quiet -- app-ui-v2-phase2d-r1.js index.html; then
+            echo 'No changes; already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- app-ui-v2-phase2d-r1.js index.html
+          git commit -m 'fix(control-center): distinguish completed and deployment-ready products'
+          git push origin HEAD:main
