@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123b2b">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests">
+  <title>DPRO共通認証｜管理者保守の隔離検証</title>
+  <link rel="stylesheet" href="auth-standard-qa.css?v=1.2.0">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="auth-standard-qa.js?v=1.2.0"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"><div class="brand"><span class="emblem">D</span><div><strong>DPRO SHOP</strong><small>CONTROL CENTER</small></div></div>
+    <span class="status-pill">独立認証・隔離QA</span>
+    <nav aria-label="関連画面"><a href="index.html">統合管理に戻る</a><a href="system-check.html">接続確認</a></nav>
+    <p class="side-note">この画面は架空店舗の認証検証用です。実店舗の設定や顧客データの変更はできません。</p>
+  </aside>
+  <main class="main">
+    <p class="eyebrow">DPRO AUTH STANDARD / STAGED INTEGRATION V1.2.0</p>
+    <h1>DPRO管理者の保守アクセス</h1>
+    <p class="lead">DPRO SHOPの管理者認証を確認し、隔離されたCloudflare Access検証環境を開きます。</p>
+    <section class="card" aria-labelledby="auth-header">
+      <h2 id="auth-header">① CONTROL CENTER 本人確認</h2>
+      <p id="auth-status" role="status" aria-live="polite">DPRO SHOP管理者のログイン状態を確認しています。</p>
+      <p class="subnote">既存のSupabase認証とMFAを使用します。パスワード・セッショントークンはこのページから送信しません。</p>
+      <div class="actions"><button type="button" id="recheck" disabled>認証状態を再確認</button><a class="button secondary" href="index.html">CONTROL CENTERへ戻る</a></div>
+    </section>
+    <section class="card" aria-labelledby="qa-header">
+      <div class="card-title"><h2 id="qa-header">② 隔離QA管理画面</h2><span class="pass">実通信4/4 PASS</span></div>
+      <p>2026年11月13日時点の検査：許可操作・別店舗拒否・未付与権限拒否・失効セッション拒否。</p>
+      <p class="subnote">こちらはCloudflare Accessで別途本人確認します。CONTROL CENTERのログイン情報をWorkerへ引き渡す仕組みではありません。</p>
+      <a id="qa-link" class="button primary" href="https://dpro-auth-standard-qa.dpromstk2000.workers.dev/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>隔離QAの保守権限検証を開く</a>
+      <p id="qa-disabled" class="disabled-note">CONTROL CENTER側の本人確認が完了すると、隔離QAへの入口が表示されます。</p>
+    </section>
+    <section class="card" aria-labelledby="progress-header">
+      <h2 id="progress-header">③ 本番統合へ向けた進捗</h2>
+      <dl class="status-list"><div><dt>隔離ゲートウェイの権限4項目</dt><dd>PASS</dd></div><div><dt>既存CONTROL CENTER認証</dt><dd>維持</dd></div><div><dt>システム間の権限引き継ぎ</dt><dd>未実装</dd></div><div><dt>GREEN本番・オーナーSMS運用</dt><dd>未変更・本番検証待ち</dd></div></dl>
+    </section>
+    <p class="foot">本画面は表示・誘導専用。アクセス権限の最終判定は各バックエンドで行います。</p>
+  </main>
+</div>
+</body>
+</html>
