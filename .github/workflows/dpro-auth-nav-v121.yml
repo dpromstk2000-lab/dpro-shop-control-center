@@ -1,0 +1,124 @@
+name: DPRO AUTH Standard - Control Center Sidebar Link V1.2.1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: dpro-auth-sidebar-v121
+  cancel-in-progress: false
+
+jobs:
+  sidebar-link:
+    name: Apply authenticated-sidebar QA link only
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard repository and branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "dpromstk2000-lab/dpro-shop-control-center"
+          test "$GITHUB_REF" = "refs/heads/main"
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Check known stable base and QA portal
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          test -f auth-standard-qa.html
+          test -f auth-standard-qa.js
+          test -f auth-standard-qa.css
+          echo "index blob: $(git hash-object index.html)"
+
+      - name: Add one navigation link without touching authentication code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          p = Path('index.html')
+          src = p.read_text(encoding='utf-8')
+          expected_blob = 'efff34feff82145c72490289e663a335dbab0c69'
+          observed_blob = subprocess.check_output(['git', 'hash-object', 'index.html'], text=True).strip()
+          link = '<a href="auth-standard-qa.html" aria-label="DPRO共通認証・保守アクセス">共通認証・保守アクセス</a>'
+          needle = '<div class="side-bottom">\n        <a href="system-check.html">接続確認</a>'
+          addition = '\n        ' + link
+
+          if link in src:
+              print('PASS: Sidebar link already exists. No changes required.')
+              raise SystemExit(0)
+          if observed_blob != expected_blob:
+              raise SystemExit('SAFETY STOP: index.html differs from reviewed version. No changes made.')
+          if src.count(needle) != 1:
+              raise SystemExit('SAFETY STOP: Authenticated sidebar anchor not uniquely found.')
+          if src.count('id="appShell"') != 1:
+              raise SystemExit('SAFETY STOP: Authenticated app shell not uniquely found.')
+          start = src.index('id="appShell"')
+          where = src.index(needle)
+          aside_end = src.find('</aside>', start)
+          if not (start < where < aside_end):
+              raise SystemExit('SAFETY STOP: Link is outside authenticated sidebar.')
+          dst = src.replace(needle, needle + addition, 1)
+          if dst.replace(addition, '', 1) != src or dst.count(link) != 1:
+              raise SystemExit('SAFETY STOP: Change is not exactly one sidebar link.')
+          p.write_text(dst, encoding='utf-8')
+          print('PASS: Added one link in logged-in sidebar only.')
+          PY
+
+      - name: Audit exact changed-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only)"
+          if [ -n "$changed" ] && [ "$changed" != 'index.html' ]; then
+            echo "SAFETY STOP: unexpected changed files: $changed" >&2
+            exit 1
+          fi
+          if [ -n "$changed" ]; then
+            git diff -- index.html
+          else
+            echo 'No change (already installed).'
+          fi
+
+      - name: Commit to main if changed
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- index.html; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'Navigation link already installed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- index.html
+          git commit -m 'feat(control-center): add common auth QA link to sidebar'
+          git push origin HEAD:main
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Request GitHub Pages rebuild for bot-authored commit
+        if: steps.commit.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds"; then
+            echo 'Pages rebuild requested.'
+          else
+            echo '::warning::Commit succeeded but Pages build trigger was rejected. Verify Pages and use a manual rebuild if needed.'
+          fi
