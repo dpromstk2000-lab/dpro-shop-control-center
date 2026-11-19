@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://dpro-shop-control-center-api.dpromstk2000.workers.dev https://dpro-owner-auth-general.dpromstk2000.workers.dev; form-action 'none'; base-uri 'none'; img-src 'self' data:">
+<title>DPRO MAINTENANCE #57｜内部オーナー初期登録</title>
+<style>
+:root{font-family:"Noto Sans JP",system-ui,sans-serif;color:#172d31;background:#f0f5f3}*{box-sizing:border-box}body{margin:0;min-height:100dvh;padding:20px;display:flex;justify-content:center;align-items:flex-start}.wrap{width:min(100%,560px)}.top{display:flex;align-items:center;justify-content:space-between;margin:5px 0 16px}.brand{font-size:20px;font-weight:850;color:#13543f}.back{font-size:14px;color:#23664f;text-decoration:none}.card{padding:25px;background:white;border:1px solid #d7e3dd;border-radius:18px;box-shadow:0 10px 35px #22432212}h1{font-size:24px;line-height:1.5;margin:0 0 8px}.intro{color:#51645d;font-size:14px;line-height:1.7;margin:0 0 20px}.status{font-size:14px;line-height:1.6;padding:12px;margin:12px 0;border-radius:10px;background:#edf5f0;color:#235c42;white-space:pre-wrap;overflow-wrap:anywhere}.status.err{background:#fff1f1;color:#9c2930}.status.warn{background:#fff6de;color:#7b4c08}.step{border-top:1px solid #e6eeea;padding-top:18px;margin-top:16px}.step h2{font-size:18px;margin:0 0 10px}.hint{color:#566a62;font-size:13px;line-height:1.6}.field{display:block;font-size:14px;font-weight:650;margin:15px 0 5px}.field input{margin-top:5px;width:100%;padding:12px;border:1px solid #a4bfb2;border-radius:9px;font-size:16px;color:#172d31}.btn{width:100%;margin:15px 0 0;padding:13px;border:0;border-radius:10px;background:#11654c;color:white;font-size:16px;font-weight:750;cursor:pointer}.btn:disabled{background:#9ba8a1;cursor:not-allowed}.small{color:#68766e;font-size:12px;line-height:1.7}.ok{color:#176348}.sensitive{background:#fff8e4;padding:11px;border-radius:10px;font-size:13px;line-height:1.6}[hidden]{display:none!important}
+</style>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="config.js"></script>
+<script defer src="r57-owner-activation.js"></script>
+</head>
+<body><main class="wrap">
+<div class="top"><div class="brand">DPRO SHOP</div><a class="back" href="./">統合管理ホームに戻る</a></div>
+<section class="card">
+<h1>MAINTENANCE #57<br>内部オーナー初期登録</h1>
+<p class="intro">既存の共通認証でSMS本人確認とパスワード登録を行います。作業はDPRO内部検証用です。本番の別会社・顧客データやQA環境には触れません。</p>
+<p class="sensitive">秘密鍵・SMSコード・パスワードをチャットに送らないでください。招待トークンはこの画面内でのみ保持し、URLや保存領域に書き込みません。</p>
+<div id="status" class="status warn" role="status" aria-live="polite">CONTROL CENTERの管理者ログイン状態を確認しています…</div>
+<div id="issue" class="step" hidden>
+<h2>① 本人確認済み管理者から招待発行</h2>
+<p class="hint">システム：MAINTENANCE<br>施設コード：<strong>r57-dpro-internal</strong><br>登録先：DPRO MAINTENANCE 内部検証（本番認証方式）</p>
+<label class="field">登録者の表示名<input id="ownerName" maxlength="80" value="DPRO管理者" autocomplete="off"></label>
+<button class="btn" id="issueBtn" type="button">内部検証用の招待を発行</button>
+<p class="small">この操作で既存の共通認証APIに有効期間24時間の招待を1件発行します。SMSの送信はまだ行いません。</p>
+</div>
+<div id="phoneStep" class="step" hidden><h2>② 携帯番号をSMSで確認</h2>
+<label class="field">SMSを受信できる携帯番号<input id="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="090-0000-0000"></label>
+<button class="btn" id="smsBtn" type="button">確認コードをSMSへ送信</button><p class="small">SMSにはサービス所定の費用が発生する場合があります。</p></div>
+<div id="otpStep" class="step" hidden><h2>③ SMS確認コード</h2>
+<label class="field">6桁のコード<input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+<button class="btn" id="verifyBtn" type="button">本人確認を完了する</button></div>
+<div id="passwordStep" class="step" hidden><h2>④ オーナー用パスワード設定</h2><p class="hint">DEMO用の「1234」は使わず、本番専用の強いパスワードを設定してください。</p>
+<label class="field">新しいパスワード<input id="password" type="password" autocomplete="new-password" minlength="12" maxlength="128"></label>
+<label class="field">同じパスワードを再入力<input id="passwordConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128"></label>
+<button class="btn" id="passwordBtn" type="button">パスワードを設定する</button></div>
+<div id="done" class="step" hidden><h2 class="ok">✓ オーナー登録が完了しました</h2><p>共通認証で本人確認とパスワード設定が完了しました。次はMAINTENANCE本番D1の会社・権限紐付けです。</p><p class="hint">この完了画面だけをスクリーンショットで送ってください。電話番号・秘密鍵・パスワードは送らないでください。</p></div>
+</section><p class="small">DPRO MAINTENANCE #57 / 管理者限定の登録補助画面。本番Workerは引き続き非公開です。</p>
+</main></body></html>
